@@ -1,0 +1,5 @@
+CompileFlags:
+  # CMake writes compile_commands.json into the preset's binary dir, which is a
+  # level deeper than clangd searches on its own. Point it at the Linux debug
+  # preset so clangd resolves SFML's headers.
+  CompilationDatabase: build/linux-debug

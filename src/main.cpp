@@ -1,9 +1,16 @@
 #include <SFML/Graphics.hpp>
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode({200, 200}), "SFML works!");
-    sf::CircleShape shape(100.f);
-    shape.setFillColor(sf::Color::Green);
+    sf::RenderWindow window(sf::VideoMode({1920, 1080}), "Horde game!");
+    sf::CircleShape shape(30);
+    shape.setOutlineColor(sf::Color::Green);
+    shape.setOutlineThickness(2);
+    shape.setFillColor(sf::Color::Transparent);
+
+    sf::Font font("arial.ttf");
+    sf::Text text(font);
+    text.setString("Hello Bailen!");
+    text.setCharacterSize(34);
 
     while (window.isOpen()) {
         while (const std::optional event = window.pollEvent()) {
