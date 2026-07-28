@@ -1,0 +1,46 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+NamespaceIndentation: None
+IndentCaseLabels: true
+
+# Braces on their own line
+BreakBeforeBraces: Allman
+
+ColumnLimit: 120
+
+# Pointers and references bind to the type: int* p, not int *p
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Keep short constructs expanded — easier to set breakpoints on
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# Includes: SFML headers first, then standard library
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<SFML/'
+    Priority: 1
+  - Regex: '^<.*\.h>'
+    Priority: 2
+  - Regex: '^<.*>'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4
+
+# Misc
+FixNamespaceComments: true
+SpaceAfterTemplateKeyword: false
+AlwaysBreakTemplateDeclarations: Yes
+EmptyLineBeforeAccessModifier: LogicalBlock
+SeparateDefinitionBlocks: Always

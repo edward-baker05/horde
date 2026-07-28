@@ -30,7 +30,7 @@ re-run the installer and choose "Git from the command line and also from 3rd-par
 ### 3. Clone and open
 
 ```
-git clone <repo-url>
+git clone https://github.com/edward-baker05/horde.git
 cd horde
 ```
 
@@ -100,6 +100,13 @@ sudo apt install -y cmake ninja-build g++ git \
 ```
 </details>
 
+Clone with:
+
+```sh
+git clone git@github.com:edward-baker05/horde.git
+cd horde
+```
+
 ### Build and run
 
 ```sh
@@ -118,6 +125,7 @@ Swap `linux-debug` for `linux-release` for an optimized build.
 horde/
 ├── CMakeLists.txt      build definition — add new .cpp files here
 ├── CMakePresets.json   shared build configurations
+├── .clang-format       shared code style
 └── src/
     └── main.cpp        entry point
 ```
@@ -145,6 +153,26 @@ to be listed.
 
 **Change the SFML version** — edit `GIT_TAG` in `CMakeLists.txt`, then delete `build/` and
 reconfigure.
+
+## Code style
+
+Formatting is defined by `.clang-format` (4-space indent, braces on their own line,
+120-column limit) so that everyone's editor produces identical output and diffs stay
+free of formatting noise.
+
+Enable format-on-save — no extra setup is needed, since every editor below finds
+`.clang-format` automatically:
+
+- **Visual Studio** — works out of the box. `Tools > Options > Text Editor > C/C++ >
+  Formatting` confirms ClangFormat is enabled.
+- **VS Code** — the C/C++ extension includes clang-format. Set `"editor.formatOnSave": true`.
+- **CLion** — prompts to enable ClangFormat when it detects the file; accept.
+
+To format from the command line:
+
+```sh
+clang-format -i src/*.cpp src/*.hpp
+```
 
 ## Troubleshooting
 
