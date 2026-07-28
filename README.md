@@ -156,7 +156,7 @@ reconfigure.
 
 ## Code style
 
-Formatting is defined by `.clang-format` (4-space indent, braces on their own line,
+Formatting is defined by `.clang-format` (4-space indent, opening braces on the same line,
 120-column limit) so that everyone's editor produces identical output and diffs stay
 free of formatting noise.
 

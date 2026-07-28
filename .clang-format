@@ -10,8 +10,8 @@ AccessModifierOffset: -4
 NamespaceIndentation: None
 IndentCaseLabels: true
 
-# Braces on their own line
-BreakBeforeBraces: Allman
+# Braces on the same line as the statement
+BreakBeforeBraces: Attach
 
 ColumnLimit: 120
 
