@@ -7,7 +7,7 @@ int main() {
     shape.setOutlineThickness(2);
     shape.setFillColor(sf::Color::Transparent);
 
-    sf::Font font("arial.ttf");
+    sf::Font font("fonts/LiberationSans-Regular.ttf");
     sf::Text text(font);
     text.setString("Hello Bailen!");
     text.setCharacterSize(34);

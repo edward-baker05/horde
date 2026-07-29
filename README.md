@@ -8,6 +8,25 @@ and Git — plus, on Linux, SFML's own build dependencies.
 
 ---
 
+## Quick build & run
+
+Once the one-time platform setup below is done, this configures, builds, and runs
+`horde` in a single step:
+
+```sh
+./build.sh debug      # or: ./build.sh release
+```
+
+```powershell
+.\build.ps1 debug     # or: .\build.ps1 release
+```
+
+`build.sh` (macOS/Linux) and `build.ps1` (Windows) detect the current platform and pick
+the matching CMake preset automatically. The first run of each takes a while, since
+that's when SFML is downloaded and compiled.
+
+---
+
 ## Windows setup
 
 ### 1. Install Visual Studio 2022
@@ -119,16 +138,55 @@ Swap `linux-debug` for `linux-release` for an optimized build.
 
 ---
 
+## macOS setup
+
+```sh
+xcode-select --install
+brew install cmake ninja git
+```
+
+`xcode-select --install` installs Apple's Command Line Tools, which provide the Clang
+compiler used to build both SFML and this project. `brew` is [Homebrew](https://brew.sh) —
+install it first if you don't already have it.
+
+Clone with:
+
+```sh
+git clone git@github.com:edward-baker05/horde.git
+cd horde
+```
+
+### Build and run
+
+```sh
+cmake --preset macos-debug
+cmake --build --preset macos-debug
+./build/macos-debug/bin/horde
+```
+
+Swap `macos-debug` for `macos-release` for an optimized build.
+
+---
+
 ## Project layout
 
 ```
 horde/
 ├── CMakeLists.txt      build definition — add new .cpp files here
 ├── CMakePresets.json   shared build configurations
+├── build.sh            quick build & run script (macOS/Linux)
+├── build.ps1           quick build & run script (Windows)
 ├── .clang-format       shared code style
+├── fonts/              bundled fonts (see licensing note below)
 └── src/
     └── main.cpp        entry point
 ```
+
+The bundled font is [Liberation Sans](https://github.com/liberationfonts/liberation-fonts),
+used in place of Arial. Arial itself is proprietary and can't be redistributed in this
+repo, but Liberation Sans is metrically compatible with it and licensed under the SIL
+Open Font License — see `fonts/LICENSE.txt`. A copy is placed next to the built
+executable automatically as part of the build.
 
 Builds go to `build/<preset-name>/`, and the executable to that directory's `bin/`.
 On Windows (a multi-config generator) there's an extra level: `bin/Debug/horde.exe`.
