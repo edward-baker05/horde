@@ -3,6 +3,8 @@
 #include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_log.h>
 
+#include <iostream>
+
 #include "core/Paths.hpp"
 
 namespace horde::gfx {

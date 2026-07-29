@@ -22,11 +22,6 @@ bool ImGuiLayer::init(gfx::GpuContext& gpu) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    // Keyboard nav is deliberately NOT enabled. It auto-focuses a widget on the
-    // first frame, so a stray key press reaching the window activates whatever
-    // button happens to be focused — which for a game means gameplay keys
-    // pressing menu buttons. Enable it only for tool panels that need it.
-
     ImGui::StyleColorsDark();
 
     // The bundled Liberation Sans, so tool panels look the same on every
