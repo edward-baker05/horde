@@ -44,15 +44,14 @@ horde_add_shaders(horde)
 
 # Runtime files live next to the executable so that SDL_GetBasePath() finds them
 # regardless of the working directory the game is launched from.
-add_custom_target(horde_runtime_files ALL
+add_custom_command(TARGET horde POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/assets
         $<TARGET_FILE_DIR:horde>/assets
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled
         $<TARGET_FILE_DIR:horde>/shaders
-    COMMENT "Copying assets and compiled shaders next to horde")
+    COMMENT "Copying assets and compiled shaders next to horde binary")
 
-add_dependencies(horde_runtime_files horde)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT horde)

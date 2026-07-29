@@ -64,6 +64,7 @@ if(glm_FOUND)
     message(STATUS "horde: using system glm ${glm_VERSION}")
 else()
     message(STATUS "horde: no system glm, fetching ${HORDE_GLM_TAG}")
+    set(GLM_BUILD_LIBRARY OFF CACHE BOOL "" FORCE)
     set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(GLM_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(glm
