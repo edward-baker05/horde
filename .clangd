@@ -3,3 +3,8 @@ CompileFlags:
   # level deeper than clangd searches on its own. Point it at the Linux debug
   # preset so clangd resolves SDL3, ImGui and our own headers.
   CompilationDatabase: build/linux-debug
+
+  Remove:
+    - "-fmodules-ts"
+    - "-fmodule-mapper=*"
+    - "-fdeps-format=*"
