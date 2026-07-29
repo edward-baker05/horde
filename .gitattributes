@@ -1,0 +1,8 @@
+# Normalize all text files to LF, regardless of the platform or the
+# contributor's core.autocrlf setting, so CRLF never gets committed.
+* text=auto eol=lf
+
+# Explicitly mark binary files so git never attempts EOL conversion on them.
+*.png binary
+*.ttf binary
+*.spv binary
