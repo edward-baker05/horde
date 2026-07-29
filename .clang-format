@@ -25,18 +25,20 @@ AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
 
-# Includes: SFML headers first, then standard library
+# Includes: SDL3 first, then other third-party, then standard library, then our own
 SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '^<SFML/'
+  - Regex: '^<SDL3(_[a-z]+)?/'
     Priority: 1
-  - Regex: '^<.*\.h>'
+  - Regex: '^<(glm/|imgui)'
     Priority: 2
-  - Regex: '^<.*>'
+  - Regex: '^<.*\.h>'
     Priority: 3
-  - Regex: '.*'
+  - Regex: '^<.*>'
     Priority: 4
+  - Regex: '.*'
+    Priority: 5
 
 # Misc
 FixNamespaceComments: true

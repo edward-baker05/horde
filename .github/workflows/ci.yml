@@ -15,24 +15,82 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-        - { name: Windows,     os: windows-latest }
-        - { name: Linux GCC,   os: ubuntu-latest }
-        - { name: Linux Clang, os: ubuntu-latest, flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
-        - { name: macOS,       os: macos-latest  }
+        - { name: Windows,     os: windows-latest, preset: windows,      build_preset: windows-release }
+        - { name: Linux GCC,   os: ubuntu-latest,  preset: linux-release, build_preset: linux-release }
+        - { name: Linux Clang, os: ubuntu-latest,  preset: linux-release, build_preset: linux-release,
+            flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
+        - { name: macOS,       os: macos-latest,   preset: macos-release, build_preset: macos-release }
         config:
         - { name: Shared, flags: -DBUILD_SHARED_LIBS=TRUE }
         - { name: Static, flags: -DBUILD_SHARED_LIBS=FALSE }
 
     steps:
-    - name: Install Linux Dependencies
+    # Ubuntu runners have no SDL3 package, so CMake falls back to building SDL3
+    # from source. These are SDL3's own build dependencies: Wayland and X11
+    # video backends, plus audio. No shader toolchain is needed — the compiled
+    # shaders are committed.
+    - name: Install Linux dependencies
       if: runner.os == 'Linux'
-      run: sudo apt-get update && sudo apt-get install -y libxrandr-dev libxcursor-dev libxi-dev libudev-dev libflac-dev libvorbis-dev libgl1-mesa-dev libegl1-mesa-dev libfreetype-dev libharfbuzz-dev libmbedtls-dev libssh2-1-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build \
+          libwayland-dev wayland-protocols libxkbcommon-dev libdecor-0-dev \
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev \
+          libgl1-mesa-dev libegl1-mesa-dev libasound2-dev libpulse-dev libudev-dev
+
+    - name: Install macOS dependencies
+      if: runner.os == 'macOS'
+      run: brew install ninja
 
     - name: Checkout
       uses: actions/checkout@v6
 
+    # Uses the presets rather than a bare `cmake -B build` so that preset drift
+    # is actually caught by CI.
     - name: Configure
-      run: cmake -B build ${{matrix.platform.flags}} ${{matrix.config.flags}}
+      run: cmake --preset ${{ matrix.platform.preset }} ${{ matrix.platform.flags }} ${{ matrix.config.flags }}
 
     - name: Build
-      run: cmake --build build --config Release
+      run: cmake --build --preset ${{ matrix.platform.build_preset }}
+
+  # Every shader format we ship must be reproducible from shaders/src/. This job
+  # rebuilds SPIR-V and MSL and fails if the committed artifacts have drifted.
+  # It is separate because building shadercross means building
+  # DirectXShaderCompiler, which is slow and should not gate the normal builds.
+  shaders:
+    name: Shaders reproducible
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build cmake libsdl3-dev || \
+          sudo apt-get install -y ninja-build cmake
+
+    - name: Cache shadercross
+      id: cache-shadercross
+      uses: actions/cache@v4
+      with:
+        path: tools/bin
+        key: shadercross-${{ runner.os }}-v1
+
+    - name: Build shadercross
+      if: steps.cache-shadercross.outputs.cache-hit != 'true'
+      run: ./tools/build_shadercross.sh
+
+    - name: Recompile shaders
+      run: |
+        cmake --preset linux-release
+        cmake --build --preset linux-release --target horde_shaders
+
+    - name: Check for drift
+      run: |
+        if ! git diff --quiet -- shaders/compiled; then
+          echo "Committed shaders differ from a fresh compile of shaders/src:"
+          git --no-pager diff --stat -- shaders/compiled
+          exit 1
+        fi

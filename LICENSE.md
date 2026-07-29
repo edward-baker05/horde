@@ -1,4 +1,4 @@
-# CMake SFML Project Licenses
+# horde Licenses
 
 *This software is available under 2 licenses -- choose whichever you prefer.*
 
@@ -29,7 +29,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-Copyright (c) 2022 Lukas D�rrenberger
+Copyright (c) 2022 Lukas Dürrenberger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -48,3 +48,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The build scaffolding in this repository began life as the
+[official SFML CMake template](https://github.com/SFML/cmake-sfml-project) by
+Lukas Dürrenberger, hence the dual licence above. The project has since migrated
+to SDL3 and no longer uses SFML.
+
+## Third-party components
+
+| Component | Licence | Where |
+| --- | --- | --- |
+| [SDL3](https://github.com/libsdl-org/SDL) | Zlib | system package or fetched at configure time |
+| [SDL3_image](https://github.com/libsdl-org/SDL_image) | Zlib | system package or fetched at configure time |
+| [Dear ImGui](https://github.com/ocornut/imgui) | MIT | fetched at configure time |
+| [glm](https://github.com/g-truc/glm) | MIT (Happy Bunny) | fetched at configure time |
+| [Liberation Sans](https://github.com/liberationfonts/liberation-fonts) | SIL OFL 1.1 | `assets/fonts/` — see `assets/fonts/LICENSE.txt` |

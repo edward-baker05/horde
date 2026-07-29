@@ -1,25 +1,18 @@
-#include <SFML/Graphics.hpp>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_main.h>
 
-int main() {
-    sf::RenderWindow window(sf::VideoMode({1920, 1080}), "Horde game!");
-    sf::CircleShape shape(30);
-    shape.setOutlineColor(sf::Color::Green);
-    shape.setOutlineThickness(2);
-    shape.setFillColor(sf::Color::Transparent);
+#include "app/App.hpp"
 
-    sf::Font font("fonts/LiberationSans-Regular.ttf");
-    sf::Text text(font);
-    text.setString("Hello Bailen!");
-    text.setCharacterSize(34);
+int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
 
-    while (window.isOpen()) {
-        while (const std::optional event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>())
-                window.close();
-        }
+    horde::app::App app;
 
-        window.clear();
-        window.draw(shape);
-        window.display();
+    if (!app.init(horde::app::AppConfig{})) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Startup failed");
+        return 1;
     }
+
+    return app.run();
 }

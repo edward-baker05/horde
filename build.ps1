@@ -11,9 +11,7 @@ $Config = if ($Mode -eq 'release') { 'Release' } else { 'Debug' }
 
 cmake --preset windows
 cmake --build --preset "windows-$Mode"
-Push-Location ".\build\windows\bin\$Config"
-try {
-    & ".\horde.exe"
-} finally {
-    Pop-Location
-}
+
+# No need to change directory first: assets and shaders are resolved relative to
+# the executable via SDL_GetBasePath(), not the working directory.
+& ".\build\windows\bin\$Config\horde.exe"

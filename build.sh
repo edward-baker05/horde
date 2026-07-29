@@ -25,5 +25,7 @@ PRESET="${PLATFORM}-${MODE}"
 
 cmake --preset "$PRESET"
 cmake --build --preset "$PRESET"
-cd "./build/${PRESET}/bin"
-exec "./horde"
+
+# No need to cd first: assets and shaders are resolved relative to the
+# executable via SDL_GetBasePath(), not the working directory.
+exec "./build/${PRESET}/bin/horde"

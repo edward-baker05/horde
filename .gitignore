@@ -6,3 +6,15 @@ out
 .vscode
 compile_commands.json
 CMakeUserPresets.json
+
+# Dear ImGui writes its saved panel layout next to wherever you launched from.
+imgui.ini
+
+# Locally built shader toolchain (tools/build_shadercross.sh). The compiled
+# shaders under shaders/compiled/ ARE committed — see cmake/Shaders.cmake.
+tools/bin
+tools/lib
+tools/lib64
+tools/include
+tools/share
+tools/.shadercross
