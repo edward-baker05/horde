@@ -84,7 +84,10 @@ jobs:
       id: cache-shadercross
       uses: actions/cache@v4
       with:
-        path: tools/bin
+        path: |
+          tools/bin
+          tools/lib
+          tools/lib64
         key: shadercross-${{ runner.os }}-${{ hashFiles('tools/build_shadercross.sh') }}
 
     - name: Build shadercross
