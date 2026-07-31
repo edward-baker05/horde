@@ -75,7 +75,7 @@ function(horde_add_shaders TARGET)
                 OUTPUT "${output}"
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${HORDE_SHADER_OUTPUT_DIR}/${format}"
                 COMMAND "${HORDE_SHADERCROSS}" "${source}" -o "${output}"
-                DEPENDS "${source}"
+                DEPENDS "${source}" # This absolutely has the potential to break, edits to .hlsli files won't trigger recompilation - TODO 
                 COMMENT "shadercross ${stem} -> ${format}"
                 VERBATIM)
 
