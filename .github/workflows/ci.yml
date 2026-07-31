@@ -1,6 +1,13 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
@@ -15,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-        - { name: Windows,     os: windows-latest, preset: windows,      build_preset: windows-release }
+        - { name: Windows,     os: windows-2022, preset: windows,      build_preset: windows-release }
         - { name: Linux GCC,   os: ubuntu-latest,  preset: linux-release, build_preset: linux-release }
         - { name: Linux Clang, os: ubuntu-latest,  preset: linux-release, build_preset: linux-release,
             flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
@@ -68,15 +75,17 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ninja-build cmake libsdl3-dev || \
-          sudo apt-get install -y ninja-build cmake
+        sudo apt-get install -y ninja-build cmake \
+          libwayland-dev wayland-protocols libxkbcommon-dev libdecor-0-dev \
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev \
+          libgl1-mesa-dev libegl1-mesa-dev libasound2-dev libpulse-dev libudev-dev
 
     - name: Cache shadercross
       id: cache-shadercross
       uses: actions/cache@v4
       with:
         path: tools/bin
-        key: shadercross-${{ runner.os }}-v1
+        key: shadercross-${{ runner.os }}-${{ hashFiles('tools/build_shadercross.sh') }}
 
     - name: Build shadercross
       if: steps.cache-shadercross.outputs.cache-hit != 'true'

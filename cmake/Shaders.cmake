@@ -22,6 +22,7 @@ set(HORDE_SHADER_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled")
 find_program(HORDE_SHADERCROSS
     NAMES shadercross
     HINTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/bin"
+    NO_CACHE
     DOC "SDL_shadercross CLI, used to recompile HLSL shaders")
 
 # DXIL must be signed by dxil.dll, which only exists on Windows. DXIL produced
