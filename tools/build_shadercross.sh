@@ -48,6 +48,7 @@ if ! pkg-config --exists sdl3 2>/dev/null; then
             -DSDL_TEST_LIBRARY=OFF \
             -DSDL_X11=OFF \
             -DSDL_WAYLAND=OFF \
+            -DSDL_UNIX_CONSOLE_BUILD=ON \
             -DSDL_EXAMPLES=OFF
         cmake --build "${WORK}/sdl-build"
         cmake --install "${WORK}/sdl-build"
