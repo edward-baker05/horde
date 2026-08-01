@@ -4,6 +4,7 @@ out
 .idea
 .vs
 .vscode
+*.DS_Store
 compile_commands.json
 CMakeUserPresets.json
 
