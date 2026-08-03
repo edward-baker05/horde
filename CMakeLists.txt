@@ -1,57 +1,27 @@
-cmake_minimum_required(VERSION 3.28)
-project(horde LANGUAGES CXX VERSION 0.1.0)
+cmake_minimum_required(VERSION 3.16)
+project(testing)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+# Always emit compile_commands.json and keep a symlink to it at the repo
+# root, so clangd (and any other tool) finds an up-to-date database without
+# needing -DCMAKE_EXPORT_COMPILE_COMMANDS or manual steps after every
+# reconfigure.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+file(CREATE_LINK
+    "${CMAKE_BINARY_DIR}/compile_commands.json"
+    "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    SYMBOLIC
+)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+set(PROJECT_SOURCE_DIR src)
 
-include(Dependencies)
-include(Shaders)
+# This assumes the SDL source is available in vendored/SDL
+add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 
-# Add new source files here.
-add_executable(horde
-    src/main.cpp
-    src/app/App.cpp
-    src/core/Paths.cpp
-    src/gfx/Camera2D.cpp
-    src/gfx/GpuContext.cpp
-    src/gfx/ShaderLoader.cpp
-    src/gfx/SpriteBatch.cpp
-    src/gfx/Texture.cpp
-    src/scene/LevelScene.cpp
-    src/scene/MainMenuScene.cpp
-    src/scene/SceneStack.cpp
-    src/scene/TechTreeScene.cpp
-    src/ui/ImGuiLayer.cpp)
+# Create your game executable target as usual
+add_executable(testing WIN32 ${PROJECT_SOURCE_DIR}/main.cpp)
+target_include_directories(testing PRIVATE include)
 
-target_compile_features(horde PRIVATE cxx_std_20)
-target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(horde PRIVATE
-    SDL3::SDL3
-    SDL3_image::SDL3_image
-    glm::glm
-    imgui::imgui)
-
-if(MSVC)
-    target_compile_options(horde PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(horde PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-# Regenerates shaders/compiled/ when the shadercross CLI is available; a no-op
-# otherwise, since the compiled artifacts are committed.
-horde_add_shaders(horde)
-
-# Runtime files live next to the executable so that SDL_GetBasePath() finds them
-# regardless of the working directory the game is launched from.
-add_custom_command(TARGET horde POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
-        $<TARGET_FILE_DIR:horde>/assets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled
-        $<TARGET_FILE_DIR:horde>/shaders
-    COMMENT "Copying assets and compiled shaders next to horde binary")
-
-
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT horde)
+# Link to the actual SDL3 library.
+target_link_libraries(testing PRIVATE SDL3::SDL3)

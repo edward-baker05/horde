@@ -1,0 +1,8 @@
+/Users/edwardbaker/Documents/Code/horde/CMakeFiles/testing.dir
+/Users/edwardbaker/Documents/Code/horde/CMakeFiles/edit_cache.dir
+/Users/edwardbaker/Documents/Code/horde/CMakeFiles/rebuild_cache.dir
+/Users/edwardbaker/Documents/Code/horde/vendored/SDL/CMakeFiles/SDL3-shared.dir
+/Users/edwardbaker/Documents/Code/horde/vendored/SDL/CMakeFiles/SDL3_test.dir
+/Users/edwardbaker/Documents/Code/horde/vendored/SDL/CMakeFiles/SDL_uclibc.dir
+/Users/edwardbaker/Documents/Code/horde/vendored/SDL/CMakeFiles/edit_cache.dir
+/Users/edwardbaker/Documents/Code/horde/vendored/SDL/CMakeFiles/rebuild_cache.dir
