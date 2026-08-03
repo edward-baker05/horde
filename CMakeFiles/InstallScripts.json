@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/edwardbaker/Documents/Code/horde/cmake_install.cmake",
+		"/Users/edwardbaker/Documents/Code/horde/vendored/SDL/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
