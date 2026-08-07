@@ -8,6 +8,9 @@
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
 
+Circle circleOne = Circle(200, 300, 50, true);
+Circle circleTwo = Circle(200, 400, 50, false);
+
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (!SDL_CreateWindowAndRenderer("Test", 800, 600, SDL_WINDOW_FULLSCREEN, &window, &renderer)) {
         SDL_Log("Couldn't create window and renderer: %s", SDL_GetError());
@@ -30,12 +33,11 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 }
 
 SDL_AppResult SDL_AppIterate(void* appstate) {
-    SDL_SetRenderDrawColor(renderer, 105, 15, 15, SDL_ALPHA_OPAQUE);
+    SDL_SetRenderDrawColor(renderer, 15, 15, 15, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
-    Circle circle = Circle(50, 400, 300);
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderPoints(renderer, circle.points, 4000);
+    circleOne.draw(renderer, 255, 255, 0);
+    circleTwo.draw(renderer, 0, 0, 255);
 
     SDL_RenderPresent(renderer);
 
