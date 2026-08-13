@@ -17,45 +17,54 @@ App::~App() {
     shutdown();
 }
 
+//creating App init
 bool App::init(const AppConfig& config) {
     m_config = config;
 
+    // checking sdl can start drivers?
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init failed: %s", SDL_GetError());
         return false;
     }
-
+    //log graphics driver being used: Vulkan/DirectX/Metal
     SDL_Log("Video driver: %s", SDL_GetCurrentVideoDriver());
 
+    //creating the window with config from App.hpp header file, @see AppConfig
     m_window = SDL_CreateWindow(m_config.title, m_config.width, m_config.height,
                                 SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
+    // if m_window fails to complete properly, error out
     if (m_window == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
     }
-
+    // m_gpu is a gfx::GpuContext object created in App.hpp header file, @see GpuContext
     if (!m_gpu.init(m_window, m_config.gpuDebug)) {
         return false;
     }
 
+    //swap chain stuff, I presume methods to update displayed window from frame buffer
     SDL_SetGPUSwapchainParameters(m_gpu.device(), m_window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
                                   m_config.vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_MAILBOX);
 
+    //honestly no clue what this is doing, I think its assigning the gpu to @see ShaderLoader
     m_shaders = std::make_unique<gfx::ShaderLoader>(m_gpu.device());
 
+    // m_batch is a gfx::SpriteBatch object, I think it's for batching sprite draw calls and atlas stuff
     if (!m_batch.init(m_gpu.device(), *m_shaders, m_gpu.swapchainFormat())) {
         return false;
     }
-
+    // loads sprite atlas. I think we'll be using one large atlas at runtime, so I'd like to make
+    // a tool for creating the atlas from a set of sprite textures.
     if (!m_atlas.loadFromFile(m_gpu.device(), paths::asset("textures/atlas.png"))) {
         return false;
     }
-
+    // idk. TODO: figure this out
     if (!m_imgui.init(m_gpu)) {
         return false;
     }
 
+    // allocated services to a scene
     scene::Services services;
     services.gpu = &m_gpu;
     services.shaders = m_shaders.get();
@@ -79,15 +88,18 @@ int App::run() {
         const Uint64 now = SDL_GetTicksNS();
         // Clamped so a hitch or a dragged window does not teleport the
         // simulation on the next frame.
+        // TODO: This will need changing with more complex stuff, likely going to be moved to Logic/sim
         const float deltaTime = std::min(static_cast<float>(now - m_lastTicks) / 1.0e9f, 0.1f);
         m_lastTicks = now;
 
+        //? handles inputs maybe?
         pumpEvents();
 
         if (!m_running) {
             break;
         }
 
+        // App general update func
         update(deltaTime);
         render();
 
