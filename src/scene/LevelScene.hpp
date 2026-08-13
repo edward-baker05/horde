@@ -2,6 +2,8 @@
 
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
+#include <glm/glm.hpp>
+#include "Logic/UnitData.hpp"
 
 namespace horde::scene {
 
@@ -11,6 +13,7 @@ class LevelScene : public Scene {
 public:
     bool onEnter(Services& services) override;
     bool handleEvent(const SDL_Event& event) override;
+    void update(float dt) override;
     void render(gfx::SpriteBatch& batch) override;
     void debugUi() override;
     void onResize(float width, float height) override;
@@ -27,6 +30,13 @@ private:
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
+
+    size_t MaxUnits = 100;
+    UnitManager unit_manager{MaxUnits};
+
+
+    glm::vec2 level_size = {6000, 4000};
+    int enemy_size = 5;
 };
 
 } // namespace horde::scene

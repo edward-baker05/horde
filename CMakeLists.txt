@@ -22,7 +22,9 @@ add_executable(horde
     src/scene/MainMenuScene.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
-    src/ui/ImGuiLayer.cpp)
+    src/ui/ImGuiLayer.cpp
+        src/Logic/UnitData.cpp
+        src/Logic/UnitData.hpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
