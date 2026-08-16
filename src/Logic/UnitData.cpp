@@ -6,10 +6,15 @@
 
 UnitManager::UnitManager(const size_t MaxUnits) : MaxUnits(MaxUnits) {
     // does this once at startup
-    positions.resize(MaxUnits);
-    velocities.resize(MaxUnits);
-    health.resize(MaxUnits);
-    invMass.resize(MaxUnits);
+    Reserve(MaxUnits);
+}
+
+void UnitManager::Reserve(size_t newMaxUnits) {
+    MaxUnits = newMaxUnits;
+    positions.resize(newMaxUnits);
+    velocities.resize(newMaxUnits);
+    health.resize(newMaxUnits);
+    invMass.resize(newMaxUnits);
 }
 
 void UnitManager::UpdatePhysics(float dt) {
@@ -31,16 +36,21 @@ void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
     health[CurrentUnits] = hp;
     invMass[CurrentUnits] = invM;
 
-
     CurrentUnits++;
 }
 
-size_t UnitManager::GetCurrentUnits() const{
+size_t UnitManager::GetCurrentUnits() const {
     return CurrentUnits;
 }
-glm::vec2 UnitManager::GetPosition(size_t index) const{
+
+size_t UnitManager::GetMaxUnits() const {
+    return MaxUnits;
+}
+
+glm::vec2 UnitManager::GetPosition(size_t index) const {
     return positions[index];
 }
-const glm::vec2* UnitManager::GetPositionsPtr() const{
+
+const glm::vec2* UnitManager::GetPositionsPtr() const {
     return positions.data();
 }
