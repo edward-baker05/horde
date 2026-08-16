@@ -4,17 +4,19 @@
 #pragma once
 
 #include <vector>
-//TODO: test this
+// TODO: test this
 #define GLM_FORCE_INLINE
 #include <glm/glm.hpp>
-//TODO: test glm::vec2 vs custom 2vector implementation
-//glm has obvious benefits of including many functions but it may be bloated for what we're using it for, testing needed
 
-//TODO: compare data structure methods and their performance at scale. Metric: how many units can be simulated until i can no longer get 240fps.
-//Structure of Arrays, class containing arrays where index is the unit "ID".
-//Array of Structures, singular Unit structure contains all the info for an individual unit, then stored in a list.
+// TODO: test glm::vec2 vs custom 2vector implementation
+// glm has obvious benefits of including many functions but it may be bloated for what we're using it for, testing
+// needed
 
-//SoA based approach
+// TODO: compare data structure methods and their performance at scale. Metric: how many units can be simulated until i
+// can no longer get 240fps. Structure of Arrays, class containing arrays where index is the unit "ID". Array of
+// Structures, singular Unit structure contains all the info for an individual unit, then stored in a list.
+
+// SoA based approach
 class UnitManager {
 private:
     std::vector<glm::vec2> positions;
@@ -26,24 +28,28 @@ private:
     size_t CurrentUnits = 0;
     size_t MaxUnits;
 
-    //used in Uniform Grid for collisions.
+    // used in Uniform Grid for collisions.
     std::vector<int> CellHeads;
     std::vector<int> NextUnit;
 
 public:
-    //Constructor
+    // Constructor
     explicit UnitManager(size_t MaxUnits);
 
-    //Main loop
+    void Reserve(size_t newMaxUnits);
+
+    // Main loop
     void UpdatePhysics(float dt);
 
     void UpdatePositions(float dt);
 
     void SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM = 0.01f);
 
-    size_t GetCurrentUnits() const;
+    [[nodiscard]] size_t GetCurrentUnits() const;
 
-    glm::vec2 GetPosition(size_t index) const;
+    [[nodiscard]] size_t GetMaxUnits() const;
 
-    const glm::vec2* GetPositionsPtr() const;
+    [[nodiscard]] glm::vec2 GetPosition(size_t index) const;
+
+    [[nodiscard]] const glm::vec2* GetPositionsPtr() const;
 };
