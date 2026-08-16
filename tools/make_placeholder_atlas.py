@@ -25,8 +25,8 @@ CELL = SIZE // 2
 
 
 def disc(x, y, cx, cy, radius):
-    dx = x - cx
-    dy = y - cy
+    dx = (x + 0.5) - cx
+    dy = (y + 0.5) - cy
     return dx * dx + dy * dy <= radius * radius
 
 
@@ -36,7 +36,7 @@ def pixel(x, y):
     row = y // CELL
     lx = x % CELL
     ly = y % CELL
-    centre = (CELL - 1) / 2.0
+    centre = CELL / 2.0
 
     if (col, row) == (0, 0):
         # Bordered square: solid 2px frame, dim fill.
@@ -44,13 +44,13 @@ def pixel(x, y):
         return (255, 255, 255, 255 if edge else 190)
 
     if (col, row) == (1, 0):
-        return (255, 255, 255, 255 if disc(lx, ly, centre, centre, CELL * 0.42) else 0)
+        return (255, 255, 255, 255 if disc(lx, ly, centre, centre, CELL * 0.5) else 0)
 
     if (col, row) == (0, 1):
-        if not disc(lx, ly, centre, centre, CELL * 0.42):
+        if not disc(lx, ly, centre, centre, CELL * 0.5):
             return (255, 255, 255, 0)
         # Punch a diagonal slash out of the disc to read as "locked".
-        if abs((lx - ly)) <= 2:
+        if abs(lx - ly) <= 2:
             return (255, 255, 255, 60)
         return (255, 255, 255, 255)
 
