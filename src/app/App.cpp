@@ -17,7 +17,7 @@ App::~App() {
     shutdown();
 }
 
-//creating App init
+// creating App init
 bool App::init(const AppConfig& config) {
     m_config = config;
 
@@ -26,10 +26,10 @@ bool App::init(const AppConfig& config) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init failed: %s", SDL_GetError());
         return false;
     }
-    //log graphics driver being used: Vulkan/DirectX/Metal
+    // log graphics driver being used: Vulkan/DirectX/Metal
     SDL_Log("Video driver: %s", SDL_GetCurrentVideoDriver());
 
-    //creating the window with config from App.hpp header file, @see AppConfig
+    // creating the window with config from App.hpp header file, @see AppConfig
     m_window = SDL_CreateWindow(m_config.title, m_config.width, m_config.height,
                                 SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
@@ -43,11 +43,11 @@ bool App::init(const AppConfig& config) {
         return false;
     }
 
-    //swap chain stuff, I presume methods to update displayed window from frame buffer
+    // swap chain stuff, I presume methods to update displayed window from frame buffer
     SDL_SetGPUSwapchainParameters(m_gpu.device(), m_window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
                                   m_config.vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_MAILBOX);
 
-    //honestly no clue what this is doing, I think its assigning the gpu to @see ShaderLoader
+    // honestly no clue what this is doing, I think its assigning the gpu to @see ShaderLoader
     m_shaders = std::make_unique<gfx::ShaderLoader>(m_gpu.device());
 
     // m_batch is a gfx::SpriteBatch object, I think it's for batching sprite draw calls and atlas stuff

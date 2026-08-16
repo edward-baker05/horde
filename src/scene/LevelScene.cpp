@@ -18,10 +18,9 @@ bool LevelScene::onEnter(Services& services) {
 
     for (size_t i = 0; i < MaxUnits; ++i) {
         unit_manager.SpawnUnit(
-            //silly wrapping
-            glm::vec2(enemy_size*(i*enemy_size)/int(level_size.y),(i*enemy_size)%int(level_size.y)),
-            glm::vec2(80,0),
-            10);
+            // silly wrapping
+            glm::vec2(enemy_size * (i * enemy_size) / int(level_size.y), (i * enemy_size) % int(level_size.y)),
+            glm::vec2(80, 0), 10);
     }
 
     return true;
@@ -47,7 +46,7 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
     gfx::Sprite unit;
     unit.size = {enemy_size, enemy_size};
     unit.uv = gfx::atlasCell(1, 0, 2, 2);
-    //TODO: color could be determined from hp
+    // TODO: color could be determined from hp
     unit.color = {0.0f, 1.0f, 0.2f, 1.0f};
 
     const size_t unitCount = unit_manager.GetCurrentUnits();
@@ -57,7 +56,6 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
         unit.position = {positions[i], 0.0f};
         batch.draw(unit, m_services->atlas->handle());
     }
-
 }
 
 void LevelScene::debugUi() {

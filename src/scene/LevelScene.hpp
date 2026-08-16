@@ -1,9 +1,10 @@
 #pragma once
 
+#include <glm/glm.hpp>
+
+#include "Logic/UnitData.hpp"
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
-#include <glm/glm.hpp>
-#include "Logic/UnitData.hpp"
 
 namespace horde::scene {
 
@@ -31,9 +32,8 @@ private:
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
 
-    size_t MaxUnits = 100;
+    size_t MaxUnits = 1000000;
     UnitManager unit_manager{MaxUnits};
-
 
     glm::vec2 level_size = {6000, 4000};
     int enemy_size = 5;
