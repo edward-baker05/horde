@@ -69,9 +69,9 @@ void UnitManager::BuildUniformGrid() {
 // }
 
 void UnitManager::PopulateUniformGrid() {
-    for (int i : activeCells) {
+    for (int i : activeCells)
         cellHeads[i] = -1;
-    }
+    // std::ranges::fill(cellHeads, -1);
     activeCells.clear();
     int j = 0;
     for (int i = 0; i < currentUnits; ++i) {
