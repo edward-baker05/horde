@@ -25,8 +25,16 @@ private:
     std::vector<int> health;
     std::vector<float> invMass; // a*b more efficient than a/b
 
+    int unit_size;
+
     size_t CurrentUnits = 0;
     size_t MaxUnits;
+
+    // World bounds
+    glm::vec2 WorldOrigin = {0,0};
+    glm::vec2 WorldBounds;
+    glm::vec2 MaxP;
+    float Restitution = -1.0f;
 
     // used in Uniform Grid for collisions.
     std::vector<int> CellHeads;
@@ -34,17 +42,21 @@ private:
 
 public:
     // Constructor
-    explicit UnitManager(size_t MaxUnits);
+    explicit UnitManager(size_t MaxUnits, glm::vec2 WorldBounds, int unit_size);
 
     void Reserve(size_t newMaxUnits);
 
-    // Main loop
+    void SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM = 0.01f);
+
+    // Main Loop
     void UpdatePhysics(float dt);
 
     void UpdatePositions(float dt);
 
-    void SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM = 0.01f);
+    void ResolveCollisions();
 
+
+    // Getters and Setters
     [[nodiscard]] size_t GetCurrentUnits() const;
 
     [[nodiscard]] size_t GetMaxUnits() const;
