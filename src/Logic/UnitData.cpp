@@ -85,19 +85,6 @@ void UnitManager::ResolveCollisions() {
     ResolveEdgeCollisions();
 }
 
-// void UnitManager::ResolveEdgeCollisions() {
-//     for (size_t i = 0; i < currentUnits; ++i) {
-//         glm::vec2& pos = positions[i];
-//         glm::vec2& vel = velocities[i];
-//         if ((pos.x > maxP.x && vel.x > 0.0f) || (pos.x < worldOrigin.x && vel.x < 0.0f))
-//             vel.x *= restitution;
-//         if ((pos.y > maxP.y && vel.y > 0.0f) || (pos.y < worldOrigin.y && vel.y < 0.0f))
-//             vel.y *= restitution;
-//         pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-//         pos.y = std::clamp(pos.y, 0.0f, maxP.y);
-//     }
-// }
-
 void UnitManager::ResolveEdgeCollisions() {
     auto calculate = [&](int cellX, int cellY) {
         int id = cellY * gridCols + cellX;
@@ -121,28 +108,6 @@ void UnitManager::ResolveEdgeCollisions() {
         calculate(0, cellY);
         calculate(maxCol, cellY);
     }
-    // std::vector<int> edgeUnits{};
-    // for (int cellY = 1; cellY < maxRow; ++cellY) {
-    //     if (cellHeads[cellY * gridCols] != -1)
-    //         edgeUnits.push_back(cellHeads[cellY * gridCols]);
-    //     if (cellHeads[maxCol + cellY * gridCols] != -1)
-    //         edgeUnits.push_back(cellHeads[maxCol + cellY * gridCols]);
-    // }
-    //
-    // for (int i = nextUnit[0]; i != -1; i = nextUnit[i]) {
-    //     edgeUnits.push_back(nextUnit[i]);
-    // }
-    //
-    // for (int i : edgeUnits) {
-    //     glm::vec2& pos = positions[i];
-    //     glm::vec2& vel = velocities[i];
-    //     if ((pos.x > maxP.x && vel.x > 0.0f) || (pos.x < worldOrigin.x && vel.x < 0.0f))
-    //         vel.x *= restitution;
-    //     if ((pos.y > maxP.y && vel.y > 0.0f) || (pos.y < worldOrigin.y && vel.y < 0.0f))
-    //         vel.y *= restitution;
-    //     pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-    //     pos.y = std::clamp(pos.y, 0.0f, maxP.y);
-    // }
 }
 
 size_t UnitManager::GetCurrentUnits() const {
