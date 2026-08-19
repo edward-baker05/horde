@@ -32,12 +32,9 @@ inline glm::vec4 atlasCell(int column, int row, int columns, int rows, float tex
     const float cellWidth = 1.0f / static_cast<float>(columns);
     const float cellHeight = 1.0f / static_cast<float>(rows);
 
-    return {
-        static_cast<float>(column) * cellWidth + texelInset,
-        static_cast<float>(row) * cellHeight + texelInset,
-        static_cast<float>(column + 1) * cellWidth - texelInset,
-       static_cast<float>(row + 1) * cellHeight -texelInset
-    };
+    return {static_cast<float>(column) * cellWidth + texelInset, static_cast<float>(row) * cellHeight + texelInset,
+            static_cast<float>(column + 1) * cellWidth - texelInset,
+            static_cast<float>(row + 1) * cellHeight - texelInset};
 }
 
 // Draws textured quads with one draw call per run of consecutive sprites that
