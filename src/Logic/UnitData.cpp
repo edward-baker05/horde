@@ -84,18 +84,6 @@ void UnitManager::ResolveCollisions() {
 }
 
 void UnitManager::ResolveEdgeCollisions() {
-    // auto calculate = [&](int cellX, int cellY) {
-    //     for (int unitId = cellHeads[cellY * gridCols + cellX]; unitId != -1; unitId = nextUnit[unitId]) {
-    //         glm::vec2& pos = positions[unitId];
-    //         glm::vec2& vel = velocities[unitId];
-    //         if (pos.x > maxP.x || pos.x < worldOrigin.x)
-    //             vel.x *= restitution;
-    //         if (pos.y > maxP.y || pos.y < worldOrigin.y)
-    //             vel.y *= restitution;
-    //         pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-    //         pos.y = std::clamp(pos.y, 0.0f, maxP.y);
-    //     }
-    // };
     for (int cellX = 0; cellX < gridCols; ++cellX) {
         for (int unitId = cellHeads[cellX]; unitId != -1; unitId = nextUnit[unitId]) {
             glm::vec2& pos = positions[unitId];
