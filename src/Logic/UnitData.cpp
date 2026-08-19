@@ -84,27 +84,56 @@ void UnitManager::ResolveCollisions() {
 }
 
 void UnitManager::ResolveEdgeCollisions() {
-    auto calculate = [&](int cellX, int cellY) {
-        int id = cellY * gridCols + cellX;
-
-        for (int unitId = cellHeads[id]; unitId != -1; unitId = nextUnit[unitId]) {
+    // auto calculate = [&](int cellX, int cellY) {
+    //     for (int unitId = cellHeads[cellY * gridCols + cellX]; unitId != -1; unitId = nextUnit[unitId]) {
+    //         glm::vec2& pos = positions[unitId];
+    //         glm::vec2& vel = velocities[unitId];
+    //         if (pos.x > maxP.x || pos.x < worldOrigin.x)
+    //             vel.x *= restitution;
+    //         if (pos.y > maxP.y || pos.y < worldOrigin.y)
+    //             vel.y *= restitution;
+    //         pos.x = std::clamp(pos.x, 0.0f, maxP.x);
+    //         pos.y = std::clamp(pos.y, 0.0f, maxP.y);
+    //     }
+    // };
+    for (int cellX = 0; cellX < gridCols; ++cellX) {
+        for (int unitId = cellHeads[cellX]; unitId != -1; unitId = nextUnit[unitId]) {
             glm::vec2& pos = positions[unitId];
             glm::vec2& vel = velocities[unitId];
-            if ((pos.x > maxP.x && vel.x > 0.0f) || (pos.x < worldOrigin.x && vel.x < 0.0f))
-                vel.x *= restitution;
-            if ((pos.y > maxP.y && vel.y > 0.0f) || (pos.y < worldOrigin.y && vel.y < 0.0f))
+            if (pos.y < worldOrigin.y) {
                 vel.y *= restitution;
-            pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-            pos.y = std::clamp(pos.y, 0.0f, maxP.y);
+                pos.y = 0.f;
+            }
         }
-    };
-    for (int cellX = 0; cellX < gridCols; ++cellX) {
-        calculate(cellX, 0);
-        calculate(cellX, maxRow);
+
+        for (int unitId = cellHeads[maxRow * gridCols + cellX]; unitId != -1; unitId = nextUnit[unitId]) {
+            glm::vec2& pos = positions[unitId];
+            glm::vec2& vel = velocities[unitId];
+            if (pos.y > maxP.y) {
+                vel.y *= restitution;
+                pos.y = maxP.y;
+            }
+        }
     }
-    for (int cellY = 1; cellY < gridRows; ++cellY) {
-        calculate(0, cellY);
-        calculate(maxCol, cellY);
+
+    for (int cellY = 0; cellY < gridRows; ++cellY) {
+        for (int unitId = cellHeads[cellY * gridCols]; unitId != -1; unitId = nextUnit[unitId]) {
+            glm::vec2& pos = positions[unitId];
+            glm::vec2& vel = velocities[unitId];
+            if (pos.x < worldOrigin.x) {
+                vel.x *= restitution;
+                pos.x = 0.f;
+            }
+        }
+
+        for (int unitId = cellHeads[cellY * gridCols + maxCol]; unitId != -1; unitId = nextUnit[unitId]) {
+            glm::vec2& pos = positions[unitId];
+            glm::vec2& vel = velocities[unitId];
+            if (pos.x > maxP.x) {
+                vel.x *= restitution;
+                pos.x = maxP.x;
+            }
+        }
     }
 }
 
