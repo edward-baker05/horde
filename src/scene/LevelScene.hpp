@@ -32,11 +32,10 @@ private:
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
 
-
     size_t MaxUnits = 1000000;
     glm::vec2 level_size = {600, 400};
     int enemy_size = 5;
-    UnitManager unit_manager{MaxUnits,level_size,enemy_size};
+    UnitManager unit_manager{MaxUnits, level_size, enemy_size};
 };
 
 } // namespace horde::scene

@@ -23,20 +23,20 @@ private:
     std::vector<glm::vec2> velocities;
 
     std::vector<int> health;
-    std::vector<float> invMass; // a*b more efficient than a/b
+    std::vector<float> invMass;
 
     int unitSize;
     float cellSize;
-    float invCellSize = 1.0f / cellSize;
+    float invCellSize = 1.f / cellSize;
 
     size_t currentUnits = 0;
     size_t maxUnits;
 
     // World bounds
-    glm::vec2 worldOrigin = {0,0};
+    const glm::vec2 worldOrigin = {0, 0};
     glm::vec2 worldBounds;
     glm::vec2 maxP{};
-    float restitution = -1.0f;
+    float restitution = -1.f;
 
     // used in Uniform Grid for collisions.
     std::vector<int> cellHeads;
@@ -66,11 +66,6 @@ public:
     void UpdatePhysics(float dt);
 
     void UpdatePositions(float dt);
-
-    void ResolveCollisions();
-
-    void ResolveEdgeCollisions();
-
 
 
     // Getters and Setters
