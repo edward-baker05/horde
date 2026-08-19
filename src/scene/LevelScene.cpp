@@ -38,14 +38,14 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
     gfx::Sprite rectangle;
     rectangle.position = {0.0f, 0.0f, 0.0f};
     rectangle.size = level_size;
-    rectangle.uv = gfx::atlasCell(1, 1, 2, 2);
+    rectangle.uv = gfx::atlasCell(1, 1, 4, 4);
     rectangle.color = {0.35f, 0.65f, 0.9f, 1.0f};
 
     batch.draw(rectangle, m_services->atlas->handle());
 
     gfx::Sprite unit;
     unit.size = {enemy_size, enemy_size};
-    unit.uv = gfx::atlasCell(1, 0, 2, 2);
+    unit.uv = gfx::atlasCell(1, 0, 4, 4);
     // TODO: color could be determined from hp
     unit.color = {0.0f, 1.0f, 0.2f, 1.0f};
 
