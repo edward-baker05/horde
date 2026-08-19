@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "scene/EditorScene.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
 #include "scene/TechTreeScene.hpp"
@@ -31,6 +32,10 @@ void MainMenuScene::debugUi() {
 
     if (ImGui::Button("Upgrades", ImVec2(160.0f, 0.0f))) {
         m_services->scenes->push(std::make_unique<TechTreeScene>());
+    }
+
+    if (ImGui::Button("Level Editor", ImVec2(160.0f, 0.0f))) {
+        m_services->scenes->push(std::make_unique<EditorScene>());
     }
 
     ImGui::End();
