@@ -28,12 +28,16 @@ static_assert(sizeof(Sprite) == 64, "Sprite must match the HLSL struct layout");
 
 // UV rectangle for one cell of a uniform grid atlas, in the xy/zw form Sprite
 // expects.
-inline glm::vec4 atlasCell(int column, int row, int columns, int rows) {
+inline glm::vec4 atlasCell(int column, int row, int columns, int rows, float texelInset = 0.0001f) {
     const float cellWidth = 1.0f / static_cast<float>(columns);
     const float cellHeight = 1.0f / static_cast<float>(rows);
 
-    return {static_cast<float>(column) * cellWidth, static_cast<float>(row) * cellHeight,
-            static_cast<float>(column + 1) * cellWidth, static_cast<float>(row + 1) * cellHeight};
+    return {
+        static_cast<float>(column) * cellWidth + texelInset,
+        static_cast<float>(row) * cellHeight + texelInset,
+        static_cast<float>(column + 1) * cellWidth - texelInset,
+       static_cast<float>(row + 1) * cellHeight -texelInset
+    };
 }
 
 // Draws textured quads with one draw call per run of consecutive sprites that
