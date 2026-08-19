@@ -47,8 +47,8 @@ void UnitManager::PopulateUniformGrid() {
     activeCells.clear();
     for (int i = 0; i < (int)currentUnits; ++i) {
         const glm::vec2 pos = positions[i];
-        const int cellX = (int)(pos.x * invCellSize);
-        const int cellY = (int)(pos.y * invCellSize);
+        const int cellX = std::clamp((int)(pos.x * invCellSize), 0, maxCol);
+        const int cellY = std::clamp((int)(pos.y * invCellSize), 0, maxRow);
         const int cellIndex = cellX + cellY * gridCols;
 
         nextUnit[i] = cellHeads[cellIndex];
