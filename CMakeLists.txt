@@ -19,6 +19,8 @@ add_executable(horde
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
+    src/editor/EditorUi.cpp
+    src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp
     src/scene/SceneStack.cpp
