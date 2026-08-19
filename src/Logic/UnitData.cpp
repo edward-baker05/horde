@@ -39,12 +39,10 @@ void UnitManager::BuildUniformGrid() {
     maxCol = gridCols - 1;
     maxRow = gridRows - 1;
     cellHeads.assign(gridCols * gridRows, -1);
-    activeCells.clear();
 }
 
 void UnitManager::PopulateUniformGrid() {
     std::fill(cellHeads.begin(), cellHeads.end(), -1);
-    activeCells.clear();
     for (int i = 0; i < (int)currentUnits; ++i) {
         const glm::vec2 pos = positions[i];
         const int cellX = std::clamp((int)(pos.x * invCellSize), 0, maxCol);
