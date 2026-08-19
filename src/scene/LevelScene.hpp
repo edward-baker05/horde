@@ -2,8 +2,8 @@
 
 #include <glm/glm.hpp>
 
-#include "Logic/UnitData.hpp"
 #include "gfx/Camera2D.hpp"
+#include "logic/UnitData.hpp"
 #include "scene/Scene.hpp"
 
 namespace horde::scene {

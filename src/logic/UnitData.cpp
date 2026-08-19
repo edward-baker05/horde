@@ -6,10 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <execution>
-#include <set>
-
-#include "SDL3/SDL_log.h"
 
 UnitManager::UnitManager(const size_t MaxUnits, const glm::vec2 WorldBounds, const int unit_size)
     : unitSize(unit_size), cellSize(unit_size), maxUnits(MaxUnits), worldBounds(WorldBounds) {
