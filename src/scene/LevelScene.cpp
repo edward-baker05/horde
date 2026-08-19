@@ -1,4 +1,4 @@
-#include "scene/LevelScene.hpp"
+#include "LevelScene.hpp"
 
 #include <imgui.h>
 
