@@ -29,8 +29,8 @@ void UnitManager::Reserve(size_t newMaxUnits) {
 
 // Consider removing input to this function and have entire object be recreated to change.
 void UnitManager::SetWorldBounds(const glm::vec2 WorldBounds) {
-    const glm::vec2 r(unitSize);
-    maxP = WorldBounds - r;
+    // const glm::vec2 r(unitSize);
+    maxP = WorldBounds - glm::vec2(unitSize);
 }
 
 void UnitManager::BuildUniformGrid() {
