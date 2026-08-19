@@ -27,6 +27,8 @@ void UnitManager::Reserve(size_t newMaxUnits) {
     health.resize(newMaxUnits);
     invMass.resize(newMaxUnits);
     nextUnit.resize(newMaxUnits);
+    edgeUnits.resize(newMaxUnits);
+    activeCells.resize(newMaxUnits);
 }
 
 // Consider removing input to this function and have entire object be recreated to change.
@@ -36,24 +38,45 @@ void UnitManager::SetWorldBounds(const glm::vec2 WorldBounds) {
 }
 
 void UnitManager::BuildUniformGrid() {
-    gridCols = std::max(1, static_cast<int>(std::ceil(worldBounds.x / cellSize)));
-    gridRows = std::max(1, static_cast<int>(std::ceil(worldBounds.y / cellSize)));
+    gridCols = std::max(1, static_cast<int>(std::ceil(worldBounds.x * invCellSize)));
+    gridRows = std::max(1, static_cast<int>(std::ceil(worldBounds.y * invCellSize)));
     maxCol = gridCols - 1;
     maxRow = gridRows - 1;
     cellHeads.assign(gridCols*gridRows, -1);
     activeCells.clear();
 }
 
+// void UnitManager::PopulateUniformGrid() {
+//     for (int i : activeCells) {
+//         cellHeads[i] = -1;
+//     }
+//     activeCells.clear();
+//     for (int i = 0; i < currentUnits; ++i) {
+//         const glm::vec2& pos = positions[i];
+//         const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
+//         const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
+//         const int cellIndex = cellX + cellY * gridCols;
+//         int& cellHead = cellHeads[cellIndex];
+//         if (cellHead == -1) {
+//             activeCells.push_back(cellIndex);
+//         }
+//         nextUnit[i] = cellHead;
+//         cellHead = i;
+//     }
+// }
 void UnitManager::PopulateUniformGrid() {
     for (int i : activeCells) {
         cellHeads[i] = -1;
     }
     activeCells.clear();
+    edgeUnits.clear();
     for (int i = 0; i < currentUnits; ++i) {
         const glm::vec2& pos = positions[i];
         const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
         const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
         const int cellIndex = cellX + cellY * gridCols;
+        if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow)
+            edgeUnits.push_back(i);
         int& cellHead = cellHeads[cellIndex];
         if (cellHead == -1) {
             activeCells.push_back(cellIndex);
@@ -106,16 +129,6 @@ void UnitManager::ResolveCollisions() {
 // }
 
 void UnitManager::ResolveEdgeCollisions() {
-    std::vector<int> edgeUnits{};
-    for (int cellX = 0; cellX < gridCols; ++cellX) {
-        if (cellHeads[cellX] != -1) edgeUnits.push_back(cellHeads[cellX]);
-        if (cellHeads[cellX + maxRow*gridCols] != -1) edgeUnits.push_back(cellHeads[cellX + maxRow*gridCols]);
-    }
-    for (int cellY = 1; cellY < maxRow; ++cellY) {
-        if (cellHeads[cellY*gridCols] != -1) edgeUnits.push_back(cellHeads[cellY*gridCols]);
-        if (cellHeads[maxCol + cellY*gridCols] != -1) edgeUnits.push_back(cellHeads[maxCol + cellY*gridCols]);
-    }
-
     for (int i : edgeUnits) {
         glm::vec2& pos = positions[i];
         glm::vec2& vel = velocities[i];
