@@ -42,6 +42,7 @@ private:
     std::vector<int> cellHeads;
     std::vector<int> nextUnit;
     std::vector<int> activeCells;
+    std::vector<int> edgeUnits;
     int gridCols = 0;
     int gridRows = 0;
     int maxCol = 0;
