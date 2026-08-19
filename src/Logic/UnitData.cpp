@@ -117,9 +117,9 @@ void UnitManager::ResolveEdgeCollisions() {
         calculate(cellX, 0);
         calculate(cellX, maxRow);
     }
-    for (int cellY = 1; cellY < maxRow - 1; ++cellY) {
+    for (int cellY = 1; cellY < gridRows; ++cellY) {
         calculate(0, cellY);
-        calculate(gridCols, cellY);
+        calculate(maxCol, cellY);
     }
     // std::vector<int> edgeUnits{};
     // for (int cellY = 1; cellY < maxRow; ++cellY) {
