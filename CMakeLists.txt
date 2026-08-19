@@ -24,7 +24,10 @@ add_executable(horde
     src/scene/TechTreeScene.cpp
     src/ui/ImGuiLayer.cpp
     src/logic/UnitData.cpp
-    src/logic/UnitData.hpp)
+    src/logic/UnitData.hpp
+    src/logic/Level.cpp
+    src/logic/LevelGeometry.cpp
+    src/logic/LevelValidation.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
