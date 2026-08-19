@@ -67,6 +67,7 @@ public:
 
     void UpdatePositions(float dt);
 
+    inline void ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel, int cellX, int cellY) const;
 
     // Getters and Setters
     [[nodiscard]] size_t GetCurrentUnits() const;

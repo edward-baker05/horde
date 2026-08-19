@@ -50,15 +50,7 @@ void UnitManager::PopulateUniformGrid() {
         const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
         const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
         const int cellIndex = cellX + cellY * gridCols;
-        if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow) {
-            glm::vec2& vel = velocities[i];
-            if (pos.x > maxP.x || pos.x < worldOrigin.x)
-                vel.x *= restitution;
-            if (pos.y > maxP.y || pos.y < worldOrigin.y)
-                vel.y *= restitution;
-            pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-            pos.y = std::clamp(pos.y, 0.0f, maxP.y);
-        }
+        ResolveEdgeCollisions(pos, velocities[i], cellX, cellY);
         nextUnit[i] = cellHeads[cellIndex];
         cellHeads[cellIndex] = i;
     }
@@ -85,6 +77,17 @@ void UnitManager::UpdatePhysics(float dt) {
 void UnitManager::UpdatePositions(float dt) {
     for (size_t i = 0; i < currentUnits; ++i) {
         positions[i] += velocities[i] * dt;
+    }
+}
+
+inline void UnitManager::ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel, const int cellX, const int cellY) const {
+    if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow) {
+        if (pos.x > maxP.x || pos.x < worldOrigin.x)
+            vel.x *= restitution;
+        if (pos.y > maxP.y || pos.y < worldOrigin.y)
+            vel.y *= restitution;
+        pos.x = std::clamp(pos.x, worldOrigin.x, maxP.x);
+        pos.y = std::clamp(pos.y, worldOrigin.y, maxP.y);
     }
 }
 
