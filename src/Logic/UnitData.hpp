@@ -66,9 +66,6 @@ public:
 
     void UpdatePositions(float dt);
 
-    void ResolveCollisions();
-
-    void ResolveEdgeCollisions();
 
     // Getters and Setters
     [[nodiscard]] size_t GetCurrentUnits() const;

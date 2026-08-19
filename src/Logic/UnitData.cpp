@@ -42,13 +42,21 @@ void UnitManager::BuildUniformGrid() {
 }
 
 void UnitManager::PopulateUniformGrid() {
-    std::fill(cellHeads.begin(), cellHeads.end(), -1);
-    for (int i = 0; i < (int)currentUnits; ++i) {
-        const glm::vec2 pos = positions[i];
-        const int cellX = std::clamp((int)(pos.x * invCellSize), 0, maxCol);
-        const int cellY = std::clamp((int)(pos.y * invCellSize), 0, maxRow);
+    std::ranges::fill(cellHeads, -1);
+    for (int i = 0; i < static_cast<int>(currentUnits); ++i) {
+        glm::vec2& pos = positions[i];
+        const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
+        const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
         const int cellIndex = cellX + cellY * gridCols;
-
+        if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow) {
+            glm::vec2& vel = velocities[i];
+            if (pos.x > maxP.x || pos.x < worldOrigin.x)
+                vel.x *= restitution;
+            if (pos.y > maxP.y || pos.y < worldOrigin.y)
+                vel.y *= restitution;
+            pos.x = std::clamp(pos.x, 0.0f, maxP.x);
+            pos.y = std::clamp(pos.y, 0.0f, maxP.y);
+        }
         nextUnit[i] = cellHeads[cellIndex];
         cellHeads[cellIndex] = i;
     }
@@ -70,58 +78,11 @@ void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
 void UnitManager::UpdatePhysics(float dt) {
     UpdatePositions(dt);
     PopulateUniformGrid();
-    ResolveCollisions();
 }
 
 void UnitManager::UpdatePositions(float dt) {
     for (size_t i = 0; i < currentUnits; ++i) {
         positions[i] += velocities[i] * dt;
-    }
-}
-
-void UnitManager::ResolveCollisions() {
-    ResolveEdgeCollisions();
-}
-
-void UnitManager::ResolveEdgeCollisions() {
-    for (int cellX = 0; cellX < gridCols; ++cellX) {
-        for (int unitId = cellHeads[cellX]; unitId != -1; unitId = nextUnit[unitId]) {
-            glm::vec2& pos = positions[unitId];
-            glm::vec2& vel = velocities[unitId];
-            if (pos.y < worldOrigin.y) {
-                vel.y *= restitution;
-                pos.y = 0.f;
-            }
-        }
-
-        for (int unitId = cellHeads[maxRow * gridCols + cellX]; unitId != -1; unitId = nextUnit[unitId]) {
-            glm::vec2& pos = positions[unitId];
-            glm::vec2& vel = velocities[unitId];
-            if (pos.y > maxP.y) {
-                vel.y *= restitution;
-                pos.y = maxP.y;
-            }
-        }
-    }
-
-    for (int cellY = 0; cellY < gridRows; ++cellY) {
-        for (int unitId = cellHeads[cellY * gridCols]; unitId != -1; unitId = nextUnit[unitId]) {
-            glm::vec2& pos = positions[unitId];
-            glm::vec2& vel = velocities[unitId];
-            if (pos.x < worldOrigin.x) {
-                vel.x *= restitution;
-                pos.x = 0.f;
-            }
-        }
-
-        for (int unitId = cellHeads[cellY * gridCols + maxCol]; unitId != -1; unitId = nextUnit[unitId]) {
-            glm::vec2& pos = positions[unitId];
-            glm::vec2& vel = velocities[unitId];
-            if (pos.x > maxP.x) {
-                vel.x *= restitution;
-                pos.x = maxP.x;
-            }
-        }
     }
 }
 
