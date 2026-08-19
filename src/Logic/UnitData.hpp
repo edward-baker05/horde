@@ -25,26 +25,39 @@ private:
     std::vector<int> health;
     std::vector<float> invMass; // a*b more efficient than a/b
 
-    int unit_size;
+    int unitSize;
+    float cellSize;
+    float invCellSize = 1.0f / cellSize;
 
-    size_t CurrentUnits = 0;
-    size_t MaxUnits;
+    size_t currentUnits = 0;
+    size_t maxUnits;
 
     // World bounds
-    glm::vec2 WorldOrigin = {0,0};
-    glm::vec2 WorldBounds;
-    glm::vec2 MaxP;
-    float Restitution = -1.0f;
+    glm::vec2 worldOrigin = {0,0};
+    glm::vec2 worldBounds;
+    glm::vec2 maxP{};
+    float restitution = -1.0f;
 
     // used in Uniform Grid for collisions.
-    std::vector<int> CellHeads;
-    std::vector<int> NextUnit;
+    std::vector<int> cellHeads;
+    std::vector<int> nextUnit;
+    std::vector<int> activeCells;
+    int gridCols = 0;
+    int gridRows = 0;
+    int maxCol = 0;
+    int maxRow = 0;
 
 public:
     // Constructor
     explicit UnitManager(size_t MaxUnits, glm::vec2 WorldBounds, int unit_size);
 
     void Reserve(size_t newMaxUnits);
+
+    void SetWorldBounds(glm::vec2 WorldBounds);
+
+    void BuildUniformGrid();
+
+    void PopulateUniformGrid();
 
     void SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM = 0.01f);
 
@@ -54,6 +67,9 @@ public:
     void UpdatePositions(float dt);
 
     void ResolveCollisions();
+
+    void ResolveEdgeCollisions();
+
 
 
     // Getters and Setters
