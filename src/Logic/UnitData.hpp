@@ -33,7 +33,7 @@ private:
     size_t maxUnits;
 
     // World bounds
-    glm::vec2 worldOrigin = {0, 0};
+    const glm::vec2 worldOrigin = {0, 0};
     glm::vec2 worldBounds;
     glm::vec2 maxP{};
     float restitution = -1.f;
