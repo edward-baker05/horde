@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "size": [600, 400],
+  "backgroundColor": [38, 42, 50],
+  "walls": [
+    { "kind": "rectangle", "center": [180, 120], "rotation": 0, "color": [200, 90, 80], "halfExtents": [60, 20] },
+    { "kind": "rectangle", "center": [420, 280], "rotation": 30, "color": [200, 150, 80], "halfExtents": [70, 18] },
+    { "kind": "triangle", "center": [300, 200], "rotation": 0, "color": [110, 180, 110], "halfExtents": [40, 55] },
+    { "kind": "circle", "center": [460, 110], "color": [90, 130, 220], "radius": 45 },
+    { "kind": "polyline", "center": [160, 300], "rotation": 0, "color": [220, 210, 120], "thickness": 8,
+      "points": [[-60, -30], [0, 20], [60, -30], [90, 10]] }
+  ],
+  "markers": [
+    { "kind": "spawn", "edge": "west", "offset": 150, "length": 100 },
+    { "kind": "exit", "edge": "east", "offset": 150, "length": 100 }
+  ]
+}

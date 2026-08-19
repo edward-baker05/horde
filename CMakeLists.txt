@@ -27,6 +27,7 @@ add_executable(horde
     src/logic/UnitData.hpp
     src/logic/Level.cpp
     src/logic/LevelGeometry.cpp
+    src/logic/LevelIO.cpp
     src/logic/LevelValidation.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
@@ -35,7 +36,8 @@ target_link_libraries(horde PRIVATE
     SDL3::SDL3
     SDL3_image::SDL3_image
     glm::glm
-    imgui::imgui)
+    imgui::imgui
+    nlohmann_json::nlohmann_json)
 
 if(MSVC)
     target_compile_options(horde PRIVATE /W4 /permissive-)

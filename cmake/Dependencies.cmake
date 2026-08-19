@@ -11,6 +11,7 @@ set(HORDE_SDL3_TAG "release-3.4.12" CACHE STRING "SDL3 tag to fetch when no syst
 set(HORDE_SDL3_IMAGE_TAG "release-3.4.4" CACHE STRING "SDL3_image tag to fetch when no system SDL3_image is found")
 set(HORDE_GLM_TAG "1.0.1" CACHE STRING "glm tag to fetch when no system glm is found")
 set(HORDE_IMGUI_TAG "v1.92.9-docking" CACHE STRING "Dear ImGui tag to fetch")
+set(HORDE_JSON_TAG "v3.11.3" CACHE STRING "nlohmann/json tag to fetch when no system copy is found")
 
 # --- SDL3 --------------------------------------------------------------------
 
@@ -75,6 +76,28 @@ else()
         EXCLUDE_FROM_ALL
         SYSTEM)
     FetchContent_MakeAvailable(glm)
+endif()
+
+# --- nlohmann/json -----------------------------------------------------------
+#
+# Header-only, and the only parsing dependency in the project. Used solely by
+# src/logic/LevelIO.cpp to read and write level files.
+
+find_package(nlohmann_json 3.11 CONFIG QUIET)
+
+if(nlohmann_json_FOUND)
+    message(STATUS "horde: using system nlohmann/json ${nlohmann_json_VERSION}")
+else()
+    message(STATUS "horde: no system nlohmann/json, fetching ${HORDE_JSON_TAG}")
+    set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+    set(JSON_Install OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG ${HORDE_JSON_TAG}
+        GIT_SHALLOW ON
+        EXCLUDE_FROM_ALL
+        SYSTEM)
+    FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
 # --- Dear ImGui --------------------------------------------------------------
