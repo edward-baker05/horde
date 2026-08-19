@@ -6,6 +6,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 
+#include <cmath>
 #include <vector>
 
 namespace horde::gfx {
@@ -27,17 +28,15 @@ struct Sprite {
 static_assert(sizeof(Sprite) == 64, "Sprite must match the HLSL struct layout");
 
 // UV rectangle for one cell of a uniform grid atlas, in the xy/zw form Sprite
-// expects.
+// expects. See drawCentered() below for placing a sprite by its centre rather
+// than the corner this returns UVs for.
 inline glm::vec4 atlasCell(int column, int row, int columns, int rows, float texelInset = 0.0001f) {
     const float cellWidth = 1.0f / static_cast<float>(columns);
     const float cellHeight = 1.0f / static_cast<float>(rows);
 
-    return {
-        static_cast<float>(column) * cellWidth + texelInset,
-        static_cast<float>(row) * cellHeight + texelInset,
-        static_cast<float>(column + 1) * cellWidth - texelInset,
-       static_cast<float>(row + 1) * cellHeight -texelInset
-    };
+    return {static_cast<float>(column) * cellWidth + texelInset, static_cast<float>(row) * cellHeight + texelInset,
+            static_cast<float>(column + 1) * cellWidth - texelInset,
+            static_cast<float>(row + 1) * cellHeight - texelInset};
 }
 
 // Draws textured quads with one draw call per run of consecutive sprites that
@@ -105,5 +104,29 @@ private:
     Uint32 m_maxSprites = 0;
     Uint32 m_uploadedCount = 0;
 };
+
+// Queues a sprite centred on `center` and rotated about that centre.
+//
+// Sprite::position is the quad's TOP-LEFT corner and Sprite::rotation turns the
+// quad about that corner, so a centred shape must have its corner placed at
+// center - R(rotation) * (size * 0.5). Every caller that thinks in centres —
+// which is everything drawing a level — must go through here rather than
+// repeating this trigonometry.
+inline void drawCentered(SpriteBatch& batch, SDL_GPUTexture* texture, glm::vec2 center, glm::vec2 size, float rotation,
+                         glm::vec4 uv, glm::vec4 color, float z = 0.0f) {
+    const glm::vec2 half = size * 0.5f;
+    const float c = std::cos(rotation);
+    const float s = std::sin(rotation);
+    const glm::vec2 offset{half.x * c - half.y * s, half.x * s + half.y * c};
+
+    Sprite sprite;
+    sprite.position = {center.x - offset.x, center.y - offset.y, z};
+    sprite.rotation = rotation;
+    sprite.size = size;
+    sprite.uv = uv;
+    sprite.color = color;
+
+    batch.draw(sprite, texture);
+}
 
 } // namespace horde::gfx
