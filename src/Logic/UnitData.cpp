@@ -26,71 +26,42 @@ void UnitManager::Reserve(size_t newMaxUnits) {
     velocities.resize(newMaxUnits);
     health.resize(newMaxUnits);
     invMass.resize(newMaxUnits);
-    nextUnit.resize(newMaxUnits);
-    edgeUnits.resize(newMaxUnits);
-    activeCells.resize(newMaxUnits);
+    nextUnit.resize(newMaxUnits, -1);
 }
 
 // Consider removing input to this function and have entire object be recreated to change.
 void UnitManager::SetWorldBounds(const glm::vec2 WorldBounds) {
-    const glm::vec2 r(unitSize);
-    maxP = WorldBounds - r;
+    // const glm::vec2 r(unitSize);
+    maxP = WorldBounds - glm::vec2(unitSize);
 }
 
 void UnitManager::BuildUniformGrid() {
-    gridCols = std::max(1, static_cast<int>(std::ceil(worldBounds.x * invCellSize)));
-    gridRows = std::max(1, static_cast<int>(std::ceil(worldBounds.y * invCellSize)));
+    gridCols = static_cast<int>(std::ceil(worldBounds.x * invCellSize));
+    gridRows = static_cast<int>(std::ceil(worldBounds.y * invCellSize));
     maxCol = gridCols - 1;
     maxRow = gridRows - 1;
-    cellHeads.assign(gridCols*gridRows, -1);
-    activeCells.clear();
+    cellHeads.assign(gridCols * gridRows, -1);
 }
 
-// void UnitManager::PopulateUniformGrid() {
-//     for (int i : activeCells) {
-//         cellHeads[i] = -1;
-//     }
-//     activeCells.clear();
-//     edgeUnits.clear();
-//     for (int i = 0; i < currentUnits; ++i) {
-//         const glm::vec2& pos = positions[i];
-//         const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
-//         const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
-//         const int cellIndex = cellX + cellY * gridCols;
-//         if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow)
-//             edgeUnits.push_back(i);
-//         int& cellHead = cellHeads[cellIndex];
-//         if (cellHead == -1) {
-//             activeCells.push_back(cellIndex);
-//         }
-//         nextUnit[i] = cellHead;
-//         cellHead = i;
-//     }
-// }
-
 void UnitManager::PopulateUniformGrid() {
-    for (int i : activeCells)
-        cellHeads[i] = -1;
-    // std::ranges::fill(cellHeads, -1);
-    activeCells.clear();
-    int j = 0;
-    for (int i = 0; i < currentUnits; ++i) {
-        const glm::vec2& pos = positions[i];
+    std::ranges::fill(cellHeads, -1);
+    for (int i = 0; i < static_cast<int>(currentUnits); ++i) {
+        glm::vec2& pos = positions[i];
         const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
         const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
         const int cellIndex = cellX + cellY * gridCols;
         if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow) {
-            edgeUnits[j] = i;
-            j++;
+            glm::vec2& vel = velocities[i];
+            if (pos.x > maxP.x || pos.x < worldOrigin.x)
+                vel.x *= restitution;
+            if (pos.y > maxP.y || pos.y < worldOrigin.y)
+                vel.y *= restitution;
+            pos.x = std::clamp(pos.x, 0.0f, maxP.x);
+            pos.y = std::clamp(pos.y, 0.0f, maxP.y);
         }
-        int& cellHead = cellHeads[cellIndex];
-        if (cellHead == -1) {
-            activeCells.push_back(cellIndex);
-        }
-        nextUnit[i] = cellHead;
-        cellHead = i;
+        nextUnit[i] = cellHeads[cellIndex];
+        cellHeads[cellIndex] = i;
     }
-    edgeUnits[j] = -1;
 }
 
 void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
@@ -109,7 +80,6 @@ void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
 void UnitManager::UpdatePhysics(float dt) {
     UpdatePositions(dt);
     PopulateUniformGrid();
-    ResolveCollisions();
 }
 
 void UnitManager::UpdatePositions(float dt) {
@@ -117,39 +87,6 @@ void UnitManager::UpdatePositions(float dt) {
         positions[i] += velocities[i] * dt;
     }
 }
-
-void UnitManager::ResolveCollisions() {
-    ResolveEdgeCollisions();
-}
-
-void UnitManager::ResolveEdgeCollisions() {
-    for (int i : edgeUnits) {
-        if (i == -1) {
-            break;
-        }
-        glm::vec2& pos = positions[i];
-        glm::vec2& vel = velocities[i];
-        if ((pos.x > maxP.x && vel.x > 0.0f) || (pos.x < worldOrigin.x && vel.x < 0.0f))
-            vel.x *= restitution;
-        if ((pos.y > maxP.y && vel.y > 0.0f) || (pos.y < worldOrigin.y && vel.y < 0.0f))
-            vel.y *= restitution;
-        pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-        pos.y = std::clamp(pos.y, 0.0f, maxP.y);
-    }
-}
-
-// void UnitManager::ResolveEdgeCollisions() {
-//         for (int i : edgeUnits) {
-//             glm::vec2& pos = positions[i];
-//             glm::vec2& vel = velocities[i];
-//             if ((pos.x > maxP.x && vel.x > 0.0f) || (pos.x < worldOrigin.x && vel.x < 0.0f))
-//                 vel.x *= restitution;
-//             if ((pos.y > maxP.y && vel.y > 0.0f) || (pos.y < worldOrigin.y && vel.y < 0.0f))
-//                 vel.y *= restitution;
-//             pos.x = std::clamp(pos.x, 0.0f, maxP.x);
-//             pos.y = std::clamp(pos.y, 0.0f, maxP.y);
-//         }
-// }
 
 // Getters and Setters
 size_t UnitManager::GetCurrentUnits() const {
