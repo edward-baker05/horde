@@ -37,6 +37,10 @@ private:
 
     editor::EditorState m_state;
     glm::vec2 m_cursorWorld{0.0f, 0.0f};
+
+    // Set while the left button is held after grabbing a selected element.
+    bool m_draggingBody = false;
+    glm::vec2 m_dragGrabOffset{0.0f, 0.0f};
 };
 
 } // namespace horde::scene

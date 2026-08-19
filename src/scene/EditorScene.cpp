@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "editor/EditorUi.hpp"
+#include "editor/HitTest.hpp"
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
@@ -43,6 +44,44 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         m_cursorWorld = mouseWorld(event.motion.x, event.motion.y);
     }
 
+    if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Select) {
+        switch (event.type) {
+            case SDL_EVENT_MOUSE_MOTION: {
+                if (m_draggingBody && m_state.selection.isWall()) {
+                    m_state.level.walls[m_state.selection.index].center = m_cursorWorld - m_dragGrabOffset;
+                    return true;
+                }
+                m_state.hovered = editor::pick(m_state.level, m_cursorWorld);
+                return false;
+            }
+
+            case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+                if (event.button.button != SDL_BUTTON_LEFT) {
+                    break;
+                }
+                m_state.selection = editor::pick(m_state.level, m_cursorWorld);
+                if (m_state.selection.isWall()) {
+                    // Snapshot once, here, at the start of the drag — not on
+                    // every motion event.
+                    m_state.beginMutation();
+                    m_draggingBody = true;
+                    m_dragGrabOffset = m_cursorWorld - m_state.level.walls[m_state.selection.index].center;
+                }
+                return true;
+            }
+
+            case SDL_EVENT_MOUSE_BUTTON_UP: {
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    m_draggingBody = false;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
     // CameraController pans on left OR middle drag, but in the editor the left
     // button belongs to the tools. Forward only wheel and middle-button events.
     const bool cameraEvent = event.type == SDL_EVENT_MOUSE_WHEEL ||
@@ -58,7 +97,21 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
 }
 
 void EditorScene::render(gfx::SpriteBatch& batch) {
-    gfx::renderLevel(m_state.level, batch, m_services->atlas->handle());
+    SDL_GPUTexture* atlas = m_services->atlas->handle();
+    gfx::renderLevel(m_state.level, batch, atlas);
+
+    // Redraw the hovered and selected walls tinted, on top of the level. There
+    // is no depth test, so drawing after is what puts them on top.
+    const auto highlight = [&](const editor::Selection& selection, glm::vec4 tint) {
+        if (selection.isWall() && selection.index < m_state.level.walls.size()) {
+            gfx::renderWall(m_state.level.walls[selection.index], batch, atlas, tint);
+        }
+    };
+
+    if (!(m_state.hovered == m_state.selection)) {
+        highlight(m_state.hovered, {1.0f, 1.0f, 1.0f, 0.25f});
+    }
+    highlight(m_state.selection, {1.0f, 0.85f, 0.2f, 0.45f});
 }
 
 void EditorScene::debugUi() {
