@@ -66,7 +66,6 @@ public:
 
     void UpdatePositions(float dt);
 
-
     // Getters and Setters
     [[nodiscard]] size_t GetCurrentUnits() const;
 

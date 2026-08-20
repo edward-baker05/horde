@@ -2,8 +2,11 @@
 
 #include <imgui.h>
 
+#include <filesystem>
 #include <memory>
+#include <string>
 
+#include "logic/LevelFiles.hpp"
 #include "scene/EditorScene.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
@@ -27,7 +30,12 @@ void MainMenuScene::debugUi() {
     ImGui::Begin("horde");
 
     if (ImGui::Button("Play", ImVec2(160.0f, 0.0f))) {
-        m_services->scenes->push(std::make_unique<LevelScene>());
+        // One level means there is nothing to choose between: go straight in.
+        if (logic::listLevels().size() > 1) {
+            m_choosingLevel = true;
+        } else {
+            m_services->scenes->push(std::make_unique<LevelScene>());
+        }
     }
 
     if (ImGui::Button("Upgrades", ImVec2(160.0f, 0.0f))) {
@@ -36,6 +44,22 @@ void MainMenuScene::debugUi() {
 
     if (ImGui::Button("Level Editor", ImVec2(160.0f, 0.0f))) {
         m_services->scenes->push(std::make_unique<EditorScene>());
+    }
+
+    if (m_choosingLevel) {
+        ImGui::SeparatorText("Choose a level");
+
+        for (const std::filesystem::path& path : logic::listLevels()) {
+            const std::string name = logic::levelDisplayName(path);
+            if (ImGui::Button(name.c_str(), ImVec2(160.0f, 0.0f))) {
+                m_choosingLevel = false;
+                m_services->scenes->push(std::make_unique<LevelScene>(path));
+            }
+        }
+
+        if (ImGui::Button("Cancel", ImVec2(160.0f, 0.0f))) {
+            m_choosingLevel = false;
+        }
     }
 
     ImGui::End();

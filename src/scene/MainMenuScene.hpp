@@ -26,6 +26,10 @@ public:
 private:
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
+
+    // Levels are only offered as a choice once there is more than one, so the
+    // extra click appears only when it has been earned.
+    bool m_choosingLevel = false;
 };
 
 } // namespace horde::scene
