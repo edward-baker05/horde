@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 
 #include "editor/EditorUi.hpp"
 #include "editor/HitTest.hpp"
@@ -33,6 +34,16 @@ bool EditorScene::onEnter(Services& services) {
 
 glm::vec2 EditorScene::mouseWorld(float screenX, float screenY) const {
     return m_camera.screenToWorld({screenX, screenY});
+}
+
+// Handles are drawn and picked at a constant SCREEN size, so convert once per
+// use: at zoom z, one screen pixel is 1/z world units.
+float EditorScene::handleWorldSize() const {
+    return 10.0f / m_camera.zoom();
+}
+
+float EditorScene::handlePickRadius() const {
+    return handleWorldSize();
 }
 
 void EditorScene::commitDraft() {
@@ -186,6 +197,11 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
     if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Select) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION: {
+                if (m_activeHandle.kind != editor::HandleKind::None && m_state.selection.isWall()) {
+                    editor::applyHandleDrag(m_state.level.walls[m_state.selection.index], m_activeHandle, m_cursorWorld,
+                                            m_rotationGrabOffset);
+                    return true;
+                }
                 if (m_draggingBody && m_state.selection.isWall()) {
                     m_state.level.walls[m_state.selection.index].center = m_cursorWorld - m_dragGrabOffset;
                     return true;
@@ -198,6 +214,23 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 if (event.button.button != SDL_BUTTON_LEFT) {
                     break;
                 }
+
+                // Handles beat the body: a corner handle sits ON the shape's
+                // outline, so testing the body first would make it unreachable.
+                if (m_state.selection.isWall()) {
+                    const logic::Wall& wall = m_state.level.walls[m_state.selection.index];
+                    const editor::Handle handle = editor::pickHandle(wall, m_cursorWorld, handlePickRadius());
+                    if (handle.kind != editor::HandleKind::None) {
+                        m_state.beginMutation();
+                        m_activeHandle = handle;
+                        if (handle.kind == editor::HandleKind::Rotate) {
+                            const glm::vec2 d = m_cursorWorld - wall.center;
+                            m_rotationGrabOffset = std::atan2(d.y, d.x) - wall.rotation;
+                        }
+                        return true;
+                    }
+                }
+
                 m_state.selection = editor::pick(m_state.level, m_cursorWorld);
                 if (m_state.selection.isWall()) {
                     // Snapshot once, here, at the start of the drag — not on
@@ -212,6 +245,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
             case SDL_EVENT_MOUSE_BUTTON_UP: {
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     m_draggingBody = false;
+                    m_activeHandle = editor::Handle{};
                 }
                 break;
             }
@@ -275,6 +309,17 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
             glm::vec4 tint = gfx::toFloatColor(wall.color);
             tint.a = 0.55f;
             gfx::renderWall(wall, batch, atlas, tint);
+        }
+    }
+
+    // The grips on the selected wall, drawn last so nothing covers them.
+    if (m_state.selection.isWall() && m_state.selection.index < m_state.level.walls.size()) {
+        const float size = handleWorldSize();
+        for (const editor::Handle& handle : editor::wallHandles(m_state.level.walls[m_state.selection.index])) {
+            const glm::vec4 uv = handle.kind == editor::HandleKind::Rotate ? gfx::cellDisc() : gfx::cellSolid();
+            const glm::vec4 color = handle.kind == editor::HandleKind::Rotate ? glm::vec4{0.4f, 0.8f, 1.0f, 1.0f}
+                                                                              : glm::vec4{1.0f, 0.9f, 0.3f, 1.0f};
+            gfx::drawCentered(batch, atlas, handle.world, {size, size}, 0.0f, uv, color);
         }
     }
 }
