@@ -25,7 +25,7 @@ private:
     std::vector<int> health;
     std::vector<float> invMass;
 
-    int unitSize;
+    float unitSize;
     float cellSize;
     float invCellSize = 1.f / cellSize;
 
@@ -50,7 +50,7 @@ private:
 
 public:
     // Constructor
-    explicit UnitManager(size_t MaxUnits, glm::vec2 WorldBounds, int unit_size);
+    explicit UnitManager(size_t MaxUnits, glm::vec2 WorldBounds, float unit_size);
 
     void Reserve(size_t newMaxUnits);
 
@@ -67,7 +67,9 @@ public:
 
     void UpdatePositions(float dt);
 
-    inline void ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel, int cellX, int cellY) const;
+    inline void ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel) const;
+
+    void ResolveEntityCollisions(float dt);
 
     // Getters and Setters
     [[nodiscard]] size_t GetCurrentUnits() const;
