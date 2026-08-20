@@ -2,6 +2,7 @@
 
 #include "editor/EditorState.hpp"
 #include "editor/Handles.hpp"
+#include "editor/Markers.hpp"
 #include "editor/Tools.hpp"
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
@@ -64,6 +65,10 @@ private:
     // rotation and the cursor when it was grabbed.
     editor::Handle m_activeHandle;
     float m_rotationGrabOffset = 0.0f;
+
+    // 0 = not dragging an end, 1 = the low end, 2 = the high end, 3 = the body.
+    int m_markerDrag = 0;
+    float m_markerGrabOffset = 0.0f;
 };
 
 } // namespace horde::scene

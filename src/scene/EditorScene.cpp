@@ -159,6 +159,43 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
+    if (!io.WantCaptureMouse && (m_state.tool == editor::Tool::Spawn || m_state.tool == editor::Tool::Exit)) {
+        const logic::MarkerKind kind =
+            m_state.tool == editor::Tool::Spawn ? logic::MarkerKind::Spawn : logic::MarkerKind::Exit;
+
+        switch (event.type) {
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    m_placement.active = true;
+                    m_placement.start = m_cursorWorld;
+                    m_placement.current = m_cursorWorld;
+                    return true;
+                }
+                break;
+
+            case SDL_EVENT_MOUSE_MOTION:
+                m_placement.current = m_cursorWorld;
+                return m_placement.active;
+
+            case SDL_EVENT_MOUSE_BUTTON_UP: {
+                if (event.button.button != SDL_BUTTON_LEFT || !m_placement.active) {
+                    break;
+                }
+                m_placement.active = false;
+
+                logic::Marker marker;
+                if (editor::makeMarkerFromDrag(m_state.level, kind, m_placement.start, m_cursorWorld, marker)) {
+                    m_state.beginMutation();
+                    m_state.level.markers.push_back(marker);
+                }
+                return true;
+            }
+
+            default:
+                break;
+        }
+    }
+
     if (!io.WantCaptureMouse && editor::isBoxTool(m_state.tool)) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -212,6 +249,26 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     }
                     return true;
                 }
+                if (m_markerDrag != 0 && m_state.selection.isMarker()) {
+                    logic::Marker& marker = m_state.level.markers[m_state.selection.index];
+                    const float along = editor::projectOntoEdge(m_state.level, marker.edge, m_cursorWorld);
+
+                    if (m_markerDrag == 1) {
+                        const float end = marker.offset + marker.length;
+                        marker.offset = std::min(along, end - editor::kMinimumMarkerLength);
+                        marker.length = end - marker.offset;
+                    } else if (m_markerDrag == 2) {
+                        marker.length = std::max(along - marker.offset, editor::kMinimumMarkerLength);
+                    } else {
+                        marker.offset = along - m_markerGrabOffset;
+                    }
+
+                    // Clamping here is what makes overlap impossible, rather
+                    // than something validation reports after the fact.
+                    editor::clampMarker(m_state.level, m_state.selection.index);
+                    return true;
+                }
+
                 if (m_draggingBody && m_state.selection.isWall()) {
                     m_state.level.walls[m_state.selection.index].center =
                         editor::snapPosition(m_cursorWorld - m_dragGrabOffset, m_state.snap);
@@ -242,6 +299,27 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     }
                 }
 
+                // A selected marker's end grips are reachable before the
+                // selection changes, the same way a wall's handles are.
+                if (m_state.selection.isMarker()) {
+                    const logic::Marker& marker = m_state.level.markers[m_state.selection.index];
+                    glm::vec2 low{};
+                    glm::vec2 high{};
+                    editor::markerEndHandles(m_state.level, marker, low, high);
+
+                    const float reach = handlePickRadius();
+                    const auto isNear = [&](glm::vec2 p) {
+                        const glm::vec2 d = m_cursorWorld - p;
+                        return std::sqrt(d.x * d.x + d.y * d.y) <= reach;
+                    };
+
+                    if (isNear(low) || isNear(high)) {
+                        m_state.beginMutation();
+                        m_markerDrag = isNear(low) ? 1 : 2;
+                        return true;
+                    }
+                }
+
                 m_state.selection = editor::pick(m_state.level, m_cursorWorld);
                 if (m_state.selection.isWall()) {
                     // Snapshot once, here, at the start of the drag — not on
@@ -250,6 +328,14 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     m_draggingBody = true;
                     m_dragGrabOffset = m_cursorWorld - m_state.level.walls[m_state.selection.index].center;
                 }
+                if (m_state.selection.isMarker()) {
+                    const logic::Marker& marker = m_state.level.markers[m_state.selection.index];
+                    m_state.beginMutation();
+                    m_markerDrag = 3;
+                    m_markerGrabOffset =
+                        editor::projectOntoEdge(m_state.level, marker.edge, m_cursorWorld) - marker.offset;
+                    return true;
+                }
                 return true;
             }
 
@@ -257,6 +343,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     m_draggingBody = false;
                     m_activeHandle = editor::Handle{};
+                    m_markerDrag = 0;
                 }
                 break;
             }
@@ -331,6 +418,19 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
             const glm::vec4 color = handle.kind == editor::HandleKind::Rotate ? glm::vec4{0.4f, 0.8f, 1.0f, 1.0f}
                                                                               : glm::vec4{1.0f, 0.9f, 0.3f, 1.0f};
             gfx::drawCentered(batch, atlas, handle.world, {size, size}, 0.0f, uv, color);
+        }
+    }
+
+    // A marker stretches along its edge only, so it gets two end grips and
+    // nothing that would make it thicker.
+    if (m_state.selection.isMarker() && m_state.selection.index < m_state.level.markers.size()) {
+        const float size = handleWorldSize();
+        glm::vec2 low{};
+        glm::vec2 high{};
+        editor::markerEndHandles(m_state.level, m_state.level.markers[m_state.selection.index], low, high);
+
+        for (const glm::vec2& position : {low, high}) {
+            gfx::drawCentered(batch, atlas, position, {size, size}, 0.0f, gfx::cellSolid(), {1.0f, 1.0f, 1.0f, 1.0f});
         }
     }
 }
