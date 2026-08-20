@@ -68,6 +68,11 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 m_state.tool = editor::Tool::Exit;
                 return true;
 
+            case SDLK_DELETE:
+            case SDLK_BACKSPACE:
+                editor::deleteSelected(m_state);
+                return true;
+
             case SDLK_ESCAPE:
                 m_placement.active = false;
                 m_state.tool = editor::Tool::Select;
