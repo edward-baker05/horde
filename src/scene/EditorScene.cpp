@@ -11,6 +11,7 @@
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "logic/LevelValidation.hpp"
 #include "scene/SceneStack.hpp"
 
 namespace horde::scene {
@@ -407,6 +408,14 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
             glm::vec4 tint = gfx::toFloatColor(wall.color);
             tint.a = 0.55f;
             gfx::renderWall(wall, batch, atlas, tint);
+        }
+    }
+
+    // Tint every wall validation rejects, so the reason saving is blocked is
+    // visible in the world and not only in a panel.
+    for (const logic::Problem& problem : logic::validate(m_state.level)) {
+        if (problem.wallIndex < m_state.level.walls.size()) {
+            gfx::renderWall(m_state.level.walls[problem.wallIndex], batch, atlas, {1.0f, 0.25f, 0.2f, 0.55f});
         }
     }
 
