@@ -27,13 +27,16 @@ struct Sprite {
 static_assert(sizeof(Sprite) == 64, "Sprite must match the HLSL struct layout");
 
 // UV rectangle for one cell of a uniform grid atlas, in the xy/zw form Sprite
-// expects.
-inline glm::vec4 atlasCell(int column, int row, int columns, int rows) {
+// expects. Insets by a small epsilon to avoid texture bleeding between adjacent
+// cells caused by floating-point rasterization precision in nearest-neighbor sampling.
+inline glm::vec4 atlasCell(int column, int row, int columns, int rows, float texelInset = 0.0001f) {
     const float cellWidth = 1.0f / static_cast<float>(columns);
     const float cellHeight = 1.0f / static_cast<float>(rows);
 
-    return {static_cast<float>(column) * cellWidth, static_cast<float>(row) * cellHeight,
-            static_cast<float>(column + 1) * cellWidth, static_cast<float>(row + 1) * cellHeight};
+    return {static_cast<float>(column) * cellWidth + texelInset,
+            static_cast<float>(row) * cellHeight + texelInset,
+            static_cast<float>(column + 1) * cellWidth - texelInset,
+            static_cast<float>(row + 1) * cellHeight - texelInset};
 }
 
 // Draws textured quads with one draw call per run of consecutive sprites that
@@ -57,7 +60,7 @@ public:
     // Builds the pipeline against the given swapchain format. Returns false and
     // logs on failure.
     bool init(SDL_GPUDevice* device, const ShaderLoader& shaders, SDL_GPUTextureFormat colorTargetFormat,
-              Uint32 maxSprites = 16384);
+              Uint32 maxSprites = 65536);
     void shutdown();
 
     // Clears the queue. Call once per frame before adding sprites.

@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $Config = if ($Mode -eq 'release') { 'Release' } else { 'Debug' }
 
 cmake --preset windows
+python tools/generate_compile_commands.py
 cmake --build --preset "windows-$Mode"
 
 # No need to change directory first: assets and shaders are resolved relative to

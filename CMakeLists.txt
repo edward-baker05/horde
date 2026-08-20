@@ -13,6 +13,8 @@ add_executable(horde
     src/main.cpp
     src/app/App.cpp
     src/core/Paths.cpp
+    src/core/ThreadPool.cpp
+    src/core/ThreadPool.hpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
     src/gfx/ShaderLoader.cpp
@@ -23,8 +25,12 @@ add_executable(horde
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
     src/ui/ImGuiLayer.cpp
-        src/Logic/UnitData.cpp
-        src/Logic/UnitData.hpp)
+    src/Logic/BoundingBox.cpp
+    src/Logic/BoundingBox.hpp
+    src/Logic/UnitData.cpp
+    src/Logic/UnitData.hpp
+    src/Logic/VectorField.cpp
+    src/Logic/VectorField.hpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

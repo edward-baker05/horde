@@ -42,6 +42,11 @@ glm::vec2 Camera2D::worldToScreen(glm::vec2 world) const {
     return (world - m_center) * m_zoom + m_viewport * 0.5f;
 }
 
+BoundingBox Camera2D::visibleBounds(float margin) const {
+    const glm::vec2 halfExtent = (m_viewport * 0.5f / m_zoom) + glm::vec2(margin);
+    return BoundingBox::fromCenterHalfExtents(m_center, halfExtent);
+}
+
 glm::mat4 Camera2D::viewProjection() const {
     const glm::vec2 halfExtent = m_viewport * 0.5f / m_zoom;
 

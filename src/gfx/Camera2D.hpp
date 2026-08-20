@@ -5,6 +5,8 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 
+#include "Logic/BoundingBox.hpp"
+
 namespace horde::gfx {
 
 // Orthographic 2D camera with pan and zoom.
@@ -46,6 +48,9 @@ public:
 
     glm::vec2 screenToWorld(glm::vec2 screen) const;
     glm::vec2 worldToScreen(glm::vec2 world) const;
+
+    // World-space visible bounds (AABB), optionally expanded with margin.
+    [[nodiscard]] BoundingBox visibleBounds(float margin = 0.0f) const;
 
     // Column-major view-projection matrix, ready to upload as a uniform.
     glm::mat4 viewProjection() const;
