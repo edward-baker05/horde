@@ -102,6 +102,18 @@ void drawLevelPanel(EditorState& state, bool& wantsExit) {
                                        static_cast<std::uint8_t>(background[2] * 255.0f)};
     }
 
+    ImGui::SeparatorText("Snapping");
+
+    ImGui::Checkbox("Snap position", &state.snap.position);
+    ImGui::BeginDisabled(!state.snap.position);
+    ImGui::DragFloat("Grid", &state.snap.gridSize, 0.5f, 1.0f, 500.0f, "%.1f");
+    ImGui::EndDisabled();
+
+    ImGui::Checkbox("Snap rotation", &state.snap.rotation);
+    ImGui::BeginDisabled(!state.snap.rotation);
+    ImGui::DragFloat("Step", &state.snap.rotationDegrees, 0.5f, 1.0f, 180.0f, "%.1f deg");
+    ImGui::EndDisabled();
+
     ImGui::SeparatorText("History");
 
     ImGui::BeginDisabled(!state.undo.canUndo());
