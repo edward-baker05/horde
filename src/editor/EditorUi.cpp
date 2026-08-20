@@ -5,12 +5,20 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
+#include <filesystem>
 #include <iterator>
+#include <optional>
+#include <utility>
 #include <variant>
+#include <vector>
 
 #include "editor/EditorState.hpp"
 #include "editor/Markers.hpp"
 #include "editor/Tools.hpp"
+#include "logic/LevelFiles.hpp"
+#include "logic/LevelIO.hpp"
+#include "logic/LevelValidation.hpp"
 
 namespace horde::editor {
 
@@ -281,6 +289,97 @@ void drawWallList(EditorState& state) {
     ImGui::End();
 }
 
+void drawFilesPanel(EditorState& state) {
+    ImGui::SetNextWindowPos(ImVec2(600.0f, 20.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(280.0f, 300.0f), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Files");
+
+    // A plain list of the levels that actually exist beats a native dialog that
+    // opens somewhere unrelated, and works identically on all three platforms.
+    ImGui::SeparatorText("Open");
+
+    const std::vector<std::filesystem::path> levels = logic::listLevels();
+    if (levels.empty()) {
+        ImGui::TextDisabled("No levels saved yet.");
+    }
+
+    for (const std::filesystem::path& path : levels) {
+        const std::string name = logic::levelDisplayName(path);
+        if (ImGui::Selectable(name.c_str(), state.path == path)) {
+            std::string error;
+            if (std::optional<logic::Level> loaded = logic::loadLevel(path, &error)) {
+                state.level = std::move(*loaded);
+                state.path = path;
+                state.selection.clear();
+                state.hovered.clear();
+                state.undo.clear();
+                state.dirty = false;
+                state.status = "Opened " + name;
+            } else {
+                state.status = "Could not open " + name + ": " + error;
+            }
+        }
+    }
+
+    ImGui::SeparatorText("Save");
+
+    static char nameBuffer[128] = "untitled";
+    ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer));
+
+    const std::vector<logic::Problem> problems = logic::validate(state.level);
+
+    ImGui::BeginDisabled(!problems.empty());
+    if (ImGui::Button("Save", ImVec2(120.0f, 0.0f))) {
+        const std::filesystem::path path = logic::levelPathForName(nameBuffer);
+        std::string error;
+        if (logic::saveLevel(state.level, path, &error)) {
+            state.path = path;
+            state.dirty = false;
+            state.status = "Saved " + logic::levelDisplayName(path);
+        } else {
+            state.status = "Could not save: " + error;
+        }
+    }
+    ImGui::EndDisabled();
+
+    if (!problems.empty()) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "fix %zu problem(s)", problems.size());
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("New", ImVec2(80.0f, 0.0f))) {
+        state.level = logic::makeDefaultLevel();
+        state.path.clear();
+        state.selection.clear();
+        state.hovered.clear();
+        state.undo.clear();
+        state.dirty = false;
+        state.status = "New level";
+    }
+
+    if (state.dirty) {
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f), "Unsaved changes");
+    }
+
+    ImGui::SeparatorText("Problems");
+
+    if (problems.empty()) {
+        ImGui::TextDisabled("None. This level can be saved.");
+    }
+
+    for (const logic::Problem& problem : problems) {
+        char label[160];
+        std::snprintf(label, sizeof(label), "Wall %zu: %s##problem%zu", problem.wallIndex, problem.message.c_str(),
+                      problem.wallIndex);
+        if (ImGui::Selectable(label)) {
+            state.selection = Selection{SelectionKind::Wall, problem.wallIndex};
+        }
+    }
+
+    ImGui::End();
+}
+
 } // namespace
 
 void drawEditorUi(EditorState& state, bool& wantsExit) {
@@ -288,6 +387,7 @@ void drawEditorUi(EditorState& state, bool& wantsExit) {
     drawLevelPanel(state, wantsExit);
     drawInspector(state);
     drawWallList(state);
+    drawFilesPanel(state);
 }
 
 } // namespace horde::editor

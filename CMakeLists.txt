@@ -34,6 +34,7 @@ add_executable(horde
     src/logic/UnitData.hpp
     src/logic/Level.cpp
     src/logic/LevelGeometry.cpp
+    src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
     src/logic/LevelValidation.cpp)
 
