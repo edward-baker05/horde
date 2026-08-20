@@ -44,6 +44,94 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         m_cursorWorld = mouseWorld(event.motion.x, event.motion.y);
     }
 
+    if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard) {
+        switch (event.key.key) {
+            case SDLK_1:
+                m_state.tool = editor::Tool::Select;
+                return true;
+            case SDLK_2:
+                m_state.tool = editor::Tool::Rectangle;
+                return true;
+            case SDLK_3:
+                m_state.tool = editor::Tool::Triangle;
+                return true;
+            case SDLK_4:
+                m_state.tool = editor::Tool::Circle;
+                return true;
+            case SDLK_5:
+                m_state.tool = editor::Tool::Polyline;
+                return true;
+            case SDLK_6:
+                m_state.tool = editor::Tool::Spawn;
+                return true;
+            case SDLK_7:
+                m_state.tool = editor::Tool::Exit;
+                return true;
+
+            case SDLK_ESCAPE:
+                m_placement.active = false;
+                m_state.tool = editor::Tool::Select;
+                return true;
+
+            case SDLK_Z:
+                if ((event.key.mod & SDL_KMOD_CTRL) != 0) {
+                    m_state.undo.undo(m_state.level);
+                    m_state.selection.clear();
+                    m_state.dirty = true;
+                    return true;
+                }
+                break;
+
+            case SDLK_Y:
+                if ((event.key.mod & SDL_KMOD_CTRL) != 0) {
+                    m_state.undo.redo(m_state.level);
+                    m_state.selection.clear();
+                    m_state.dirty = true;
+                    return true;
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    if (!io.WantCaptureMouse && editor::isBoxTool(m_state.tool)) {
+        switch (event.type) {
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    m_placement.active = true;
+                    m_placement.start = m_cursorWorld;
+                    m_placement.current = m_cursorWorld;
+                    return true;
+                }
+                break;
+
+            case SDL_EVENT_MOUSE_MOTION:
+                m_placement.current = m_cursorWorld;
+                return m_placement.active;
+
+            case SDL_EVENT_MOUSE_BUTTON_UP: {
+                if (event.button.button != SDL_BUTTON_LEFT || !m_placement.active) {
+                    break;
+                }
+                m_placement.active = false;
+
+                logic::Wall wall;
+                if (editor::makeWallFromDrag(m_state.tool, m_placement.start, m_cursorWorld, m_state.newWallColor,
+                                             wall)) {
+                    m_state.beginMutation();
+                    m_state.level.walls.push_back(std::move(wall));
+                }
+                // The tool stays armed: walls come in runs.
+                return true;
+            }
+
+            default:
+                break;
+        }
+    }
+
     if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Select) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION: {
@@ -112,6 +200,18 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
         highlight(m_state.hovered, {1.0f, 1.0f, 1.0f, 0.25f});
     }
     highlight(m_state.selection, {1.0f, 0.85f, 0.2f, 0.45f});
+
+    // A translucent preview of what the current drag would produce, so the
+    // result is visible before the button is released.
+    if (m_placement.active) {
+        logic::Wall preview;
+        if (editor::makeWallFromDrag(m_state.tool, m_placement.start, m_placement.current, m_state.newWallColor,
+                                     preview)) {
+            glm::vec4 tint = gfx::toFloatColor(preview.color);
+            tint.a = 0.45f;
+            gfx::renderWall(preview, batch, atlas, tint);
+        }
+    }
 }
 
 void EditorScene::debugUi() {
