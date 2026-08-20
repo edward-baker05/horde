@@ -21,6 +21,7 @@ add_executable(horde
     src/gfx/Texture.cpp
     src/editor/EditorUi.cpp
     src/editor/Handles.cpp
+    src/editor/Markers.cpp
     src/editor/HitTest.cpp
     src/editor/Tools.cpp
     src/scene/EditorScene.cpp
