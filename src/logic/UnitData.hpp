@@ -57,6 +57,8 @@ private:
 
     void ResolveEntityCollisions(float dt);
 
+    void getNeighbours(const int cellIndex, std::vector<int>& neighbours) const;
+
 public:
     // Constructor
     UnitManager() = default;
@@ -77,4 +79,6 @@ public:
     [[nodiscard]] glm::vec2 GetPosition(size_t index) const;
 
     [[nodiscard]] const glm::vec2* GetPositionsPtr() const;
+
+    [[nodiscard]] const int* GetHealthsPtr() const;
 };
