@@ -180,7 +180,7 @@ void UnitManager::ResolveEntityCollisions(float dt) {
             float py = pos.y;
             auto [neighbours] = getNeighbours(cellIndex);
             for (const int i : neighbours) {
-                if (i == unit || i == cellHeads[cellIndex]) {
+                if (i == unit) {
                     continue;
                 }
                 glm::vec2& ipos = positions[i];
