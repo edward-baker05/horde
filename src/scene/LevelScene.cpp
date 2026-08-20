@@ -41,8 +41,9 @@ bool LevelScene::onEnter(Services& services) {
     for (int i = 0; i < MaxUnits; ++i) {
         unit_manager.SpawnUnit(
             // silly wrapping
-            glm::vec2(i * 25 / int(m_level.size.y), i * 5 % int(m_level.size.y)),
-            glm::vec2(i * 5 / int(m_level.size.y), i * 5 / int(m_level.size.y)),
+            glm::vec2(i * 25 / int(m_level.size.y) + m_level.size.x * 0.5, i * 5 % int(m_level.size.y)),
+            glm::vec2(0, 0),
+            // glm::vec2(i * 5 / int(m_level.size.y), i * 5 / int(m_level.size.y)),
             // glm::vec2(2, std::min(i/int(m_level.size.y),10)),
             10);
     }
@@ -69,12 +70,13 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
 
     const size_t unitCount = unit_manager.GetCurrentUnits();
     const glm::vec2* positions = unit_manager.GetPositionsPtr();
+    const int* healths = unit_manager.GetHealthsPtr();
 
     for (size_t i = 0; i < unitCount; ++i) {
         if (i == 0) {
             unit.color = {1.0f, 0.0f, 0.0f, 1.0f};
         } else {
-            unit.color = {0.0f, 1.0f, 0.2f, 1.0f};
+            unit.color = {1.0f - healths[i] / 10, 1.0f * healths[i] / 10, 0.2f, 1.0f};
         }
         unit.position = {positions[i], 0.0f};
         batch.draw(unit, m_services->atlas->handle());

@@ -43,6 +43,7 @@ private:
     logic::Level m_level;
 
     static constexpr size_t MaxUnits = 30000;
+    // static constexpr size_t MaxUnits = 10;
     float enemy_size = 5.0f;
     UnitManager unit_manager;
 };
