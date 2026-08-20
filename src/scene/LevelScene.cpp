@@ -19,8 +19,7 @@ bool LevelScene::onEnter(Services& services) {
     for (size_t i = 0; i < MaxUnits; ++i) {
         unit_manager.SpawnUnit(
             // silly wrapping
-            glm::vec2(enemy_size * (i * enemy_size) / int(level_size.y), (i * enemy_size) % int(level_size.y)),
-            glm::vec2(20, (i * enemy_size) % int(level_size.y)), 10);
+            glm::vec2(5 * (i * 5) / int(level_size.y), (i * 5) % int(level_size.y)), glm::vec2(2, (-8.0f)), 10);
     }
 
     return true;

@@ -5,14 +5,14 @@
 #include "UnitData.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <execution>
-#include <set>
 
 #include "SDL3/SDL_log.h"
 
 // Constructor
-UnitManager::UnitManager(const size_t MaxUnits, const glm::vec2 WorldBounds, const int unit_size)
+UnitManager::UnitManager(const size_t MaxUnits, const glm::vec2 WorldBounds, const float unit_size)
     : unitSize(unit_size), cellSize(unit_size), maxUnits(MaxUnits), worldBounds(WorldBounds) {
     // does this once at startup
     Reserve(MaxUnits);
@@ -31,7 +31,6 @@ void UnitManager::Reserve(size_t newMaxUnits) {
 
 // Consider removing input to this function and have entire object be recreated to change.
 void UnitManager::SetWorldBounds(const glm::vec2 WorldBounds) {
-    // const glm::vec2 r(unitSize);
     maxP = WorldBounds - glm::vec2(unitSize);
 }
 
@@ -41,16 +40,23 @@ void UnitManager::BuildUniformGrid() {
     maxCol = gridCols - 1;
     maxRow = gridRows - 1;
     cellHeads.assign(gridCols * gridRows, -1);
+    activeCells.resize(gridCols * gridRows);
 }
 
 void UnitManager::PopulateUniformGrid() {
     std::ranges::fill(cellHeads, -1);
+    activeCells.clear();
     for (int i = 0; i < static_cast<int>(currentUnits); ++i) {
         glm::vec2& pos = positions[i];
         const int cellX = std::clamp(static_cast<int>(pos.x * invCellSize), 0, maxCol);
         const int cellY = std::clamp(static_cast<int>(pos.y * invCellSize), 0, maxRow);
         const int cellIndex = cellX + cellY * gridCols;
-        ResolveEdgeCollisions(pos, velocities[i], cellX, cellY);
+        if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow) {
+            ResolveEdgeCollisions(pos, velocities[i]);
+        }
+        if (cellHeads[cellIndex] == -1) {
+            activeCells.push_back(cellIndex);
+        }
         nextUnit[i] = cellHeads[cellIndex];
         cellHeads[cellIndex] = i;
     }
@@ -72,6 +78,7 @@ void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
 void UnitManager::UpdatePhysics(float dt) {
     UpdatePositions(dt);
     PopulateUniformGrid();
+    ResolveEntityCollisions(dt);
 }
 
 void UnitManager::UpdatePositions(float dt) {
@@ -80,14 +87,113 @@ void UnitManager::UpdatePositions(float dt) {
     }
 }
 
-inline void UnitManager::ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel, const int cellX, const int cellY) const {
-    if (cellX == 0 || cellX == maxCol || cellY == 0 || cellY == maxRow) {
-        if (pos.x > maxP.x || pos.x < worldOrigin.x)
+inline void UnitManager::ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel) const {
+    if (pos.x > maxP.x || pos.x < worldOrigin.x)
             vel.x *= restitution;
         if (pos.y > maxP.y || pos.y < worldOrigin.y)
             vel.y *= restitution;
         pos.x = std::clamp(pos.x, worldOrigin.x, maxP.x);
         pos.y = std::clamp(pos.y, worldOrigin.y, maxP.y);
+}
+
+void UnitManager::ResolveEntityCollisions(float dt) {
+    struct NeighborList {
+        std::vector<int> neighbours;
+    };
+
+    auto getNeighbours = [&](const int cellIndex) {
+        NeighborList activeCellHeads;
+        int cellX = cellIndex % gridCols;
+        int cellY = cellIndex / gridCols;
+        std::array<int, 5> heads{};
+        int k = 0;
+        heads[k++] = cellHeads[cellIndex];
+        if (cellX < maxCol) { // east cell
+            heads[k++] = cellHeads[cellIndex + 1];
+        }
+        if (cellY < maxRow) {
+            heads[k++] = cellHeads[cellIndex + gridCols]; // south cell
+            if (cellX < maxCol) {
+                heads[k++] = cellHeads[cellIndex + gridCols + 1]; // south-east cell
+            }
+            if (cellX > 0) {
+                heads[k++] = cellHeads[cellIndex + gridCols - 1]; // south-west cell //TODO: check if can remove
+            }
+        }
+        for (int head : heads) {
+            activeCellHeads.neighbours.push_back(head);
+            for (int u = head; u != -1; u = nextUnit[u]) {
+                activeCellHeads.neighbours.push_back(u);
+            }
+        }
+        return activeCellHeads;
+    };
+
+    // TODO: fix, doesnt quite work yet.
+    float desiredDistSquared = unitSize * unitSize;
+    for (const int cellIndex : activeCells) {
+        int unit = cellHeads[cellIndex];
+        glm::vec2& pos = positions[unit];
+        float px = pos.x;
+        float py = pos.y;
+        auto [neighbours] = getNeighbours(cellIndex);
+        for (const int i : neighbours) {
+            if (i == unit) {
+                continue;
+            }
+            glm::vec2& ipos = positions[i];
+            float ipx = ipos.x;
+            float dx = ipx - px;
+            if (dx <= unitSize) {
+                float ipy = ipos.y;
+                float dy = ipy - py;
+                if (dy <= unitSize) {
+                    float distSquared = dx * dx + dy * dy;
+                    if (distSquared <= desiredDistSquared) {
+                        float nx = dx / distSquared;
+                        float ny = dy / distSquared;
+                        float dist = sqrt(distSquared);
+                        float overlap = unitSize - dist;
+                        glm::vec2& vel = velocities[unit];
+                        glm::vec2& ivel = velocities[i];
+                        float vx = vel.x;
+                        float vy = vel.y;
+                        float ivx = ivel.x;
+                        float ivy = ivel.y;
+                        float dvx = ivx - vx;
+                        float dvy = ivy - vy;
+                        pos.x -= nx * (overlap);
+                        pos.y -= ny * (overlap);
+                        pos.x = std::clamp(pos.x, worldOrigin.x, maxP.x);
+                        pos.y = std::clamp(pos.y, worldOrigin.y, maxP.y);
+                        ipos.x += nx * (overlap);
+                        ipos.y += ny * (overlap);
+                        ipos.x = std::clamp(ipos.x, worldOrigin.x, maxP.x);
+                        ipos.y = std::clamp(ipos.y, worldOrigin.y, maxP.y);
+                        vel.x -= nx * (overlap);
+                        vel.y -= ny * (overlap);
+                        vel.x = std::clamp(vel.x, 0.0f, 14.0f);
+                        vel.y = std::clamp(vel.y, 0.0f, 14.0f);
+                        ivel.x += nx * (overlap);
+                        ivel.y += ny * (overlap);
+                        ivel.x = std::clamp(ivel.x, 0.0f, 14.0f);
+                        ivel.y = std::clamp(ivel.y, 0.0f, 14.0f);
+                    }
+                }
+            }
+
+            // glm::vec2 rpos = ipos - pos;
+            // glm::vec2 rvel = ivel-vel;
+            // glm::vec2 normal = normalize(rpos);
+            // float distance = length(rpos);
+            // float normalVel = dot(normal, rvel);
+            // if (distance <= unitSize) {
+            //     pos -= normal * (unitSize - distance);
+            //     ipos += normal * (unitSize - distance);
+            //     // vel -= normalVel*invMass[unit];
+            //     // ivel += normalVel*invMass[unit];
+            // }
+        }
     }
 }
 
