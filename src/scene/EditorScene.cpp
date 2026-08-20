@@ -7,6 +7,7 @@
 
 #include "editor/EditorUi.hpp"
 #include "editor/HitTest.hpp"
+#include "editor/Snap.hpp"
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
@@ -136,7 +137,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
     if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Polyline) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION:
-                m_draft.cursor = m_cursorWorld;
+                m_draft.cursor = editor::snapPosition(m_cursorWorld, m_state.snap);
                 return m_draft.active;
 
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
@@ -149,7 +150,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     return true;
                 }
                 m_draft.active = true;
-                m_draft.points.push_back(m_cursorWorld);
+                m_draft.points.push_back(editor::snapPosition(m_cursorWorld, m_state.snap));
                 return true;
             }
 
@@ -163,14 +164,16 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     m_placement.active = true;
-                    m_placement.start = m_cursorWorld;
-                    m_placement.current = m_cursorWorld;
+                    m_placement.start = editor::snapPosition(m_cursorWorld, m_state.snap);
+                    m_placement.current = m_placement.start;
                     return true;
                 }
                 break;
 
             case SDL_EVENT_MOUSE_MOTION:
-                m_placement.current = m_cursorWorld;
+                // Snap here too, so the preview shows exactly what release
+                // would produce.
+                m_placement.current = editor::snapPosition(m_cursorWorld, m_state.snap);
                 return m_placement.active;
 
             case SDL_EVENT_MOUSE_BUTTON_UP: {
@@ -180,7 +183,8 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 m_placement.active = false;
 
                 logic::Wall wall;
-                if (editor::makeWallFromDrag(m_state.tool, m_placement.start, m_cursorWorld, m_state.newWallColor,
+                if (editor::makeWallFromDrag(m_state.tool, m_placement.start,
+                                             editor::snapPosition(m_cursorWorld, m_state.snap), m_state.newWallColor,
                                              wall)) {
                     m_state.beginMutation();
                     m_state.level.walls.push_back(std::move(wall));
@@ -198,12 +202,19 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION: {
                 if (m_activeHandle.kind != editor::HandleKind::None && m_state.selection.isWall()) {
-                    editor::applyHandleDrag(m_state.level.walls[m_state.selection.index], m_activeHandle, m_cursorWorld,
-                                            m_rotationGrabOffset);
+                    logic::Wall& wall = m_state.level.walls[m_state.selection.index];
+                    const glm::vec2 target = m_activeHandle.kind == editor::HandleKind::ResizeCorner
+                                                 ? editor::snapPosition(m_cursorWorld, m_state.snap)
+                                                 : m_cursorWorld;
+                    editor::applyHandleDrag(wall, m_activeHandle, target, m_rotationGrabOffset);
+                    if (m_activeHandle.kind == editor::HandleKind::Rotate) {
+                        wall.rotation = editor::snapRotation(wall.rotation, m_state.snap);
+                    }
                     return true;
                 }
                 if (m_draggingBody && m_state.selection.isWall()) {
-                    m_state.level.walls[m_state.selection.index].center = m_cursorWorld - m_dragGrabOffset;
+                    m_state.level.walls[m_state.selection.index].center =
+                        editor::snapPosition(m_cursorWorld - m_dragGrabOffset, m_state.snap);
                     return true;
                 }
                 m_state.hovered = editor::pick(m_state.level, m_cursorWorld);
