@@ -2,10 +2,46 @@
 
 #include <imgui.h>
 
+#include <cstdio>
+#include <iterator>
+
 #include "editor/EditorState.hpp"
+#include "editor/Tools.hpp"
 
 namespace horde::editor {
 namespace {
+
+void drawToolbar(EditorState& state) {
+    ImGui::SetNextWindowPos(ImVec2(320.0f, 20.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(240.0f, 300.0f), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Tools");
+
+    const Tool tools[] = {Tool::Select,   Tool::Rectangle, Tool::Triangle, Tool::Circle,
+                          Tool::Polyline, Tool::Spawn,     Tool::Exit};
+
+    for (int i = 0; i < static_cast<int>(std::size(tools)); ++i) {
+        const Tool tool = tools[i];
+        char label[64];
+        std::snprintf(label, sizeof(label), "%d  %s", i + 1, toolName(tool));
+
+        if (ImGui::RadioButton(label, state.tool == tool)) {
+            state.tool = tool;
+        }
+    }
+
+    ImGui::SeparatorText("New wall colour");
+
+    float color[3] = {static_cast<float>(state.newWallColor.r) / 255.0f,
+                      static_cast<float>(state.newWallColor.g) / 255.0f,
+                      static_cast<float>(state.newWallColor.b) / 255.0f};
+    if (ImGui::ColorEdit3("##newcolor", color)) {
+        state.newWallColor = {static_cast<std::uint8_t>(color[0] * 255.0f),
+                              static_cast<std::uint8_t>(color[1] * 255.0f),
+                              static_cast<std::uint8_t>(color[2] * 255.0f)};
+    }
+
+    ImGui::End();
+}
 
 void drawLevelPanel(EditorState& state, bool& wantsExit) {
     ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
@@ -67,6 +103,7 @@ void drawLevelPanel(EditorState& state, bool& wantsExit) {
 } // namespace
 
 void drawEditorUi(EditorState& state, bool& wantsExit) {
+    drawToolbar(state);
     drawLevelPanel(state, wantsExit);
 }
 

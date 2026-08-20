@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/EditorState.hpp"
+#include "editor/Tools.hpp"
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
 
@@ -37,6 +38,10 @@ private:
 
     editor::EditorState m_state;
     glm::vec2 m_cursorWorld{0.0f, 0.0f};
+
+    // The box-sweep drag in progress, for the rectangle, triangle and circle
+    // tools.
+    editor::Placement m_placement;
 
     // Set while the left button is held after grabbing a selected element.
     bool m_draggingBody = false;
