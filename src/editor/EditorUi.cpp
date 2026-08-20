@@ -9,6 +9,7 @@
 #include <variant>
 
 #include "editor/EditorState.hpp"
+#include "editor/Markers.hpp"
 #include "editor/Tools.hpp"
 
 namespace horde::editor {
@@ -88,6 +89,7 @@ void drawLevelPanel(EditorState& state, bool& wantsExit) {
     if (ImGui::DragFloat2("Size", size, 1.0f, 50.0f, 10000.0f, "%.0f")) {
         state.beginMutation();
         state.level.size = {size[0], size[1]};
+        clampAllMarkers(state.level);
     }
 
     ImGui::SeparatorText("Background");
