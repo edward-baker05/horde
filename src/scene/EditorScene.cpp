@@ -35,6 +35,16 @@ glm::vec2 EditorScene::mouseWorld(float screenX, float screenY) const {
     return m_camera.screenToWorld({screenX, screenY});
 }
 
+void EditorScene::commitDraft() {
+    logic::Wall wall;
+    if (editor::finishPolyline(m_draft, m_state.newWallColor, m_state.newPolylineThickness, wall)) {
+        m_state.beginMutation();
+        m_state.level.walls.push_back(std::move(wall));
+    }
+    m_draft.clear();
+    // Tool stays armed, ready for the next polyline.
+}
+
 bool EditorScene::handleEvent(const SDL_Event& event) {
     // ImGui gets first refusal on the mouse, so dragging a panel never also
     // drags the world behind it.
@@ -73,7 +83,18 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 editor::deleteSelected(m_state);
                 return true;
 
+            case SDLK_RETURN:
+            case SDLK_KP_ENTER:
+                if (m_draft.active) {
+                    commitDraft();
+                    return true;
+                }
+                break;
+
             case SDLK_ESCAPE:
+                // Escape abandons an in-progress polyline entirely, rather than
+                // committing a partial one.
+                m_draft.clear();
                 m_placement.active = false;
                 m_state.tool = editor::Tool::Select;
                 return true;
@@ -95,6 +116,31 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     return true;
                 }
                 break;
+
+            default:
+                break;
+        }
+    }
+
+    if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Polyline) {
+        switch (event.type) {
+            case SDL_EVENT_MOUSE_MOTION:
+                m_draft.cursor = m_cursorWorld;
+                return m_draft.active;
+
+            case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+                if (event.button.button != SDL_BUTTON_LEFT) {
+                    break;
+                }
+                // A double click finishes rather than adding a duplicate point.
+                if (event.button.clicks >= 2) {
+                    commitDraft();
+                    return true;
+                }
+                m_draft.active = true;
+                m_draft.points.push_back(m_cursorWorld);
+                return true;
+            }
 
             default:
                 break;
@@ -215,6 +261,20 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
             glm::vec4 tint = gfx::toFloatColor(preview.color);
             tint.a = 0.45f;
             gfx::renderWall(preview, batch, atlas, tint);
+        }
+    }
+
+    // The in-progress polyline, plus a rubber-band segment to the cursor so you
+    // can see where the next click would land.
+    if (m_draft.active && !m_draft.points.empty()) {
+        editor::PolylineDraft preview = m_draft;
+        preview.points.push_back(m_draft.cursor);
+
+        logic::Wall wall;
+        if (editor::finishPolyline(preview, m_state.newWallColor, m_state.newPolylineThickness, wall)) {
+            glm::vec4 tint = gfx::toFloatColor(wall.color);
+            tint.a = 0.55f;
+            gfx::renderWall(wall, batch, atlas, tint);
         }
     }
 }

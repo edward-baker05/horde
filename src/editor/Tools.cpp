@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace horde::editor {
 
@@ -58,6 +59,34 @@ bool makeWallFromDrag(Tool tool, glm::vec2 start, glm::vec2 end, logic::Rgb colo
             return false;
     }
 
+    return true;
+}
+
+bool finishPolyline(const PolylineDraft& draft, logic::Rgb color, float thickness, logic::Wall& out) {
+    if (draft.points.size() < 2) {
+        return false;
+    }
+
+    // The wall's centre is the centroid of its points, so that rotating and
+    // dragging a polyline behave like every other wall kind.
+    glm::vec2 centroid{0.0f, 0.0f};
+    for (const glm::vec2& point : draft.points) {
+        centroid += point;
+    }
+    centroid /= static_cast<float>(draft.points.size());
+
+    logic::PolylineShape line;
+    line.thickness = thickness;
+    line.points.reserve(draft.points.size());
+    for (const glm::vec2& point : draft.points) {
+        line.points.push_back(point - centroid);
+    }
+
+    out = logic::Wall{};
+    out.center = centroid;
+    out.rotation = 0.0f;
+    out.color = color;
+    out.shape = std::move(line);
     return true;
 }
 

@@ -67,6 +67,9 @@ void drawToolbar(EditorState& state) {
                               static_cast<std::uint8_t>(color[2] * 255.0f)};
     }
 
+    ImGui::SeparatorText("New polyline");
+    ImGui::DragFloat("Thickness", &state.newPolylineThickness, 0.25f, 1.0f, 200.0f);
+
     ImGui::End();
 }
 

@@ -61,6 +61,9 @@ struct EditorState {
     // Colour applied to the next wall placed.
     logic::Rgb newWallColor{180, 180, 190};
 
+    // Thickness applied to the next polyline drawn.
+    float newPolylineThickness = 6.0f;
+
     // Empty until the level has been saved or loaded from somewhere.
     std::filesystem::path path;
     bool dirty = false;
