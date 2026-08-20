@@ -32,6 +32,10 @@ private:
     // World-space position of the mouse, updated every motion event.
     glm::vec2 mouseWorld(float screenX, float screenY) const;
 
+    // Turns the in-progress polyline draft into a wall, if it has enough
+    // points, and clears it either way.
+    void commitDraft();
+
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
@@ -42,6 +46,9 @@ private:
     // The box-sweep drag in progress, for the rectangle, triangle and circle
     // tools.
     editor::Placement m_placement;
+
+    // The polyline being clicked out, point by point.
+    editor::PolylineDraft m_draft;
 
     // Set while the left button is held after grabbing a selected element.
     bool m_draggingBody = false;
