@@ -28,20 +28,23 @@ bool LevelScene::onEnter(Services& services) {
     // to a bare default rather than failing to enter the scene.
     const std::filesystem::path path = m_levelPath.empty() ? paths::asset("levels/default.level.json") : m_levelPath;
 
-    std::string error;
-    if (std::optional<logic::Level> loaded = logic::loadLevel(path, &error)) {
-        m_level = std::move(*loaded);
-    } else {
-        SDL_Log("LevelScene: falling back to an empty level (%s)", error.c_str());
-        m_level = logic::makeDefaultLevel();
-    }
+    // std::string error;
+    // if (std::optional<logic::Level> loaded = logic::loadLevel(path, &error)) {
+    //     m_level = std::move(*loaded);
+    // } else {
+    //     SDL_Log("LevelScene: falling back to an empty level (%s)", error.c_str());
+    //     m_level = logic::makeDefaultLevel();
+    // }
+    m_level = logic::makeDefaultLevel();
+    unit_manager = UnitManager(MaxUnits, m_level.size, enemy_size);
 
-    unit_manager.SetWorldBounds(m_level.size);
-
-    for (size_t i = 0; i < MaxUnits; ++i) {
+    for (int i = 0; i < MaxUnits; ++i) {
         unit_manager.SpawnUnit(
             // silly wrapping
-            glm::vec2(5 * (i * 5) / int(level_size.y), (i * 5) % int(level_size.y)), glm::vec2(2, (-8.0f)), 10);
+            glm::vec2(i * 25 / int(m_level.size.y), i * 5 % int(m_level.size.y)),
+            glm::vec2(i * 5 / int(m_level.size.y), i * 5 / int(m_level.size.y)),
+            // glm::vec2(2, std::min(i/int(m_level.size.y),10)),
+            10);
     }
 
     return true;
@@ -68,6 +71,11 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
     const glm::vec2* positions = unit_manager.GetPositionsPtr();
 
     for (size_t i = 0; i < unitCount; ++i) {
+        if (i == 0) {
+            unit.color = {1.0f, 0.0f, 0.0f, 1.0f};
+        } else {
+            unit.color = {0.0f, 1.0f, 0.2f, 1.0f};
+        }
         unit.position = {positions[i], 0.0f};
         batch.draw(unit, m_services->atlas->handle());
     }

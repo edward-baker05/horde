@@ -89,7 +89,7 @@ int App::run() {
         // Clamped so a hitch or a dragged window does not teleport the
         // simulation on the next frame.
         // TODO: This will need changing with more complex stuff, likely going to be moved to Logic/sim
-        const float deltaTime = std::min(static_cast<float>(now - m_lastTicks) / 1.0e9f, 0.1f);
+        const float deltaTime = std::min(static_cast<float>(now - m_lastTicks) / 1.0e9f, 0.01666f);
         m_lastTicks = now;
 
         //? handles inputs maybe?

@@ -80,7 +80,7 @@ struct Marker {
 // Bounds run from (0,0) to `size`. The background exactly fills those bounds
 // and is the only element units do not collide with.
 struct Level {
-    glm::vec2 size{600.0f, 400.0f};
+    glm::vec2 size{6000.0f, 4000.0f};
     Rgb backgroundColor{38, 42, 50};
     std::vector<Wall> walls;     // a later index draws on top of an earlier one
     std::vector<Marker> markers; // always at least one spawn and one exit
