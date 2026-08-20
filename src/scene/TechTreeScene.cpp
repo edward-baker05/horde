@@ -39,19 +39,14 @@ void TechTreeScene::render(gfx::SpriteBatch& batch) {
     edge.position = {m_nodeA.x - normal.x * kEdgeThickness * 0.5f, m_nodeA.y - normal.y * kEdgeThickness * 0.5f, 0.0f};
     edge.size = {length, kEdgeThickness};
     edge.rotation = std::atan2(delta.y, delta.x);
-    edge.uv = gfx::atlasCell(1, 1, 2, 2);
+    edge.uv = gfx::atlasCell(1, 1, 4, 4);
     edge.color = {0.4f, 0.4f, 0.45f, 1.0f};
 
     batch.draw(edge, atlas);
 
     for (const glm::vec2& position : {m_nodeA, m_nodeB}) {
-        gfx::Sprite node;
-        node.position = {position.x - kNodeSize * 0.5f, position.y - kNodeSize * 0.5f, 0.1f};
-        node.size = {kNodeSize, kNodeSize};
-        node.uv = gfx::atlasCell(1, 0, 2, 2);
-        node.color = {0.7f, 0.9f, 0.7f, 1.0f};
-
-        batch.draw(node, atlas);
+        gfx::drawCentered(batch, atlas, position, {kNodeSize, kNodeSize}, 0.0f, gfx::atlasCell(1, 0, 4, 4),
+                          {0.7f, 0.9f, 0.7f, 1.0f}, 0.1f);
     }
 }
 

@@ -1,9 +1,17 @@
-#include "scene/LevelScene.hpp"
+#include "LevelScene.hpp"
+
+#include <SDL3/SDL_log.h>
 
 #include <imgui.h>
 
+#include <optional>
+#include <string>
+
+#include "core/Paths.hpp"
+#include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "logic/LevelIO.hpp"
 #include "scene/SceneStack.hpp"
 
 namespace horde::scene {
@@ -15,6 +23,20 @@ bool LevelScene::onEnter(Services& services) {
     int height = 0;
     SDL_GetWindowSizeInPixels(services.window, &width, &height);
     m_camera.setViewport(static_cast<float>(width), static_cast<float>(height));
+
+    // A missing or malformed level must never stop the game booting: fall back
+    // to a bare default rather than failing to enter the scene.
+    const std::filesystem::path path = m_levelPath.empty() ? paths::asset("levels/default.level.json") : m_levelPath;
+
+    std::string error;
+    if (std::optional<logic::Level> loaded = logic::loadLevel(path, &error)) {
+        m_level = std::move(*loaded);
+    } else {
+        SDL_Log("LevelScene: falling back to an empty level (%s)", error.c_str());
+        m_level = logic::makeDefaultLevel();
+    }
+
+    unit_manager.SetWorldBounds(m_level.size);
 
     for (size_t i = 0; i < MaxUnits; ++i) {
         unit_manager.SpawnUnit(
@@ -34,17 +56,11 @@ void LevelScene::update(float dt) {
 }
 
 void LevelScene::render(gfx::SpriteBatch& batch) {
-    gfx::Sprite rectangle;
-    rectangle.position = {0.0f, 0.0f, 0.0f};
-    rectangle.size = level_size;
-    rectangle.uv = gfx::atlasCell(1, 1, 2, 2);
-    rectangle.color = {0.35f, 0.65f, 0.9f, 1.0f};
-
-    batch.draw(rectangle, m_services->atlas->handle());
+    gfx::renderLevel(m_level, batch, m_services->atlas->handle());
 
     gfx::Sprite unit;
     unit.size = {enemy_size, enemy_size};
-    unit.uv = gfx::atlasCell(1, 0, 2, 2);
+    unit.uv = gfx::atlasCell(1, 0, 4, 4);
     // TODO: color could be determined from hp
     unit.color = {0.0f, 1.0f, 0.2f, 1.0f};
 
