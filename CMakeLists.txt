@@ -15,16 +15,28 @@ add_executable(horde
     src/core/Paths.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
+    src/gfx/LevelRenderer.cpp
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
+    src/editor/EditorUi.cpp
+    src/editor/Handles.cpp
+    src/editor/Markers.cpp
+    src/editor/HitTest.cpp
+    src/editor/Tools.cpp
+    src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
     src/ui/ImGuiLayer.cpp
-        src/logic/UnitData.cpp
-        src/logic/UnitData.hpp)
+    src/logic/UnitData.cpp
+    src/logic/UnitData.hpp
+    src/logic/Level.cpp
+    src/logic/LevelGeometry.cpp
+    src/logic/LevelFiles.cpp
+    src/logic/LevelIO.cpp
+    src/logic/LevelValidation.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -32,7 +44,8 @@ target_link_libraries(horde PRIVATE
     SDL3::SDL3
     SDL3_image::SDL3_image
     glm::glm
-    imgui::imgui)
+    imgui::imgui
+    nlohmann_json::nlohmann_json)
 
 if(MSVC)
     target_compile_options(horde PRIVATE /W4 /permissive-)
