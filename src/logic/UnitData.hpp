@@ -27,16 +27,16 @@ private:
 
     float unitSize;
     float cellSize;
-    float invCellSize = 1.f / cellSize;
+    float invCellSize;
 
     size_t currentUnits = 0;
-    size_t maxUnits;
+    size_t maxUnits{};
 
     // World bounds
-    const glm::vec2 worldOrigin = {0, 0};
-    glm::vec2 worldBounds;
+    static constexpr glm::vec2 worldOrigin = {0.0f, 0.0f};
+    glm::vec2 worldBounds{};
     glm::vec2 maxP{};
-    float restitution = -1.f;
+    float restitution = -0.1f;
 
     // used in Uniform Grid for collisions.
     std::vector<int> cellHeads;
@@ -48,28 +48,26 @@ private:
     int maxCol = 0;
     int maxRow = 0;
 
-public:
-    // Constructor
-    explicit UnitManager(size_t MaxUnits, glm::vec2 WorldBounds, float unit_size);
-
-    void Reserve(size_t newMaxUnits);
-
-    void SetWorldBounds(glm::vec2 WorldBounds);
-
     void BuildUniformGrid();
 
     void PopulateUniformGrid();
-
-    void SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM = 0.01f);
-
-    // Main Loop
-    void UpdatePhysics(float dt);
-
     void UpdatePositions(float dt);
 
     inline void ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel) const;
 
     void ResolveEntityCollisions(float dt);
+
+public:
+    // Constructor
+    UnitManager() = default;
+    UnitManager(size_t MaxUnits, glm::vec2 WorldBounds, float unit_size);
+
+    void Reserve(size_t newMaxUnits);
+
+    void SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM = 0.01f);
+
+    // Main Loop
+    void UpdatePhysics(float dt);
 
     // Getters and Setters
     [[nodiscard]] size_t GetCurrentUnits() const;

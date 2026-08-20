@@ -42,9 +42,9 @@ private:
     std::filesystem::path m_levelPath;
     logic::Level m_level;
 
-    static constexpr size_t MaxUnits = 1000000;
+    static constexpr size_t MaxUnits = 30000;
     float enemy_size = 5.0f;
-    UnitManager unit_manager{MaxUnits, glm::vec2{600.0f, 400.0f}, enemy_size};
+    UnitManager unit_manager;
 };
 
 } // namespace horde::scene
