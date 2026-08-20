@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/EditorState.hpp"
+#include "editor/Handles.hpp"
 #include "editor/Tools.hpp"
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
@@ -36,6 +37,11 @@ private:
     // points, and clears it either way.
     void commitDraft();
 
+    // Handles are drawn and picked at a constant SCREEN size, so their world
+    // size falls out of the current zoom.
+    float handleWorldSize() const;
+    float handlePickRadius() const;
+
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
@@ -53,6 +59,11 @@ private:
     // Set while the left button is held after grabbing a selected element.
     bool m_draggingBody = false;
     glm::vec2 m_dragGrabOffset{0.0f, 0.0f};
+
+    // The handle being dragged, if any, and the angle between the wall's
+    // rotation and the cursor when it was grabbed.
+    editor::Handle m_activeHandle;
+    float m_rotationGrabOffset = 0.0f;
 };
 
 } // namespace horde::scene

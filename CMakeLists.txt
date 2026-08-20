@@ -20,6 +20,7 @@ add_executable(horde
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
     src/editor/EditorUi.cpp
+    src/editor/Handles.cpp
     src/editor/HitTest.cpp
     src/editor/Tools.cpp
     src/scene/EditorScene.cpp
