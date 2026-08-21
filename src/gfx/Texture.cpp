@@ -135,6 +135,79 @@ bool Texture::loadFromFile(SDL_GPUDevice* device, const std::filesystem::path& p
     return true;
 }
 
+bool Texture::createFromPixels(SDL_GPUDevice* device, Uint32 width, Uint32 height, const void* rgbaPixels) {
+    release();
+
+    const Uint32 byteCount = width * height * 4;
+
+    SDL_GPUTextureCreateInfo textureInfo{};
+    textureInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    textureInfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    textureInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    textureInfo.width = width;
+    textureInfo.height = height;
+    textureInfo.layer_count_or_depth = 1;
+    textureInfo.num_levels = 1;
+
+    SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &textureInfo);
+    if (texture == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "SDL_CreateGPUTexture failed: %s", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUTransferBufferCreateInfo transferInfo{};
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = byteCount;
+
+    SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    if (transfer == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "SDL_CreateGPUTransferBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTexture(device, texture);
+        return false;
+    }
+
+    void* mapped = SDL_MapGPUTransferBuffer(device, transfer, false);
+    if (mapped == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "SDL_MapGPUTransferBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return false;
+    }
+    std::memcpy(mapped, rgbaPixels, byteCount);
+    SDL_UnmapGPUTransferBuffer(device, transfer);
+
+    SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(device);
+    if (commands == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "SDL_AcquireGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return false;
+    }
+
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commands);
+    SDL_GPUTextureTransferInfo srcInfo{};
+    srcInfo.transfer_buffer = transfer;
+    srcInfo.offset = 0;
+
+    SDL_GPUTextureRegion dstRegion{};
+    dstRegion.texture = texture;
+    dstRegion.w = width;
+    dstRegion.h = height;
+    dstRegion.d = 1;
+
+    SDL_UploadToGPUTexture(copyPass, &srcInfo, &dstRegion, false);
+    SDL_EndGPUCopyPass(copyPass);
+    SDL_SubmitGPUCommandBuffer(commands);
+
+    SDL_ReleaseGPUTransferBuffer(device, transfer);
+
+    m_device = device;
+    m_texture = texture;
+    m_width = width;
+    m_height = height;
+    return true;
+}
+
 bool Texture::createStorageTarget(SDL_GPUDevice* device, Uint32 width, Uint32 height, SDL_GPUTextureFormat format) {
     release();
 

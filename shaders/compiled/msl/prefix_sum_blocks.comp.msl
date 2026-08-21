@@ -1,0 +1,62 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ScanUniforms
+{
+    uint NumCells;
+    uint3 Padding;
+};
+
+kernel void main0(
+    device const uint* CellCounts [[buffer(0)]],
+    device uint* CellStarts [[buffer(1)]],
+    device uint* BlockSums [[buffer(2)]],
+    constant type_ScanUniforms& uniforms [[buffer(3)]],
+    uint3 gl_GlobalInvocationID [[thread_position_in_grid]],
+    uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]],
+    uint3 gl_WorkGroupID [[threadgroup_position_in_grid]])
+{
+    threadgroup uint s_data[512];
+    uint tid = gl_LocalInvocationID.x;
+    uint blockIdx = gl_WorkGroupID.x;
+
+    uint idx0 = blockIdx * 512 + tid * 2;
+    uint idx1 = idx0 + 1;
+
+    s_data[tid * 2]     = (idx0 < uniforms.NumCells) ? CellCounts[idx0] : 0;
+    s_data[tid * 2 + 1] = (idx1 < uniforms.NumCells) ? CellCounts[idx1] : 0;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint stride = 1;
+    while (stride <= 256) {
+        uint index = (tid + 1) * stride * 2 - 1;
+        if (index < 512) {
+            s_data[index] += s_data[index - stride];
+        }
+        stride *= 2;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (tid == 0) {
+        BlockSums[blockIdx] = s_data[511];
+        s_data[511] = 0;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    stride = 256;
+    while (stride >= 1) {
+        uint index = (tid + 1) * stride * 2 - 1;
+        if (index < 512) {
+            uint temp = s_data[index - stride];
+            s_data[index - stride] = s_data[index];
+            s_data[index] += temp;
+        }
+        stride /= 2;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (idx0 < uniforms.NumCells) CellStarts[idx0] = s_data[tid * 2];
+    if (idx1 < uniforms.NumCells) CellStarts[idx1] = s_data[tid * 2 + 1];
+}

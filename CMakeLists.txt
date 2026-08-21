@@ -48,9 +48,9 @@ target_link_libraries(horde PRIVATE
     nlohmann_json::nlohmann_json)
 
 if(MSVC)
-    target_compile_options(horde PRIVATE /W4 /permissive-)
+    target_compile_options(horde PRIVATE /W4 /permissive- /arch:AVX2)
 else()
-    target_compile_options(horde PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(horde PRIVATE -Wall -Wextra -Wpedantic -mavx2 -mfma)
 endif()
 
 # Regenerates shaders/compiled/ when the shadercross CLI is available; a no-op

@@ -1,0 +1,167 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_CollisionUniforms
+{
+    uint UnitCount;
+    float UnitSize;
+    float DesiredDistSq;
+    float CellSize;
+    float InvCellSize;
+    float RowHeight;
+    float InvRowHeight;
+    float Restitution;
+    int GridCols;
+    int GridRows;
+    int MaxCol;
+    int MaxRow;
+    float2 WorldOrigin;
+    float2 MaxPosition;
+    float Damping;
+    float MaxDisplacement;
+    uint EnableSleeping;
+    uint DeepSleepMinContacts;
+    float SleepMaxRelSpeed;
+    float OverRelaxation;
+    float ContactFriction;
+    float Padding;
+};
+
+constant int2 EvenNeighbors[6] = {
+    int2( 1,  0), int2(-1,  0), int2(-1, -1),
+    int2( 0, -1), int2(-1,  1), int2( 0,  1)
+};
+
+constant int2 OddNeighbors[6] = {
+    int2( 1,  0), int2(-1,  0), int2( 0, -1),
+    int2( 1, -1), int2( 0,  1), int2( 1,  1)
+};
+
+kernel void main0(
+    device float2* Positions [[buffer(0)]],
+    device float2* Velocities [[buffer(1)]],
+    device uint* UnitStates [[buffer(2)]],
+    device const uint* CellStarts [[buffer(3)]],
+    device const uint* CellEnds [[buffer(4)]],
+    constant type_CollisionUniforms& uniforms [[buffer(5)]],
+    uint gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint u = gl_GlobalInvocationID.x;
+    if (u >= uniforms.UnitCount) return;
+
+    float2 myPos = Positions[u];
+    float2 myVel = Velocities[u];
+    uint stateWord = UnitStates[u];
+    uint mySleepState = stateWord & 0xFF;
+
+    int row = clamp(int(myPos.y * uniforms.InvRowHeight), 0, uniforms.MaxRow);
+    float xOffset = (row % 2 == 1) ? (0.5f * uniforms.CellSize) : 0.0f;
+    int col = clamp(int((myPos.x - xOffset) * uniforms.InvCellSize), 0, uniforms.MaxCol);
+
+    float2 totalDisp = float2(0.0f, 0.0f);
+    float2 totalImpulse = float2(0.0f, 0.0f);
+    uint contactCount = 0;
+    float maxRelSpeed = 0.0f;
+
+    int neighborCells[7];
+    neighborCells[0] = col + row * uniforms.GridCols;
+    for (int k = 0; k < 6; ++k) {
+        int2 offset = (row % 2 == 0) ? EvenNeighbors[k] : OddNeighbors[k];
+        int nx = col + offset.x;
+        int ny = row + offset.y;
+        if (nx >= 0 && nx <= uniforms.MaxCol && ny >= 0 && ny <= uniforms.MaxRow) {
+            neighborCells[k + 1] = nx + ny * uniforms.GridCols;
+        } else {
+            neighborCells[k + 1] = -1;
+        }
+    }
+
+    for (int cellIdx = 0; cellIdx < 7; ++cellIdx) {
+        int cIdx = neighborCells[cellIdx];
+        if (cIdx == -1) continue;
+
+        uint start = CellStarts[cIdx];
+        uint end = CellEnds[cIdx];
+        if (start >= end) continue;
+
+        for (uint v = start; v < end; ++v) {
+            if (v != u) {
+                uint otherStateWord = UnitStates[v];
+                uint otherSleepState = otherStateWord & 0xFF;
+
+                if (uniforms.EnableSleeping != 0u && mySleepState == 2u && otherSleepState == 2u) {
+                    contactCount++;
+                } else {
+                    float2 otherPos = Positions[v];
+                    float2 delta = otherPos - myPos;
+                    if (abs(delta.x) <= uniforms.UnitSize && abs(delta.y) <= uniforms.UnitSize) {
+                        float distSq = dot(delta, delta);
+                        if (distSq < uniforms.DesiredDistSq && distSq > 0.00001f) {
+                            contactCount++;
+                            float dist = sqrt(distSq);
+                            float2 normal = delta / dist;
+
+                            float penetrRatio = max(0.0f, 1.0f - (dist / uniforms.UnitSize));
+                            float stiffness = uniforms.OverRelaxation * (1.0f + 1.5f * penetrRatio * penetrRatio);
+                            float overlap = 0.5f * stiffness * (uniforms.UnitSize - dist);
+                            totalDisp -= normal * overlap;
+
+                            float2 otherVel = Velocities[v];
+                            float2 relVel = otherVel - myVel;
+                            float relSpeed = length(relVel);
+                            maxRelSpeed = max(maxRelSpeed, relSpeed);
+
+                            float normalVel = dot(relVel, normal);
+                            if (normalVel < 0.0f) {
+                                float normalImpulse = -normalVel * uniforms.Damping;
+                                totalImpulse -= normal * normalImpulse;
+                            }
+
+                            float2 tangent = float2(-normal.y, normal.x);
+                            float tangentVel = dot(relVel, tangent);
+                            totalImpulse += tangent * (tangentVel * uniforms.ContactFriction);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (dot(totalDisp, totalDisp) > 0.0f || dot(totalImpulse, totalImpulse) > 0.0f) {
+        float dispLen = length(totalDisp);
+        if (dispLen > uniforms.MaxDisplacement && dispLen > 0.0001f) {
+            totalDisp = (totalDisp / dispLen) * uniforms.MaxDisplacement;
+        }
+        myPos += totalDisp;
+        myVel += totalImpulse;
+
+        if (myPos.x <= uniforms.WorldOrigin.x || myPos.x >= uniforms.MaxPosition.x) {
+            myVel.x *= uniforms.Restitution;
+        }
+        if (myPos.y <= uniforms.WorldOrigin.y) {
+            myVel.y *= uniforms.Restitution;
+        }
+        if (myPos.y >= uniforms.MaxPosition.y) {
+            myVel.y = 0.0f;
+        }
+        myPos = clamp(myPos, uniforms.WorldOrigin, uniforms.MaxPosition);
+
+        Positions[u] = myPos;
+        Velocities[u] = myVel;
+    }
+
+    uint newSleepState = 0u;
+    if (uniforms.EnableSleeping != 0u) {
+        if (maxRelSpeed < uniforms.SleepMaxRelSpeed) {
+            if (contactCount >= uniforms.DeepSleepMinContacts) {
+                newSleepState = 2u;
+            } else if (contactCount >= 1u) {
+                newSleepState = 1u;
+            }
+        }
+    }
+
+    UnitStates[u] = (newSleepState & 0xFF) | ((contactCount & 0xFF) << 16);
+}

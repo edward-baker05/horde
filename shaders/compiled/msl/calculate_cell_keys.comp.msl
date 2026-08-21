@@ -1,0 +1,36 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_KeyUniforms
+{
+    uint UnitCount;
+    float CellSize;
+    float InvCellSize;
+    float RowHeight;
+    float InvRowHeight;
+    int GridCols;
+    int GridRows;
+    int MaxCol;
+    int MaxRow;
+    float3 Padding;
+};
+
+kernel void main0(
+    device const float2* Positions [[buffer(0)]],
+    device uint* CellKeys [[buffer(1)]],
+    constant type_KeyUniforms& uniforms [[buffer(2)]],
+    uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint u = gl_GlobalInvocationID.x;
+    if (u >= uniforms.UnitCount) return;
+
+    float2 pos = Positions[u];
+    int row = clamp(int(pos.y * uniforms.InvRowHeight), 0, uniforms.MaxRow);
+    float xOffset = (row % 2 == 1) ? (0.5f * uniforms.CellSize) : 0.0f;
+    int col = clamp(int((pos.x - xOffset) * uniforms.InvCellSize), 0, uniforms.MaxCol);
+    uint cellIdx = uint(col + row * uniforms.GridCols);
+
+    CellKeys[u] = cellIdx;
+}

@@ -1,0 +1,46 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_SortUniforms
+{
+    uint UnitCount;
+    uint PassType;
+    uint2 Padding;
+};
+
+kernel void main0(
+    device uint* CellKeys [[buffer(0)]],
+    device float2* Positions [[buffer(1)]],
+    device float2* Velocities [[buffer(2)]],
+    device uint* UnitStates [[buffer(3)]],
+    constant type_SortUniforms& uniforms [[buffer(4)]],
+    uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint i = gl_GlobalInvocationID.x;
+    uint idxA = (i * 2) + uniforms.PassType;
+    uint idxB = idxA + 1;
+
+    if (idxB >= uniforms.UnitCount) return;
+
+    uint keyA = CellKeys[idxA];
+    uint keyB = CellKeys[idxB];
+
+    if (keyA > keyB) {
+        CellKeys[idxA] = keyB;
+        CellKeys[idxB] = keyA;
+
+        float2 posA = Positions[idxA];
+        Positions[idxA] = Positions[idxB];
+        Positions[idxB] = posA;
+
+        float2 velA = Velocities[idxA];
+        Velocities[idxA] = Velocities[idxB];
+        Velocities[idxB] = velA;
+
+        uint stateA = UnitStates[idxA];
+        UnitStates[idxA] = UnitStates[idxB];
+        UnitStates[idxB] = stateA;
+    }
+}

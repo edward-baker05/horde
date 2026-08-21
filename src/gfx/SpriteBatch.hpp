@@ -60,8 +60,11 @@ public:
     // Builds the pipeline against the given swapchain format. Returns false and
     // logs on failure.
     bool init(SDL_GPUDevice* device, const ShaderLoader& shaders, SDL_GPUTextureFormat colorTargetFormat,
-              Uint32 maxSprites = 16384);
+              Uint32 maxSprites = 4194304);
     void shutdown();
+
+    // Ensures GPU buffer capacity is sufficient for at least requiredCapacity sprites, expanding dynamically if needed.
+    bool ensureCapacity(Uint32 requiredCapacity);
 
     // Clears the queue. Call once per frame before adding sprites.
     void begin();
@@ -69,6 +72,11 @@ public:
     // Queues a sprite sampled from `texture`. Consecutive sprites sharing a
     // texture collapse into a single draw call.
     void draw(const Sprite& sprite, SDL_GPUTexture* texture);
+
+    // Fast AVX2-accelerated batch draw for units. Directly streams 64-byte Sprite
+    // structures into the sprite array in bulk.
+    void drawUnits(const glm::vec2* positions, const int* healths, size_t count, glm::vec2 size, glm::vec4 uv,
+                   SDL_GPUTexture* texture);
 
     // Uploads the queue. Must be called on the command buffer OUTSIDE any
     // render pass, before flush().

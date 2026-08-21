@@ -51,7 +51,7 @@ bool App::init(const AppConfig& config) {
     m_shaders = std::make_unique<gfx::ShaderLoader>(m_gpu.device());
 
     // m_batch is a gfx::SpriteBatch object, I think it's for batching sprite draw calls and atlas stuff
-    if (!m_batch.init(m_gpu.device(), *m_shaders, m_gpu.swapchainFormat())) {
+    if (!m_batch.init(m_gpu.device(), *m_shaders, m_gpu.swapchainFormat(), 1048576)) {
         return false;
     }
     // loads sprite atlas. I think we'll be using one large atlas at runtime, so I'd like to make
@@ -85,21 +85,20 @@ bool App::init(const AppConfig& config) {
 
 int App::run() {
     while (m_running) {
-        const Uint64 now = SDL_GetTicksNS();
+        const Uint64 frameStartNS = SDL_GetTicksNS();
         // Clamped so a hitch or a dragged window does not teleport the
         // simulation on the next frame.
-        // TODO: This will need changing with more complex stuff, likely going to be moved to Logic/sim
-        const float deltaTime = std::min(static_cast<float>(now - m_lastTicks) / 1.0e9f, 0.01666f);
-        m_lastTicks = now;
+        const float deltaTime = std::min(static_cast<float>(frameStartNS - m_lastTicks) / 1.0e9f, 0.0333f);
+        m_lastTicks = frameStartNS;
 
-        //? handles inputs maybe?
+        // Handles inputs
         pumpEvents();
 
         if (!m_running) {
             break;
         }
 
-        // App general update func
+        // App general update and render
         update(deltaTime);
         render();
 
@@ -110,6 +109,21 @@ int App::run() {
         // Every scene popped means there is nothing left to show.
         if (m_scenes->empty()) {
             m_running = false;
+        }
+
+        // High-precision frame pacer
+        if (m_config.targetFps > 0) {
+            const Uint64 targetFrameTimeNS = 1'000'000'000ULL / static_cast<Uint64>(m_config.targetFps);
+            const Uint64 elapsed = SDL_GetTicksNS() - frameStartNS;
+            if (elapsed < targetFrameTimeNS) {
+                const Uint64 remaining = targetFrameTimeNS - elapsed;
+                if (remaining > 2'000'000ULL) {
+                    SDL_DelayNS(remaining - 1'500'000ULL);
+                }
+                while ((SDL_GetTicksNS() - frameStartNS) < targetFrameTimeNS) {
+                    _mm_pause();
+                }
+            }
         }
     }
 
@@ -221,7 +235,9 @@ void App::render() {
     if (pass != nullptr) {
         if (active != nullptr) {
             active->camera().setViewport(static_cast<float>(swapchainWidth), static_cast<float>(swapchainHeight));
-            m_batch.flush(commands, pass, active->camera().viewProjection());
+            const glm::mat4 vp = active->camera().viewProjection();
+            m_batch.flush(commands, pass, vp);
+            active->renderPass(commands, pass, vp);
         }
 
         m_imgui.draw(commands, pass);

@@ -21,6 +21,7 @@ struct AppConfig {
     int height = 900;
     bool vsync = true;
     bool gpuDebug = true;
+    int targetFps = 0; // 0 = vsync/uncapped, >0 = precision paced FPS (e.g. 60, 144, 240)
 };
 
 // Owns the window, the GPU device and the frame loop, and drives the scene

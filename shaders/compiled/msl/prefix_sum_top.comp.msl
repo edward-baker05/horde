@@ -1,0 +1,56 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_TopScanUniforms
+{
+    uint NumBlocks;
+    uint3 Padding;
+};
+
+kernel void main0(
+    device uint* BlockSums [[buffer(0)]],
+    constant type_TopScanUniforms& uniforms [[buffer(1)]],
+    uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]])
+{
+    threadgroup uint s_blockData[2048];
+    uint tid = gl_LocalInvocationID.x;
+
+    uint idx0 = tid * 2;
+    uint idx1 = idx0 + 1;
+
+    s_blockData[idx0] = (idx0 < uniforms.NumBlocks) ? BlockSums[idx0] : 0;
+    s_blockData[idx1] = (idx1 < uniforms.NumBlocks) ? BlockSums[idx1] : 0;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint stride = 1;
+    while (stride <= 1024) {
+        uint index = (tid + 1) * stride * 2 - 1;
+        if (index < 2048) {
+            s_blockData[index] += s_blockData[index - stride];
+        }
+        stride *= 2;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (tid == 0) {
+        s_blockData[2047] = 0;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    stride = 1024;
+    while (stride >= 1) {
+        uint index = (tid + 1) * stride * 2 - 1;
+        if (index < 2048) {
+            uint temp = s_blockData[index - stride];
+            s_blockData[index - stride] = s_blockData[index];
+            s_blockData[index] += temp;
+        }
+        stride /= 2;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (idx0 < uniforms.NumBlocks) BlockSums[idx0] = s_blockData[idx0];
+    if (idx1 < uniforms.NumBlocks) BlockSums[idx1] = s_blockData[idx1];
+}

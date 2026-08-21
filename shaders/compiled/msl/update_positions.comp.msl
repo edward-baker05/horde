@@ -1,0 +1,71 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_SimulationUniforms
+{
+    float DeltaTime;
+    uint UnitCount;
+    float Gravity;
+    float Restitution;
+    float2 WorldOrigin;
+    float2 MaxPosition;
+    float2 MinVelocity;
+    float2 MaxVelocity;
+    float FloorFriction;
+    float UnitSize;
+    float CellSize;
+    float InvCellSize;
+    float RowHeight;
+    float InvRowHeight;
+    int GridCols;
+    int GridRows;
+    int MaxCol;
+    int MaxRow;
+    float2 Padding;
+};
+
+kernel void main0(
+    device float2* Positions [[buffer(0)]],
+    device float2* Velocities [[buffer(1)]],
+    device atomic_uint* CellCounts [[buffer(2)]],
+    device uint* CellKeys [[buffer(3)]],
+    device uint* UnitLocalIndices [[buffer(4)]],
+    constant type_SimulationUniforms& uniforms [[buffer(5)]],
+    uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint u = gl_GlobalInvocationID.x;
+    if (u >= uniforms.UnitCount) return;
+
+    float2 pos = Positions[u];
+    float2 vel = Velocities[u];
+
+    vel.y += uniforms.Gravity * uniforms.DeltaTime;
+    vel = clamp(vel, uniforms.MinVelocity, uniforms.MaxVelocity);
+    pos += vel * uniforms.DeltaTime;
+
+    if (pos.x <= uniforms.WorldOrigin.x || pos.x >= uniforms.MaxPosition.x) {
+        vel.x *= uniforms.Restitution;
+    }
+    if (pos.y <= uniforms.WorldOrigin.y) {
+        vel.y *= uniforms.Restitution;
+    }
+    if (pos.y >= uniforms.MaxPosition.y) {
+        vel.y = 0.0f;
+        vel.x *= uniforms.FloorFriction;
+    }
+    pos = clamp(pos, uniforms.WorldOrigin, uniforms.MaxPosition);
+
+    Positions[u] = pos;
+    Velocities[u] = vel;
+
+    int row = clamp(int(pos.y * uniforms.InvRowHeight), 0, uniforms.MaxRow);
+    float xOffset = (row % 2 == 1) ? (0.5f * uniforms.CellSize) : 0.0f;
+    int col = clamp(int((pos.x - xOffset) * uniforms.InvCellSize), 0, uniforms.MaxCol);
+    uint cellIdx = uint(col + row * uniforms.GridCols);
+
+    uint localSlot = atomic_fetch_add_explicit(&CellCounts[cellIdx], 1u, memory_order_relaxed);
+    CellKeys[u] = cellIdx;
+    UnitLocalIndices[u] = localSlot;
+}

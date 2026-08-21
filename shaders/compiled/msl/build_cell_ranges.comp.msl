@@ -1,0 +1,25 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_RangeUniforms
+{
+    uint UnitCount;
+    uint3 Padding;
+};
+
+kernel void main0(
+    device const uint* CellKeys [[buffer(0)]],
+    device atomic_int* CellStarts [[buffer(1)]],
+    device atomic_int* CellEnds [[buffer(2)]],
+    constant type_RangeUniforms& uniforms [[buffer(3)]],
+    uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint u = gl_GlobalInvocationID.x;
+    if (u >= uniforms.UnitCount) return;
+
+    uint key = CellKeys[u];
+    atomic_fetch_min_explicit(&CellStarts[key], int(u), memory_order_relaxed);
+    atomic_fetch_max_explicit(&CellEnds[key], int(u + 1), memory_order_relaxed);
+}

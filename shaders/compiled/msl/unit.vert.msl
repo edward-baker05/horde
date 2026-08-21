@@ -1,0 +1,67 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_UnitRenderUniforms
+{
+    float4x4 ViewProjection;
+    float2 UnitSize;
+    float2 Padding0;
+    float4 UnitUV;
+};
+
+struct main0_out
+{
+    float4 Color [[user(locn0)]];
+    float2 Texcoord [[user(locn1)]];
+    float4 gl_Position [[position]];
+};
+
+constant uint TriangleIndices[6] = { 0, 1, 2, 3, 2, 1 };
+constant float2 QuadCorners[4] = {
+    float2(0.0f, 0.0f),
+    float2(1.0f, 0.0f),
+    float2(0.0f, 1.0f),
+    float2(1.0f, 1.0f)
+};
+
+vertex main0_out main0(
+    device const float2* Positions [[buffer(0)]],
+    device const float2* Velocities [[buffer(1)]],
+    device const uint* UnitStates [[buffer(2)]],
+    constant type_UnitRenderUniforms& uniforms [[buffer(3)]],
+    uint gl_VertexIndex [[vertex_id]])
+{
+    main0_out out = {};
+    uint unitIndex = gl_VertexIndex / 6;
+    uint corner = TriangleIndices[gl_VertexIndex % 6];
+
+    float2 pos = Positions[unitIndex];
+    uint stateWord = UnitStates[unitIndex];
+    uint sleepState = stateWord & 0xFF;
+
+    float2 texcoords[4] = {
+        float2(uniforms.UnitUV.x, uniforms.UnitUV.y),
+        float2(uniforms.UnitUV.z, uniforms.UnitUV.y),
+        float2(uniforms.UnitUV.x, uniforms.UnitUV.w),
+        float2(uniforms.UnitUV.z, uniforms.UnitUV.w)
+    };
+
+    float2 local = QuadCorners[corner] * uniforms.UnitSize;
+    float2 worldPos = pos + local;
+
+    float4 color = float4(0.0f, 1.0f, 0.2f, 1.0f);
+    if (unitIndex == 0) {
+        color = float4(1.0f, 0.0f, 0.0f, 1.0f);
+    } else if (sleepState == 2u) {
+        color = float4(0.10f, 0.40f, 1.0f, 1.0f); // Royal Blue
+    } else if (sleepState == 1u) {
+        color = float4(0.20f, 0.80f, 1.0f, 1.0f); // Cyan
+    }
+
+    out.gl_Position = uniforms.ViewProjection * float4(worldPos, 0.0f, 1.0f);
+    out.Color = color;
+    out.Texcoord = texcoords[corner];
+    return out;
+}

@@ -1,0 +1,25 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ClearGridUniforms
+{
+    uint NumCells;
+    uint3 Padding;
+};
+
+kernel void main0(
+    device uint* CellCounts [[buffer(0)]],
+    device uint* CellStarts [[buffer(1)]],
+    device uint* CellEnds [[buffer(2)]],
+    constant type_ClearGridUniforms& uniforms [[buffer(3)]],
+    uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint cellIdx = gl_GlobalInvocationID.x;
+    if (cellIdx < uniforms.NumCells) {
+        CellCounts[cellIdx] = 0;
+        CellStarts[cellIdx] = 0;
+        CellEnds[cellIdx] = 0;
+    }
+}

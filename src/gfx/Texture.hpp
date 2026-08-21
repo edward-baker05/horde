@@ -23,6 +23,9 @@ public:
     // failure.
     bool loadFromFile(SDL_GPUDevice* device, const std::filesystem::path& path);
 
+    // Creates a texture directly from raw RGBA8 pixel memory
+    bool createFromPixels(SDL_GPUDevice* device, Uint32 width, Uint32 height, const void* rgbaPixels);
+
     // Creates an empty texture usable as a compute shader's read-write target
     // and as a sampled texture in the graphics pass.
     bool createStorageTarget(SDL_GPUDevice* device, Uint32 width, Uint32 height,

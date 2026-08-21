@@ -3,6 +3,7 @@
 #include <SDL3/SDL_log.h>
 
 #include <algorithm>
+#include <immintrin.h>
 
 #include "gfx/ShaderLoader.hpp"
 
@@ -96,9 +97,9 @@ bool SpriteBatch::init(SDL_GPUDevice* device, const ShaderLoader& shaders, SDL_G
     samplerInfo.min_filter = SDL_GPU_FILTER_NEAREST;
     samplerInfo.mag_filter = SDL_GPU_FILTER_NEAREST;
     samplerInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
-    samplerInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    samplerInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    samplerInfo.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    samplerInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+    samplerInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+    samplerInfo.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
 
     m_sampler = SDL_CreateGPUSampler(device, &samplerInfo);
 
@@ -139,6 +140,52 @@ void SpriteBatch::shutdown() {
     m_device = nullptr;
 }
 
+bool SpriteBatch::ensureCapacity(Uint32 requiredCapacity) {
+    if (requiredCapacity <= m_maxSprites) {
+        return true;
+    }
+    if (m_device == nullptr) {
+        return false;
+    }
+
+    Uint32 newCapacity = m_maxSprites > 0 ? m_maxSprites : 65536;
+    while (newCapacity < requiredCapacity) {
+        newCapacity *= 2;
+    }
+
+    if (m_spriteBuffer != nullptr) {
+        SDL_ReleaseGPUBuffer(m_device, m_spriteBuffer);
+        m_spriteBuffer = nullptr;
+    }
+    if (m_transferBuffer != nullptr) {
+        SDL_ReleaseGPUTransferBuffer(m_device, m_transferBuffer);
+        m_transferBuffer = nullptr;
+    }
+
+    m_maxSprites = newCapacity;
+
+    SDL_GPUBufferCreateInfo bufferInfo{};
+    bufferInfo.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
+    bufferInfo.size = static_cast<Uint32>(sizeof(Sprite)) * m_maxSprites;
+    m_spriteBuffer = SDL_CreateGPUBuffer(m_device, &bufferInfo);
+    if (m_spriteBuffer == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "SpriteBatch::ensureCapacity failed to create GPU buffer: %s", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUTransferBufferCreateInfo transferInfo{};
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = bufferInfo.size;
+    m_transferBuffer = SDL_CreateGPUTransferBuffer(m_device, &transferInfo);
+    if (m_transferBuffer == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "SpriteBatch::ensureCapacity failed to create transfer buffer: %s", SDL_GetError());
+        return false;
+    }
+
+    m_sprites.reserve(m_maxSprites);
+    return true;
+}
+
 void SpriteBatch::begin() {
     m_sprites.clear();
     m_runs.clear();
@@ -149,10 +196,7 @@ void SpriteBatch::draw(const Sprite& sprite, SDL_GPUTexture* texture) {
         return;
     }
 
-    if (m_sprites.size() >= m_maxSprites) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_GPU, "SpriteBatch full at %u sprites; dropping", m_maxSprites);
-        return;
-    }
+    ensureCapacity(static_cast<Uint32>(m_sprites.size() + 1));
 
     if (m_runs.empty() || m_runs.back().texture != texture) {
         m_runs.push_back({texture, static_cast<Uint32>(m_sprites.size()), 0});
@@ -160,6 +204,63 @@ void SpriteBatch::draw(const Sprite& sprite, SDL_GPUTexture* texture) {
 
     m_runs.back().count += 1;
     m_sprites.push_back(sprite);
+}
+
+void SpriteBatch::drawUnits(const glm::vec2* positions, const int* healths, size_t count, glm::vec2 size,
+                            glm::vec4 uv, SDL_GPUTexture* texture) {
+    if (texture == nullptr || count == 0 || positions == nullptr) {
+        return;
+    }
+
+    ensureCapacity(static_cast<Uint32>(m_sprites.size() + count));
+
+    if (m_runs.empty() || m_runs.back().texture != texture) {
+        m_runs.push_back({texture, static_cast<Uint32>(m_sprites.size()), 0});
+    }
+
+    const size_t oldSize = m_sprites.size();
+    m_runs.back().count += static_cast<Uint32>(count);
+    m_sprites.resize(oldSize + count);
+
+    Sprite* dst = m_sprites.data() + oldSize;
+
+    // Stream 64-byte Sprite structs directly via two 256-bit AVX2 stores per unit
+    for (size_t i = 0; i < count; ++i) {
+        float r = 0.0f;
+        float g = 1.0f;
+        float b = 0.2f;
+
+        if (i == 0) {
+            r = 1.0f;
+            g = 0.0f;
+            b = 0.0f;
+        } else if (healths != nullptr) {
+            const int hp = healths[i];
+            if (hp == -1) {
+                // Sleeping perimeter block unit: Vivid Sky Blue / Cyan
+                r = 0.20f;
+                g = 0.80f;
+                b = 1.00f;
+            } else if (hp == -2) {
+                // Sleeping interior block unit: Rich Royal Blue
+                r = 0.10f;
+                g = 0.40f;
+                b = 1.00f;
+            } else {
+                const float hpRatio = std::clamp(static_cast<float>(hp) * 0.1f, 0.0f, 1.0f);
+                r = 1.0f - hpRatio;
+                g = hpRatio;
+                b = 0.15f;
+            }
+        }
+
+        __m256 reg0 = _mm256_setr_ps(positions[i].x, positions[i].y, 0.0f, 0.0f, size.x, size.y, 0.0f, 0.0f);
+        __m256 reg1 = _mm256_setr_ps(uv.x, uv.y, uv.z, uv.w, r, g, b, 1.0f);
+
+        float* target = reinterpret_cast<float*>(dst + i);
+        _mm256_storeu_ps(target, reg0);
+        _mm256_storeu_ps(target + 8, reg1);
+    }
 }
 
 void SpriteBatch::upload(SDL_GPUCommandBuffer* commands) {

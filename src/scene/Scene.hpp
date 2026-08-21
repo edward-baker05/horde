@@ -3,6 +3,7 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_video.h>
+#include <glm/mat4x4.hpp>
 
 namespace horde::gfx {
 class Camera2D;
@@ -62,6 +63,13 @@ public:
     // Queue sprites for this frame. The batch has already been begun.
     virtual void render(gfx::SpriteBatch& batch) {
         (void)batch;
+    }
+
+    // Direct GPU rendering calls inside the active render pass.
+    virtual void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, const glm::mat4& viewProjection) {
+        (void)commands;
+        (void)pass;
+        (void)viewProjection;
     }
 
     // Dear ImGui calls for developer tooling. Game-facing UI belongs in
