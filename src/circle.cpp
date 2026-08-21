@@ -5,17 +5,23 @@
 #include <stdexcept>
 #include <vector>
 
+#include "SDL3/SDL_rect.h"
+#include "VectorMath.h"
+
 class Circle {
     int x_;
     int y_;
+    SDL_FPoint truePos;
     int r_;
     int filled_;
     int size_ = 0;
     int mass = 10;
     std::vector<SDL_FPoint> points_;
     std::vector<std::array<int, 4>> lines_;
+    SDL_FPoint velocity;
 
     bool isColliding(const Circle&) const;
+    void resolveCollision(Circle circle);
     void createPointsFilled();
     void createPointsOutline();
 
@@ -23,11 +29,20 @@ public:
     Circle(int, int, int, bool);
 
     void draw(SDL_Renderer*, int, int, int);
+    void update(std::vector<Circle> circles, int selfIndex, float x, float y);
+
+    void setVelocity(float x, float y) {
+        velocity.x = x;
+        velocity.y = y;
+    }
 };
 
 Circle::Circle(int x, int y, int r, bool filled) : x_(x), y_(y), r_(r), filled_(filled) {
     if (r > 200)
         throw std::invalid_argument("Radius given larger than maximum acceptable radius `200`");
+
+    truePos.x = x_;
+    truePos.y = y_;
 
     if (filled_) {
         createPointsFilled();
@@ -47,6 +62,37 @@ void Circle::draw(SDL_Renderer* renderer, int r, int g, int b) {
         SDL_RenderPoints(renderer, &points_[0], size_);
     }
 }
+
+void Circle::update(std::vector<Circle> circles, int selfIndex, float x = 0, float y = 0) {
+    if (x == 0 && y == 0) {
+        truePos += velocity;
+    } else {
+        truePos.x += x;
+        truePos.y += y;
+    }
+
+    for (int i = 0; i < circles.size(); i++) {
+        if (i == selfIndex)
+            continue;
+        if (isColliding(circles[i]))
+            resolveCollision(circles[i]);
+    }
+
+    if (truePos.x - x_ >= 1 || truePos.y - y_ >= 1 || x_ - truePos.x >= 1 || y_ - truePos.y >= 1) {
+        x_ = std::floor(truePos.x);
+        y_ = std::floor(truePos.y);
+        if (filled_) {
+            createPointsFilled();
+        } else {
+            createPointsOutline();
+        }
+    }
+}
+
+bool Circle::isColliding return false;
+}
+
+void Circle::resolveCollision(Circle circle) {}
 
 void Circle::createPointsFilled() {
     lines_.clear();
@@ -83,22 +129,6 @@ void Circle::createPointsFilled() {
         addSymmetricPoints(x, y);
     }
 }
-
-// void Circle::createPointsFilled() {
-//     for (int i = 0; i < 2 * r_; i++) {
-//         for (int j = 0; j < 2 * r_; j++) {
-//             int deltaX = i - r_;
-//             int deltaY = j - r_;
-//             if (std::sqrt(deltaX * deltaX + deltaY * deltaY) <= r_) {
-//                 SDL_FPoint tempPoint;
-//                 tempPoint.x = x_ + i - r_;
-//                 tempPoint.y = y_ + j - r_;
-//                 points.push_back(tempPoint);
-//                 size_++;
-//             }
-//         }
-//     }
-// }
 
 void Circle::createPointsOutline() {
     points_.clear();

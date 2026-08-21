@@ -8,14 +8,15 @@
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
 
-Circle circleOne = Circle(200, 300, 50, true);
-Circle circleTwo = Circle(200, 400, 50, false);
+std::vector<Circle> circles = {Circle(200, 300, 50, true), Circle(400, 300, 50, true)};
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (!SDL_CreateWindowAndRenderer("Test", 800, 600, SDL_WINDOW_FULLSCREEN, &window, &renderer)) {
         SDL_Log("Couldn't create window and renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
+    circles[0].setVelocity(1.f, 0.f);
+    circles[1].setVelocity(-1.f, 0.f);
 
     return SDL_APP_CONTINUE;
 }
@@ -36,8 +37,10 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     SDL_SetRenderDrawColor(renderer, 15, 15, 15, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
-    circleOne.draw(renderer, 255, 255, 0);
-    circleTwo.draw(renderer, 0, 0, 255);
+    circles[0].draw(renderer, 255, 255, 0);
+    circles[1].draw(renderer, 0, 0, 255);
+    circles[0].update(circles, 0);
+    circles[1].update(circles, 1);
 
     SDL_RenderPresent(renderer);
 
