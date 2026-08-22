@@ -19,3 +19,4 @@ tools/lib64
 tools/include
 tools/share
 tools/.shadercross
+vendored/
