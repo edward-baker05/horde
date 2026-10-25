@@ -68,7 +68,18 @@ private:
     Uint64 m_lastRenderNs = 0;
     Uint64 m_lastAcquireNs = 0;
     Uint64 m_lastGpuNs = 0;
+    Uint64 m_lastSceneUpdateNs = 0;
     bool m_haveFrame = false;
+
+    // Rolling frame cost, published to scenes through Services::frameStats.
+    void accumulateStats(Uint64 frameNs);
+    scene::FrameStats m_stats;
+    bool m_measureSimGpu = true;
+    bool m_haveStats = false;
+    struct {
+        Uint64 frames = 0, total = 0, frame = 0, frameMax = 0, update = 0, record = 0, gpu = 0, gpuMax = 0,
+               wait = 0;
+    } m_statsWindow;
 };
 
 } // namespace horde::app

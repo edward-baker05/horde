@@ -86,6 +86,12 @@ bool App::init(const AppConfig& config) {
     services.shaders = m_shaders.get();
     services.atlas = &m_atlas;
     services.window = m_window;
+    services.frameStats = &m_stats;
+    services.measureSimGpu = &m_measureSimGpu;
+    // Benchmarks decide for themselves whether to sync the GPU.
+    if (m_config.bench) {
+        m_measureSimGpu = m_config.bench->syncGpu;
+    }
 
     m_scenes.emplace(services);
     if (m_config.bench) {
@@ -117,6 +123,11 @@ int App::run() {
         // TODO: This will need changing with more complex stuff, likely going to be moved to Logic/sim
         float deltaTime = std::min(static_cast<float>(frameNs) / 1.0e9f, 0.01666f);
         m_lastTicks = now;
+
+        if (m_haveStats) {
+            accumulateStats(frameNs);
+        }
+        m_haveStats = true;
 
         if (m_recorder) {
             // The previous iteration has now fully completed, so its sample is whole.
@@ -186,6 +197,45 @@ int App::finishBenchmark() {
     return m_recorder->finish(info) ? 0 : 3;
 }
 
+void App::accumulateStats(Uint64 frameNs) {
+    // Render time includes the swapchain wait and the timed compute wait;
+    // what remains is the CPU building and submitting the frame.
+    const Uint64 waits = m_lastAcquireNs + (m_measureSimGpu ? m_lastGpuNs : 0);
+    const Uint64 record = m_lastRenderNs > waits ? m_lastRenderNs - waits : 0;
+
+    m_statsWindow.frames++;
+    m_statsWindow.total += frameNs;
+    m_statsWindow.frame += frameNs;
+    m_statsWindow.frameMax = std::max(m_statsWindow.frameMax, frameNs);
+    m_statsWindow.update += m_lastSceneUpdateNs;
+    m_statsWindow.record += record;
+    m_statsWindow.wait += m_lastAcquireNs;
+    if (m_measureSimGpu) {
+        m_statsWindow.gpu += m_lastGpuNs;
+        m_statsWindow.gpuMax = std::max(m_statsWindow.gpuMax, m_lastGpuNs);
+    }
+
+    // Publish twice a second: steady enough to read.
+    if (m_statsWindow.total < 500'000'000) {
+        return;
+    }
+
+    const auto ms = [&](Uint64 sum) {
+        return static_cast<float>(static_cast<double>(sum) / static_cast<double>(m_statsWindow.frames) / 1.0e6);
+    };
+    m_stats.frameMs = ms(m_statsWindow.frame);
+    m_stats.frameMaxMs = static_cast<float>(m_statsWindow.frameMax / 1.0e6);
+    m_stats.updateMs = ms(m_statsWindow.update);
+    m_stats.recordMs = ms(m_statsWindow.record);
+    m_stats.waitMs = ms(m_statsWindow.wait);
+    m_stats.simGpuMeasured = m_measureSimGpu;
+    m_stats.simGpuMs = m_measureSimGpu ? ms(m_statsWindow.gpu) : 0.0f;
+    m_stats.simGpuMaxMs = m_measureSimGpu ? static_cast<float>(m_statsWindow.gpuMax / 1.0e6) : 0.0f;
+    m_stats.otherMs = std::max(0.0f, m_stats.frameMs - m_stats.updateMs - m_stats.recordMs - m_stats.waitMs -
+                                         m_stats.simGpuMs);
+    m_statsWindow = {};
+}
+
 void App::pumpEvents() {
     SDL_Event event;
 
@@ -227,7 +277,9 @@ void App::update(float deltaTime) {
     m_imgui.beginFrame();
 
     if (scene::Scene* active = m_scenes->active()) {
+        const Uint64 start = SDL_GetTicksNS();
         active->update(deltaTime);
+        m_lastSceneUpdateNs = SDL_GetTicksNS() - start;
         active->debugUi();
     }
 }
@@ -270,7 +322,7 @@ void App::render() {
     // Compute runs first and outside the render pass — SDL_GPU passes cannot
     // nest, and the graphics pass samples what compute writes.
     if (active != nullptr) {
-        if (m_recorder && m_recorder->config().syncGpu) {
+        if (m_measureSimGpu) {
             // Benchmarks put the scene's compute work on a command buffer of
             // its own and wait for it, which times the simulation's GPU cost
             // alone: no rendering, no present, no frame-rate cap. The same
@@ -286,6 +338,7 @@ void App::render() {
             }
             m_lastGpuNs = SDL_GetTicksNS() - submitted;
         } else {
+            m_lastGpuNs = 0;
             active->compute(commands);
         }
     }

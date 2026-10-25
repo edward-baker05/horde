@@ -88,6 +88,8 @@ public:
 
 private:
     void fitCameraToLevel(float width, float height);
+    // The frame cost breakdown at the top of the debug panel.
+    void frameCostUi();
 
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;

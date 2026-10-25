@@ -133,8 +133,7 @@ void LevelScene::debugUi() {
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Level");
 
-    const ImGuiIO& io = ImGui::GetIO();
-    ImGui::Text("%.1f fps (%.2f ms)", io.Framerate, 1000.0f / std::max(io.Framerate, 0.001f));
+    frameCostUi();
     ImGui::Text("Units: %u", m_physics->unitCount());
     ImGui::Text("Physics: %s", m_options.physics.c_str());
     ImGui::TextWrapped("%s", sim::physicsDescription(m_options.physics));
@@ -223,6 +222,59 @@ void LevelScene::debugUi() {
     }
 
     ImGui::End();
+}
+
+void LevelScene::frameCostUi() {
+    const FrameStats* stats = m_services->frameStats;
+    if (stats == nullptr) {
+        return;
+    }
+
+    ImGui::Text("%.1f fps: %.2f ms per frame (worst %.2f)", stats->frameMs > 0.0f ? 1000.0f / stats->frameMs : 0.0f,
+                stats->frameMs, stats->frameMaxMs);
+
+    // What the frame actually cost, as opposed to how often frames came.
+    const float physics = stats->updateMs + stats->simGpuMs;
+    const float busy = physics + stats->recordMs + stats->otherMs;
+    if (ImGui::BeginTable("frame cost", 2, ImGuiTableFlags_SizingFixedFit)) {
+        const auto row = [](const char* label, const char* format, float value, float worst = -1.0f) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(label);
+            ImGui::TableNextColumn();
+            if (worst >= 0.0f) {
+                ImGui::Text("%6.3f ms  (worst %.3f)", value, worst);
+            } else {
+                ImGui::Text(format, value);
+            }
+        };
+        row("Physics, CPU", "%6.3f ms", stats->updateMs);
+        if (stats->simGpuMeasured) {
+            row("Physics, GPU", "", stats->simGpuMs, stats->simGpuMaxMs);
+        } else {
+            row("Physics, GPU", "not measured", 0.0f);
+        }
+        row("Physics total", "%6.3f ms", physics);
+        row("Frame building, CPU", "%6.3f ms", stats->recordMs);
+        row("Other (events, UI)", "%6.3f ms", stats->otherMs);
+        row("Busy per frame", "%6.3f ms", busy);
+        row("Waiting (cap, vsync)", "%6.3f ms", stats->waitMs);
+        ImGui::EndTable();
+    }
+
+    if (busy > 0.0f) {
+        ImGui::Text("Could run at ~%.0f fps uncapped", 1000.0f / busy);
+    }
+    if (m_services->measureSimGpu) {
+        ImGui::Checkbox("Measure GPU physics", m_services->measureSimGpu);
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Waits for the physics compute work each frame to time it exactly.\n"
+                              "Drawing's GPU time is not included in any line.");
+        }
+    }
+    ImGui::Separator();
 }
 
 void LevelScene::onResize(float width, float height) {
