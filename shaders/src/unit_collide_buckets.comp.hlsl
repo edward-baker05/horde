@@ -21,6 +21,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     UnitData unit = InUnits[index];
     int2 cell = cellOf(unit.pos);
     float2 correction = float2(0.0f, 0.0f);
+    uint overlaps = 0;
     uint stride = BucketCapacity + 1;
 
     for (int dy = -1; dy <= 1; ++dy) {
@@ -37,10 +38,10 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
             uint base = ((uint)nx + (uint)ny * GridDim.x) * stride;
             uint count = min(GridB[base], BucketCapacity);
             for (uint s = 0; s < count; ++s) {
-                accumulatePair(index, unit.pos, GridB[base + 1 + s], correction);
+                accumulatePair(index, unit.pos, GridB[base + 1 + s], correction, overlaps);
             }
         }
     }
 
-    writeResolved(index, unit, correction);
+    writeResolved(index, unit, correction, overlaps);
 }

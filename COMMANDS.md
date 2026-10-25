@@ -193,6 +193,7 @@ python tools/bench.py --physics gpu-collide --collision-iterations 8 --relaxatio
 python tools/bench.py --physics gpu-collide-counting,gpu-collide-buckets,gpu-collide-bitonic --level assets/levels/bench_walls.level.json
 python tools/bench.py --physics gpu-collide --quality low,medium,high,ultra --low-power-gpu   # on the integrated GPU
 python tools/bench.py --level-size 8000x8000 --units 1m,4m   # room for a million units
+python tools/bench.py --physics gpu-collide --solver relaxed,average   # compare solvers
 python tools/bench.py --help
 ```
 
@@ -242,7 +243,8 @@ the broadphase fixed, for comparing them.
 | --- | --- | --- |
 | `--quality low\|medium\|high\|ultra` | high | passes, relaxation and broadphase together, from integrated graphics up |
 | `--collision-iterations N` | 4 | relaxation passes per frame: the main cost and quality knob |
-| `--relaxation F` | 0.5 | fraction of each pass's correction applied |
+| `--solver relaxed\|average` | relaxed | how a Jacobi pass combines a unit's overlaps: their sum times the relaxation, or their average |
+| `--relaxation F` | 0.5 | relaxed solver: fraction of each pass's correction applied |
 | `--broadphase counting\|buckets\|bitonic` | counting | how neighbours are found |
 | `--bucket-capacity N` | 8 | units per cell before the buckets broadphase misses some |
 

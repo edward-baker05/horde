@@ -49,6 +49,35 @@ Buckets win on small grids. Counting sort wins on large ones, where the buckets
 method has to clear and scatter across millions of cells. The collision passes,
 not the broadphase, dominate at high counts.
 
+## Solver
+
+Each collision pass is Jacobi: every unit reads the same state (one unit
+buffer) and writes the next (the other), so a pass doesn't depend on thread
+order. For each overlapping neighbour, a unit takes half the overlap along the
+line between them. `CollisionSettings::solver` picks how those halves are
+combined:
+
+- **relaxed** (default): the sum, times `relaxation`. Fast to converge. It can
+  overshoot when many neighbours push at once and relaxation is high.
+- **average**: the mean (position-based dynamics' constraint averaging). It
+  never overshoots, but a unit pressed from every side moves only by the
+  average push, so pressure spreads through a crowd more slowly.
+
+Measured on an RTX 5080, mean overlap depth at the end of the run (fraction of
+a diameter) on the walls level:
+
+| units, passes | relaxed (0.5) | average |
+|---|---|---|
+| 10k, 4 | 0.12 | 0.22 |
+| 100k, 4 | 0.22 | 0.30 |
+| 10k, 8 | 0.07 | 0.15 |
+| 100k, 8 | 0.17 | 0.26 |
+
+Both fully separate a stationary random spawn. Averaging could be sped up with
+over-relaxation (scaling the mean by 1–2, as in Müller et al.'s PBD). That
+would be a third solver if the overshoot-free behaviour turns out to matter
+more than convergence.
+
 ## Scaling down
 
 `sim::collisionPreset` (`--quality low|medium|high|ultra`, also in the level

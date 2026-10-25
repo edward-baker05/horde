@@ -21,6 +21,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     UnitData unit = InUnits[index];
     int2 cell = cellOf(unit.pos);
     float2 correction = float2(0.0f, 0.0f);
+    uint overlaps = 0;
 
     // Cells are one diameter wide, so every possible overlap is within the 3x3 block.
     for (int dy = -1; dy <= 1; ++dy) {
@@ -41,10 +42,10 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
             }
             uint end = GridB[c * 2 + 1];
             for (uint s = start; s < end; ++s) {
-                accumulatePair(index, unit.pos, GridA[s].y, correction);
+                accumulatePair(index, unit.pos, GridA[s].y, correction, overlaps);
             }
         }
     }
 
-    writeResolved(index, unit, correction);
+    writeResolved(index, unit, correction, overlaps);
 }

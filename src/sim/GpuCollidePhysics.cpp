@@ -202,7 +202,11 @@ void GpuCollidePhysics::debugUi() {
     const CollisionSettings& c = m_config.collision;
     ImGui::Text("Broadphase: %s, %u x %u cells, %u passes", broadphaseName(c.broadphase), m_grid.gridDim().x,
                 m_grid.gridDim().y, m_grid.passCount());
-    ImGui::Text("Collision: %u iterations, relaxation %.2f", c.iterations, c.relaxation);
+    if (c.solver == CollisionSolver::Average) {
+        ImGui::Text("Collision: %u Jacobi passes, average solver", c.iterations);
+    } else {
+        ImGui::Text("Collision: %u Jacobi passes, relaxed solver (%.2f)", c.iterations, c.relaxation);
+    }
     ImGui::Text("Walls: %u primitives", m_walls.primitiveCount());
     ImGui::Text("Goal: (%.0f, %.0f) at %.0f u/s", m_config.movement.goal.x, m_config.movement.goal.y,
                 m_config.movement.maxSpeed);

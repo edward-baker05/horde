@@ -29,6 +29,23 @@ enum class Broadphase {
 bool parseBroadphase(const std::string& text, Broadphase& out);
 const char* broadphaseName(Broadphase broadphase);
 
+// How a collision pass combines a unit's pair corrections. Both are Jacobi:
+// within a pass every unit reads the same state and writes the next one, so
+// the result doesn't depend on thread order.
+enum class CollisionSolver {
+    // Shift by the sum of the corrections times `relaxation`. Converges faster
+    // in light contact; can overshoot in dense crowds if relaxation is high.
+    Relaxed,
+    // Shift by the average of the corrections (position-based dynamics'
+    // constraint averaging). Never overshoots however many neighbours push at
+    // once, at the cost of slower convergence in deep crowds. Ignores
+    // `relaxation`.
+    Average,
+};
+
+bool parseSolver(const std::string& text, CollisionSolver& out);
+const char* solverName(CollisionSolver solver);
+
 // Unit-vs-unit collision rules. Shared by every system that resolves
 // collisions, so that two systems are benchmarked against the same problem.
 //
@@ -38,8 +55,10 @@ struct CollisionSettings {
     // Relaxation passes per frame. More converge further (less overlap left in
     // dense crowds) at a linear cost.
     std::uint32_t iterations = 4;
-    // Fraction of each pass's summed correction applied. Below 1 because a unit
-    // pushed by several neighbours at once would otherwise overshoot.
+    CollisionSolver solver = CollisionSolver::Relaxed;
+    // Relaxed solver: fraction of each pass's summed correction applied. Below
+    // 1 because a unit pushed by several neighbours at once would otherwise
+    // overshoot.
     float relaxation = 0.5f;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;

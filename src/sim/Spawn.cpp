@@ -45,6 +45,27 @@ const char* broadphaseName(Broadphase broadphase) {
     return "?";
 }
 
+bool parseSolver(const std::string& text, CollisionSolver& out) {
+    if (text == "relaxed") {
+        out = CollisionSolver::Relaxed;
+    } else if (text == "average") {
+        out = CollisionSolver::Average;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+const char* solverName(CollisionSolver solver) {
+    switch (solver) {
+        case CollisionSolver::Relaxed:
+            return "relaxed";
+        case CollisionSolver::Average:
+            return "average";
+    }
+    return "?";
+}
+
 bool collisionPreset(const std::string& name, CollisionSettings& out) {
     // Passes are the main cost knob: each is a full read of every unit's
     // neighbourhood. The broadphase is cheap with counting sort at any scale.

@@ -143,6 +143,7 @@ bool Recorder::finish(const RunInfo& info) const {
         {"walls", info.wallCount},
         {"wall_primitives", info.wallPrimitives},
         {"collision_relaxation", collision.relaxation},
+        {"solver", info.collision ? sim::solverName(collision.solver) : "n/a"},
         {"max_speed", level.maxSpeed},
     };
     if (info.quality.measured) {
