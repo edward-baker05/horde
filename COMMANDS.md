@@ -174,3 +174,60 @@ Fedora / Nobara system packages:
 sudo dnf install -y cmake ninja-build gcc-c++ git \
   SDL3-devel SDL3_image-devel glm-devel vulkan-loader-devel vulkan-headers
 ```
+
+---
+
+## Benchmarking physics
+
+`tools/bench.py` builds the release config, then runs the game once per
+physics system and unit count. Each run boots straight into a level, warms up,
+times a fixed number of seconds and quits. Results go to
+`bench_results/<timestamp>/` (git-ignored): `summary.md`, `summary.csv`,
+one JSON per run in `runs/`, and the game's output in `logs/`.
+
+```sh
+python tools/bench.py                                  # every system x 1k, 10k, 100k
+python tools/bench.py --physics gpu-grid,cpu-grid --units 1k,10k,100k,1m --repeats 3
+python tools/bench.py --no-build --duration 5 --frames # reuse the build, keep per-frame CSVs
+python tools/bench.py --help
+```
+
+If `cmake` is not on `PATH`, the script looks for CLion's and Visual Studio's
+bundled copies, or uses `HORDE_CMAKE`.
+
+What the columns mean:
+
+| Column | Measures |
+| --- | --- |
+| fps, frame ms, p99 ms | whole frames, start to start. Can't go above a display or driver frame cap |
+| cpu sim ms | the scene's `update()`: CPU-side physics |
+| gpu sim ms | the scene's `compute()` work on its own command buffer, waited on: GPU-side physics |
+| sim ms | cpu + gpu sim: what the physics system costs per frame |
+
+Benchmarks run with vsync and GPU validation off, a fixed 1/60 s simulation
+step and a seeded random spawn, so runs with the same settings are comparable.
+If the summary says the frame rate looks capped, a driver limiter (NVIDIA frame
+cap, G-Sync/Reflex) is still syncing frames: compare by *sim ms*, or lift the
+cap.
+
+The game takes the same options directly, for a single run or to play a given
+setup:
+
+```sh
+horde --list-physics
+horde --bench --physics gpu-grid --units 100000 --duration 10 --out result.json
+horde --physics cpu-grid --units 5000     # boots straight into that level, playable
+```
+
+### Adding a physics system
+
+1. Implement `sim::PhysicsSystem` (`src/sim/PhysicsSystem.hpp`) in
+   `src/sim/<Name>.cpp`. Draw through `gfx::UnitRenderer` so every system pays
+   the same rendering cost. CPU systems can stream positions with
+   `sim::UnitStreamer`, as `CpuGridPhysics` does.
+2. Add the `.cpp` to `CMakeLists.txt`.
+3. Add one line to the table in `src/sim/PhysicsRegistry.cpp`.
+
+It then shows up in `--list-physics`, in `tools/bench.py --physics all`, and in
+the level's debug panel, which can restart the level with any system and unit
+count.

@@ -2,23 +2,44 @@
 
 #include <glm/glm.hpp>
 
+#include <cstdint>
 #include <filesystem>
+#include <memory>
+#include <string>
 
 #include "gfx/Camera2D.hpp"
 #include "logic/Level.hpp"
-#include "logic/UnitData.hpp"
 #include "scene/Scene.hpp"
+#include "sim/PhysicsRegistry.hpp"
+#include "sim/PhysicsSystem.hpp"
 
 namespace horde::scene {
 
-// The game world. Currently a single rectangle and a button back to the menu —
-// this is where the actual game goes.
+// How a level is set up: which level, which physics system, and how many units
+// start in it. The benchmark builds one of these from the command line.
+struct LevelOptions {
+    // Empty means the built-in default level.
+    std::filesystem::path levelPath;
+    std::string physics = sim::kDefaultPhysics;
+    std::uint32_t unitCount = 10000;
+    sim::SpawnPattern spawn = sim::SpawnPattern::Column;
+    std::uint32_t seed = 1;
+    // Zoom the camera so the whole level is on screen.
+    bool fitCamera = false;
+};
+
+// The game world. Currently a level full of simulated units and a button back
+// to the menu — this is where the actual game goes.
 class LevelScene : public Scene {
 public:
     LevelScene() = default;
     ~LevelScene() override;
 
-    explicit LevelScene(std::filesystem::path levelPath) : m_levelPath(std::move(levelPath)) {}
+    explicit LevelScene(std::filesystem::path levelPath) {
+        m_options.levelPath = std::move(levelPath);
+    }
+
+    explicit LevelScene(LevelOptions options) : m_options(std::move(options)) {}
 
     bool onEnter(Services& services) override;
     void onExit() override;
@@ -39,41 +60,19 @@ public:
     }
 
 private:
+    void fitCameraToLevel(float width, float height);
+
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
 
-    std::filesystem::path m_levelPath;
+    LevelOptions m_options;
+    // What the debug panel's restart button will apply.
+    LevelOptions m_pendingOptions;
     logic::Level m_level;
 
-    static constexpr size_t MaxUnits = 10000;
     float enemy_size = 5.0f;
-    UnitManager unit_manager;
-
-    // GPU Simulation Pipelines
-    SDL_GPUComputePipeline* m_gridClearPipeline = nullptr;
-    SDL_GPUComputePipeline* m_gridBuildPipeline = nullptr;
-    SDL_GPUComputePipeline* m_bitonicSortPipeline = nullptr;
-    SDL_GPUComputePipeline* m_gridFindRangesPipeline = nullptr;
-    SDL_GPUComputePipeline* m_computePipeline = nullptr;
-
-    // Direct GPU Instancing Graphics Pipeline
-    SDL_GPUGraphicsPipeline* m_unitGraphicsPipeline = nullptr;
-    SDL_GPUSampler* m_unitSampler = nullptr;
-
-    // Double buffers for deterministic collision simulation
-    SDL_GPUBuffer* m_unitBuffers[2] = {nullptr, nullptr};
-    uint32_t m_currentBufferIndex = 0;
-
-    // GPU Sort-Based Uniform Grid Buffers
-    SDL_GPUBuffer* m_gridKeysBuffer = nullptr;
-    SDL_GPUBuffer* m_cellRangesBuffer = nullptr;
-    Uint32 m_allocatedUnits = 0;
-    glm::uvec2 m_gridDim{0, 0};
-    Uint32 m_totalCells = 0;
-
-    float m_dt = 0.0f;
-    Uint32 m_unitCount = 0;
+    std::unique_ptr<sim::PhysicsSystem> m_physics;
 };
 
 } // namespace horde::scene

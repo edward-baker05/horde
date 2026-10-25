@@ -76,17 +76,14 @@ void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
 // Main Loop
 void UnitManager::UpdatePhysics(float dt) {
     // NOTE: In GPU-driven simulation mode, position integration and bounds
-    // collisions are executed on the GPU in update_positions.comp.hlsl.
-    // The CPU loop is preserved below for reference / CPU simulation fallback.
-    (void)dt;
-    /*
+    // collisions are executed on the GPU in update_positions.comp.hlsl, and
+    // this is never called. The "cpu-grid" physics system runs this loop.
     int steps = 4;
     for (int step = 0; step < steps; ++step) {
         UpdatePositions(dt / steps);
         PopulateUniformGrid();
         ResolveEntityCollisions(dt);
     }
-    */
 }
 
 void UnitManager::UpdatePositions(float dt) {

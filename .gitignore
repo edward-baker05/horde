@@ -20,3 +20,6 @@ tools/include
 tools/share
 tools/.shadercross
 vendored/
+
+# Output of tools/bench.py.
+bench_results/

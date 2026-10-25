@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 
+#include "bench/Benchmark.hpp"
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "gfx/SpriteBatch.hpp"
@@ -21,6 +22,10 @@ struct AppConfig {
     int height = 900;
     bool vsync = true;
     bool gpuDebug = true;
+    // Boot straight into this level instead of stopping at the menu.
+    std::optional<scene::LevelOptions> startLevel;
+    // Run one benchmark and quit. See bench/Benchmark.hpp.
+    std::optional<bench::BenchConfig> bench;
 };
 
 // Owns the window, the GPU device and the frame loop, and drives the scene
@@ -41,6 +46,7 @@ private:
     void pumpEvents();
     void update(float deltaTime);
     void render();
+    int finishBenchmark();
 
     AppConfig m_config;
     SDL_Window* m_window = nullptr;
@@ -53,6 +59,15 @@ private:
 
     bool m_running = false;
     Uint64 m_lastTicks = 0;
+
+    // Benchmark mode only.
+    std::optional<bench::Recorder> m_recorder;
+    const char* m_presentMode = "vsync";
+    Uint64 m_lastUpdateNs = 0;
+    Uint64 m_lastRenderNs = 0;
+    Uint64 m_lastAcquireNs = 0;
+    Uint64 m_lastGpuNs = 0;
+    bool m_haveFrame = false;
 };
 
 } // namespace horde::app

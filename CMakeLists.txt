@@ -12,6 +12,8 @@ include(Shaders)
 add_executable(horde
     src/main.cpp
     src/app/App.cpp
+    src/app/CommandLine.cpp
+    src/bench/Benchmark.cpp
     src/core/Paths.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
@@ -19,6 +21,13 @@ add_executable(horde
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
+    src/gfx/UnitRenderer.cpp
+    src/sim/CpuGridPhysics.cpp
+    src/sim/GpuGridPhysics.cpp
+    src/sim/PhysicsRegistry.cpp
+    src/sim/Spawn.cpp
+    src/sim/StaticPhysics.cpp
+    src/sim/UnitBuffers.cpp
     src/editor/EditorUi.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp
