@@ -1,25 +1,34 @@
 #pragma once
 
+#include <optional>
+
 #include "gfx/UnitRenderer.hpp"
 #include "sim/GpuSpatialGrid.hpp"
 #include "sim/GpuUnitCollisions.hpp"
+#include "sim/GpuWalls.hpp"
 #include "sim/PhysicsSystem.hpp"
 
 namespace horde::sim {
 
-// Units steer toward the level's exit and push each other apart, all on the GPU.
+// Units steer toward the level's exit, push each other apart and slide along
+// walls, all on the GPU.
 //
 // Per frame, as position-based dynamics:
-//   1. unit_integrate   steer toward the goal and predict new positions
-//   2. GpuSpatialGrid   bucket the predicted positions (the broadphase)
-//   3. GpuUnitCollisions  N relaxation passes separating overlapping units
-//   4. unit_finalize    clamp to the level, velocity = actual displacement / dt
+//   1. unit_integrate     steer toward the goal and predict new positions
+//   2. GpuSpatialGrid     bucket the predicted positions (the broadphase)
+//   3. GpuUnitCollisions  N relaxation passes, each separating units then
+//                         pushing them out of walls
+//   4. unit_finalize      out of walls once more, clamp to the level,
+//                         velocity = actual displacement / dt
 //
-// Each stage is its own piece so later systems can reuse or swap one: walls
-// would be another correction pass beside step 3, a faster sort lives inside
-// the grid, and steering could read the grid for local avoidance.
+// Each stage is its own piece so later systems can reuse or swap one: the
+// broadphase method is a setting, and steering could read the grid for local
+// avoidance.
 class GpuCollidePhysics : public PhysicsSystem {
 public:
+    // `broadphase` overrides SimConfig::collision.broadphase, for registry
+    // entries that pin one method so benchmarks can compare them.
+    explicit GpuCollidePhysics(std::optional<Broadphase> broadphase = std::nullopt) : m_forcedBroadphase(broadphase) {}
     ~GpuCollidePhysics() override;
 
     bool init(scene::Services& services, const SimConfig& config) override;
@@ -31,6 +40,10 @@ public:
     void debugUi() override;
     bool readUnits(std::vector<BaseUnitData>& out) override;
 
+    const CollisionSettings* collisionSettings() const override {
+        return &m_config.collision;
+    }
+
     std::uint32_t unitCount() const override {
         return m_unitCount;
     }
@@ -40,6 +53,8 @@ private:
     gfx::UnitRenderer m_renderer;
     GpuSpatialGrid m_grid;
     GpuUnitCollisions m_collisions;
+    GpuWalls m_walls;
+    std::optional<Broadphase> m_forcedBroadphase;
 
     SDL_GPUComputePipeline* m_integratePipeline = nullptr;
     SDL_GPUComputePipeline* m_finalizePipeline = nullptr;

@@ -20,6 +20,8 @@
 #include "logic/LevelIO.hpp"
 #include "logic/LevelValidation.hpp"
 
+#include "sim/PhysicsRegistry.hpp"
+
 namespace horde::editor {
 
 bool deleteSelected(EditorState& state) {
@@ -82,13 +84,31 @@ void drawToolbar(EditorState& state) {
     ImGui::End();
 }
 
-void drawLevelPanel(EditorState& state, bool& wantsExit) {
+void drawLevelPanel(EditorState& state, bool& wantsExit, bool& wantsPlay) {
     ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(280.0f, 260.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Level");
 
     if (ImGui::Button("Back to menu", ImVec2(160.0f, 0.0f))) {
         wantsExit = true;
+    }
+
+    ImGui::SeparatorText("Test play");
+
+    if (ImGui::BeginCombo("Physics", state.testPhysics.c_str())) {
+        for (const std::string& name : sim::physicsNames()) {
+            if (ImGui::Selectable(name.c_str(), name == state.testPhysics)) {
+                state.testPhysics = name;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::InputInt("Units", &state.testUnits, 1000, 10000);
+    state.testUnits = std::clamp(state.testUnits, 0, 4'000'000);
+
+    // Plays the level as it is now, saved or not; leaving returns here.
+    if (ImGui::Button("Test play", ImVec2(160.0f, 0.0f))) {
+        wantsPlay = true;
     }
 
     ImGui::SeparatorText("Bounds");
@@ -382,9 +402,9 @@ void drawFilesPanel(EditorState& state) {
 
 } // namespace
 
-void drawEditorUi(EditorState& state, bool& wantsExit) {
+void drawEditorUi(EditorState& state, bool& wantsExit, bool& wantsPlay) {
     drawToolbar(state);
-    drawLevelPanel(state, wantsExit);
+    drawLevelPanel(state, wantsExit, wantsPlay);
     drawInspector(state);
     drawWallList(state);
     drawFilesPanel(state);

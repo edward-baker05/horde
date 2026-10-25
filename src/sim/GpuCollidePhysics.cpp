@@ -32,8 +32,12 @@ struct alignas(16) GPUFinalizeUniforms {
     float invDt;
     Uint32 unitCount;
     float maxSpeed;
-    float padding;
+    float radius;
+    glm::uvec2 wallBinDim;
+    float wallBinSize;
+    Uint32 wallCount;
 };
+static_assert(sizeof(GPUFinalizeUniforms) == 48);
 
 Uint32 groups(Uint32 threads) {
     return std::max<Uint32>(1, (threads + 255) / 256);
@@ -48,21 +52,28 @@ GpuCollidePhysics::~GpuCollidePhysics() {
 bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config) {
     m_device = services.gpu->device();
     m_config = config;
+    if (m_forcedBroadphase) {
+        m_config.collision.broadphase = *m_forcedBroadphase;
+    }
     m_unitCount = static_cast<std::uint32_t>(config.initialUnits.size());
     m_config.initialUnits.clear(); // only needed for the upload below
 
     // unit_integrate.comp: 2 rw buffers (units, previous positions), 1 uniform buffer
     m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 2, 1, 256, 1, 1);
-    // unit_finalize.comp: 1 ro buffer (previous positions), 1 rw buffer (units), 1 uniform buffer
-    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 1, 0, 1, 1, 256, 1, 1);
+    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 1 rw buffer (units), 1 uniform buffer
+    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 1, 1, 256, 1, 1);
     if (!m_integratePipeline || !m_finalizePipeline) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to load pipelines");
         return false;
     }
 
     // One cell per unit diameter, so the collision shader's 3x3 search is complete.
-    if (!m_renderer.init(services) || !m_grid.init(services, m_unitCount, config.worldSize, config.unitSize) ||
-        !m_collisions.init(services, config.collision, config.unitSize, config.worldSize)) {
+    const CollisionSettings& collision = m_config.collision;
+    if (!m_renderer.init(services) ||
+        !m_grid.init(services, m_unitCount, config.worldSize, config.unitSize, collision.broadphase,
+                     collision.bucketCapacity) ||
+        !m_collisions.init(services, collision, config.unitSize, config.worldSize) ||
+        !m_walls.init(m_device, config.walls.get())) {
         return false;
     }
 
@@ -88,6 +99,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
 }
 
 void GpuCollidePhysics::shutdown() {
+    m_walls.shutdown();
     m_collisions.shutdown();
     m_grid.shutdown();
     m_renderer.shutdown();
@@ -151,7 +163,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
     m_grid.build(commands, m_units[m_current], m_unitCount);
 
     // 3. Separate overlapping units.
-    m_current = m_collisions.resolve(commands, m_units, m_current, m_unitCount, m_grid);
+    m_current = m_collisions.resolve(commands, m_units, m_current, m_unitCount, m_grid, m_walls);
 
     // 4. Bounds and velocity.
     {
@@ -161,6 +173,10 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.invDt = 1.0f / m_dt;
         uniforms.unitCount = m_unitCount;
         uniforms.maxSpeed = m_config.movement.maxSpeed;
+        uniforms.radius = m_config.unitSize * 0.5f;
+        uniforms.wallBinDim = m_walls.binDim();
+        uniforms.wallBinSize = m_walls.binSize();
+        uniforms.wallCount = m_walls.primitiveCount();
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding binding{};
@@ -168,7 +184,9 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 
         if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, &binding, 1)) {
             SDL_BindGPUComputePipeline(pass, m_finalizePipeline);
-            SDL_BindGPUComputeStorageBuffers(pass, 0, &m_prevPositions, 1);
+            SDL_GPUBuffer* readOnly[4] = {m_prevPositions, m_walls.buffers()[0], m_walls.buffers()[1],
+                                          m_walls.buffers()[2]};
+            SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 4);
             SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
             SDL_EndGPUComputePass(pass);
         }
@@ -182,8 +200,10 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
 
 void GpuCollidePhysics::debugUi() {
     const CollisionSettings& c = m_config.collision;
-    ImGui::Text("Grid: %u x %u cells, %u passes/frame", m_grid.gridDim().x, m_grid.gridDim().y, m_grid.passCount());
+    ImGui::Text("Broadphase: %s, %u x %u cells, %u passes", broadphaseName(c.broadphase), m_grid.gridDim().x,
+                m_grid.gridDim().y, m_grid.passCount());
     ImGui::Text("Collision: %u iterations, relaxation %.2f", c.iterations, c.relaxation);
+    ImGui::Text("Walls: %u primitives", m_walls.primitiveCount());
     ImGui::Text("Goal: (%.0f, %.0f) at %.0f u/s", m_config.movement.goal.x, m_config.movement.goal.y,
                 m_config.movement.maxSpeed);
 }

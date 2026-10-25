@@ -28,10 +28,12 @@ add_executable(horde
     src/sim/GpuGridPhysics.cpp
     src/sim/GpuSpatialGrid.cpp
     src/sim/GpuUnitCollisions.cpp
+    src/sim/GpuWalls.cpp
     src/sim/PhysicsRegistry.cpp
     src/sim/Spawn.cpp
     src/sim/StaticPhysics.cpp
     src/sim/UnitBuffers.cpp
+    src/sim/WallColliders.cpp
     src/editor/EditorUi.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp

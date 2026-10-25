@@ -1,0 +1,53 @@
+#pragma clang diagnostic ignored "-Wunused-variable"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+#include <metal_atomic>
+
+using namespace metal;
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_StructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_RWStructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_RWStructuredBuffer_v2uint
+{
+    uint2 _m0[1];
+};
+
+struct type_CountParams
+{
+    uint2 GridDim;
+    float InvCellSize;
+    uint UnitCount;
+};
+
+kernel void main0(constant type_CountParams& CountParams [[buffer(0)]], device type_StructuredBuffer_UnitData& Units [[buffer(1)]], device type_RWStructuredBuffer_uint& Counts [[buffer(2)]], device type_RWStructuredBuffer_v2uint& UnitCell [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= CountParams.UnitCount)
+        {
+            break;
+        }
+        float2 _54 = Units._m0[gl_GlobalInvocationID.x].pos;
+        int2 _63 = clamp(int2(_54 * CountParams.InvCellSize), int2(0), int2(CountParams.GridDim) - int2(1));
+        uint _71 = uint(_63.x) + (uint(_63.y) * CountParams.GridDim.x);
+        uint _73 = atomic_fetch_add_explicit((device atomic_uint*)&Counts._m0[_71], 1u, memory_order_relaxed);
+        UnitCell._m0[gl_GlobalInvocationID.x] = uint2(_71, _73);
+        break;
+    } while(false);
+}
+

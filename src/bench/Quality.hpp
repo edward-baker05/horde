@@ -7,6 +7,10 @@
 
 #include "logic/UnitData.hpp"
 
+namespace horde::sim {
+class WallColliders;
+}
+
 namespace horde::bench {
 
 // How well a set of units satisfies "no two units overlap". Speed alone would
@@ -20,9 +24,15 @@ struct CollisionQuality {
     // Fraction of the level the units' discs would cover. Above ~0.9 (hexagonal
     // packing) the units cannot all fit without overlapping.
     double density = 0.0;
+    // Units overlapping a wall by more than 1% of the diameter, and by how much
+    // on average (as a fraction of the diameter).
+    std::uint32_t unitsInWalls = 0;
+    double meanWallPenetration = 0.0;
 };
 
 // Exact, via a CPU uniform grid. O(n) for evenly spread units.
-CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float diameter, glm::vec2 worldSize);
+// `walls` may be null.
+CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float diameter, glm::vec2 worldSize,
+                                   const sim::WallColliders* walls = nullptr);
 
 } // namespace horde::bench

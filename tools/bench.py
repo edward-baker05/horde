@@ -11,6 +11,8 @@ Examples:
     python tools/bench.py --physics gpu-grid,cpu-grid --units 1000,10000,100000
     python tools/bench.py --physics all --units 1e3,1e4,1e5,1e6 --repeats 3
     python tools/bench.py --no-build --duration 5 --frames
+    python tools/bench.py --physics gpu-collide --quality low,medium,high,ultra --units 10k,100k,1m
+    python tools/bench.py --low-power-gpu --level assets/levels/bench_walls.level.json
 
 Results land in bench_results/<timestamp>/ (git-ignored).
 """
@@ -102,8 +104,10 @@ def git_info() -> dict:
             "dirty": bool(git("status", "--porcelain", "--untracked-files=no"))}
 
 
-def run_one(exe: Path, args: argparse.Namespace, physics: str, units: int, repeat: int, out_dir: Path) -> dict:
-    stem = f"{physics}_{units}_r{repeat}"
+def run_one(exe: Path, args: argparse.Namespace, physics: str, quality: str | None, units: int, repeat: int,
+            out_dir: Path) -> dict:
+    label = f"{physics}@{quality}" if quality else physics
+    stem = f"{label.replace('@', '_')}_{units}_r{repeat}"
     json_path = out_dir / "runs" / f"{stem}.json"
     log_path = out_dir / "logs" / f"{stem}.log"
 
@@ -116,6 +120,15 @@ def run_one(exe: Path, args: argparse.Namespace, physics: str, units: int, repea
         cmd += ["--fixed-dt", str(args.fixed_dt)]
     if args.level:
         cmd += ["--level", args.level]
+    if args.level_size:
+        cmd += ["--level-size", args.level_size]
+    # The preset first, so the individual flags below can override parts of it.
+    if quality:
+        cmd += ["--quality", quality]
+    if args.broadphase:
+        cmd += ["--broadphase", args.broadphase]
+    if args.low_power_gpu:
+        cmd.append("--low-power-gpu")
     for flag, value in (("--collision-iterations", args.collision_iterations), ("--relaxation", args.relaxation),
                         ("--speed", args.speed)):
         if value is not None:
@@ -132,13 +145,15 @@ def run_one(exe: Path, args: argparse.Namespace, physics: str, units: int, repea
         log_path.write_text(proc.stdout + proc.stderr, encoding="utf-8")
     except subprocess.TimeoutExpired as e:
         log_path.write_text(f"TIMEOUT after {timeout}s\n{e.stdout or ''}{e.stderr or ''}", encoding="utf-8")
-        return {"physics": physics, "units": units, "repeat": repeat, "status": "timeout"}
+        return {"label": label, "physics": physics, "units": units, "repeat": repeat, "status": "timeout"}
 
     if proc.returncode != 0 or not json_path.exists():
-        return {"physics": physics, "units": units, "repeat": repeat, "status": f"exit {proc.returncode}"}
+        return {"label": label, "physics": physics, "units": units, "repeat": repeat,
+                "status": f"exit {proc.returncode}"}
 
     result = json.loads(json_path.read_text(encoding="utf-8"))
     result["repeat"] = repeat
+    result["label"] = label
     return result
 
 
@@ -155,11 +170,11 @@ def mean_of_quality(runs: list[dict], field: str) -> float | None:
 
 
 def aggregate(results: list[dict]) -> list[dict]:
-    """One row per (physics, units): repeats averaged."""
+    """One row per (physics[@quality], units): repeats averaged."""
     rows = []
     groups: dict[tuple[str, int], list[dict]] = {}
     for r in results:
-        groups.setdefault((r["physics"], r["units"]), []).append(r)
+        groups.setdefault((r["label"], r["units"]), []).append(r)
 
     for (physics, units), runs in groups.items():
         ok = [r for r in runs if r.get("status") == "ok"]
@@ -175,8 +190,11 @@ def aggregate(results: list[dict]) -> list[dict]:
 
         update = mean_of("update_ms")
         sim_gpu = mean_of("sim_gpu_ms")
+        in_walls = mean_of_quality(ok, "units_in_walls")
         row.update({
             "status": "ok",
+            "broadphase": ok[0].get("broadphase", "-"),
+            "in_walls_pct": in_walls * 100 / units if in_walls is not None and units else None,
             "fps_mean": mean_of("fps_mean"),
             "fps_1pct_low": mean_of("fps_1pct_low"),
             "frame_ms_mean": mean_of("frame_ms"),
@@ -208,14 +226,14 @@ def fmt(value, digits: int = 2) -> str:
 def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
     columns = ["physics", "units", "status", "fps_mean", "fps_1pct_low", "frame_ms_mean", "frame_ms_p99",
                "update_ms_mean", "sim_gpu_ms_mean", "sim_ms_mean", "overlap_pct", "penetration_mean", "penetration_max",
-               "fps_spread", "runs", "ok"]
+               "in_walls_pct", "broadphase", "fps_spread", "runs", "ok"]
     with open(out_dir / "summary.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
     headers = ["physics", "units", "fps", "1% low", "frame ms", "p99 ms", "cpu sim ms", "gpu sim ms", "sim ms",
-               "overlap %", "penetration"]
+               "overlap %", "penetration", "in walls %"]
     lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
     for r in rows:
         if r.get("status") != "ok":
@@ -225,7 +243,7 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
             r["physics"], f"{r['units']:,}", fmt(r["fps_mean"], 1), fmt(r["fps_1pct_low"], 1),
             fmt(r["frame_ms_mean"]), fmt(r["frame_ms_p99"]), fmt(r["update_ms_mean"], 3),
             fmt(r["sim_gpu_ms_mean"], 3), fmt(r["sim_ms_mean"], 3), fmt(r["overlap_pct"], 1),
-            fmt(r["penetration_mean"], 3)]) + " |")
+            fmt(r["penetration_mean"], 3), fmt(r["in_walls_pct"], 2)]) + " |")
     table = "\n".join(lines)
 
     notes = []
@@ -239,11 +257,14 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
           + (" (uncommitted changes)" if meta["git"]["dirty"] else ""),
           f"- {meta['settings']['warmup']}s warmup, {meta['settings']['duration']}s measured, "
           f"{meta['settings']['repeats']} repeat(s), spawn `{meta['settings']['spawn']}`",
-          f"- backend `{meta.get('gpu_driver', '?')}`, present mode `{meta.get('present_mode', '?')}`",
+          f"- GPU `{meta.get('gpu_name', '?')}`, backend `{meta.get('gpu_driver', '?')}`, "
+          f"present mode `{meta.get('present_mode', '?')}`",
+          f"- level `{meta['settings'].get('level') or 'default'}`",
           "", *notes, "" if notes else "", table, "",
           "*cpu sim ms* is the scene update on the CPU, *gpu sim ms* the physics compute work on the GPU, "
           "timed in isolation; *sim ms* is their sum. *overlap %* is the share of units overlapping another at the "
-          "end of the run, *penetration* the mean overlap depth as a fraction of a unit's diameter.", ""]
+          "end of the run, *penetration* the mean overlap depth as a fraction of a unit's diameter, *in walls %* the "
+          "share of units overlapping a wall. `name@preset` rows ran with `--quality preset`.", ""]
     (out_dir / "summary.md").write_text("\n".join(md), encoding="utf-8")
     return table + ("\n\n" + notes[0] if notes else "")
 
@@ -270,9 +291,14 @@ def main() -> int:
     parser.add_argument("--spawn", default="random", choices=["random", "grid", "column"])
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--level", help="level file (default: built-in level)")
+    parser.add_argument("--level-size", help="built-in level at another size, e.g. 8000x8000")
     parser.add_argument("--collision-iterations", type=int, help="relaxation passes per frame (game default 4)")
     parser.add_argument("--relaxation", type=float, help="fraction of each pass's correction applied (default 0.5)")
     parser.add_argument("--speed", type=float, help="unit speed toward the exit (default 60)")
+    parser.add_argument("--quality", help="comma-separated presets to sweep (low, medium, high, ultra)")
+    parser.add_argument("--broadphase", choices=["counting", "buckets", "bitonic"],
+                        help="broadphase for gpu-collide (overrides the preset's)")
+    parser.add_argument("--low-power-gpu", action="store_true", help="run on the integrated GPU, if there is one")
     parser.add_argument("--fixed-dt", type=float, help="simulation step per frame (game default 1/60; 0 = real)")
     parser.add_argument("--width", type=int, default=1600)
     parser.add_argument("--height", type=int, default=900)
@@ -304,21 +330,27 @@ def main() -> int:
     for sub in ("runs", "logs", *(["frames"] if args.frames else [])):
         (out_dir / sub).mkdir(parents=True, exist_ok=True)
 
-    total = len(physics) * len(counts) * args.repeats
-    print(f"== {total} run(s): physics {physics} x units {counts} x {args.repeats} -> {out_dir}", flush=True)
+    qualities: list[str | None] = [q.strip() for q in args.quality.split(",") if q.strip()] if args.quality else [None]
+    variants = [(name, quality) for name in physics for quality in qualities]
+
+    total = len(variants) * len(counts) * args.repeats
+    print(f"== {total} run(s): physics {physics} x quality {qualities} x units {counts} x {args.repeats} "
+          f"-> {out_dir}", flush=True)
 
     results: list[dict] = []
     n = 0
-    for name in physics:
+    for name, quality in variants:
+        label = f"{name}@{quality}" if quality else name
         too_slow = False
         for units in counts:
             for repeat in range(args.repeats):
                 n += 1
                 if too_slow:
-                    results.append({"physics": name, "units": units, "repeat": repeat, "status": "skipped"})
+                    results.append({"label": label, "physics": name, "units": units, "repeat": repeat,
+                                    "status": "skipped"})
                     continue
-                print(f"[{n}/{total}] {name:<10} {units:>9,} units  run {repeat + 1}... ", end="", flush=True)
-                r = run_one(exe, args, name, units, repeat, out_dir)
+                print(f"[{n}/{total}] {label:<24} {units:>9,} units  run {repeat + 1}... ", end="", flush=True)
+                r = run_one(exe, args, name, quality, units, repeat, out_dir)
                 results.append(r)
                 if r.get("status") == "ok":
                     print(f"{r['fps_mean']:8.1f} fps  frame {stat(r, 'frame_ms'):7.2f} ms  "
@@ -336,6 +368,7 @@ def main() -> int:
         "host": {"system": platform.system(), "release": platform.release(), "machine": platform.machine(),
                  "processor": platform.processor()},
         "gpu_driver": first_ok.get("gpu_driver"),
+        "gpu_name": first_ok.get("gpu_name"),
         "present_mode": first_ok.get("present_mode"),
         "settings": {k: v for k, v in vars(args).items() if k != "out_dir"},
     }

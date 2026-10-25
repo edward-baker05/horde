@@ -58,6 +58,41 @@ bool uploadUnitsNow(SDL_GPUDevice* device, const BaseUnitData* units, std::uint3
     return true;
 }
 
+bool uploadBytesNow(SDL_GPUDevice* device, const void* data, std::uint32_t size, SDL_GPUBuffer* target) {
+    if (size == 0) {
+        return true;
+    }
+
+    SDL_GPUTransferBufferCreateInfo transferInfo{};
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = size;
+
+    SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    if (transfer == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create upload buffer: %s", SDL_GetError());
+        return false;
+    }
+
+    void* mapped = SDL_MapGPUTransferBuffer(device, transfer, false);
+    SDL_memcpy(mapped, data, size);
+    SDL_UnmapGPUTransferBuffer(device, transfer);
+
+    SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(device);
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commands);
+
+    SDL_GPUTransferBufferLocation src{};
+    src.transfer_buffer = transfer;
+    SDL_GPUBufferRegion dst{};
+    dst.buffer = target;
+    dst.size = size;
+    SDL_UploadToGPUBuffer(copyPass, &src, &dst, false);
+
+    SDL_EndGPUCopyPass(copyPass);
+    SDL_SubmitGPUCommandBuffer(commands);
+    SDL_ReleaseGPUTransferBuffer(device, transfer);
+    return true;
+}
+
 bool downloadUnits(SDL_GPUDevice* device, SDL_GPUBuffer* source, std::uint32_t count,
                    std::vector<BaseUnitData>& out) {
     out.resize(count);

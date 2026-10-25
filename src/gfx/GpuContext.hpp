@@ -19,7 +19,9 @@ public:
     GpuContext& operator=(const GpuContext&) = delete;
 
     // Creates the device and claims the window. Returns false and logs on failure.
-    bool init(SDL_Window* window, bool enableDebug);
+    // `preferLowPower` asks for an integrated GPU when there is one, which is
+    // how to check that the game scales down on a machine with a big card.
+    bool init(SDL_Window* window, bool enableDebug, bool preferLowPower = false);
     void shutdown();
 
     SDL_GPUDevice* device() const {
@@ -36,6 +38,9 @@ public:
 
     // Name of the backend actually chosen ("vulkan", "metal", "direct3d12").
     const char* driverName() const;
+
+    // The GPU's name as the driver reports it, or "unknown".
+    const char* deviceName() const;
 
 private:
     SDL_GPUDevice* m_device = nullptr;

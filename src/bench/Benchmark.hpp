@@ -3,6 +3,7 @@
 #include <SDL3/SDL_stdinc.h>
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -43,12 +44,17 @@ struct FrameSample {
 struct RunInfo {
     std::string videoDriver;
     std::string gpuDriver;
+    std::string gpuName;
     std::string shaderFormat;
     std::string presentMode;
     int windowWidth = 0;
     int windowHeight = 0;
     // Of the units at the end of the run, if the physics system can read them back.
     CollisionQuality quality;
+    // What the physics system reports it really ran with, if it uses them.
+    std::optional<sim::CollisionSettings> collision;
+    std::uint32_t wallCount = 0;
+    std::uint32_t wallPrimitives = 0;
 };
 
 // Collects frame samples across the warmup and measurement windows.

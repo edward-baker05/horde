@@ -28,7 +28,9 @@ bool LevelScene::onEnter(Services& services) {
     // A missing or malformed level must never stop the game booting: fall back
     // to a bare default rather than failing to enter the scene.
     m_level = logic::makeDefaultLevel();
-    if (!m_options.levelPath.empty()) {
+    if (m_options.level) {
+        m_level = *m_options.level;
+    } else if (!m_options.levelPath.empty()) {
         std::string error;
         if (std::optional<logic::Level> loaded = logic::loadLevel(m_options.levelPath, &error)) {
             m_level = std::move(*loaded);
@@ -51,11 +53,15 @@ bool LevelScene::onEnter(Services& services) {
         return false;
     }
 
+    // Walls don't move: flatten and bin them once, for every system to share.
+    m_walls->build(m_level, enemy_size * 0.5f);
+
     sim::SimConfig config;
     config.worldSize = m_level.size;
     config.unitSize = enemy_size;
-    config.initialUnits =
-        sim::spawnUnits(m_options.spawn, m_options.unitCount, m_level.size, enemy_size, m_options.seed);
+    config.walls = m_walls;
+    config.initialUnits = sim::spawnUnits(m_options.spawn, m_options.unitCount, m_level.size, enemy_size,
+                                          m_options.seed, m_walls.get());
     config.collision = m_options.collision;
     config.movement.maxSpeed = m_options.maxSpeed;
     // Head for the first exit; with none, the middle of the level.
@@ -70,8 +76,9 @@ bool LevelScene::onEnter(Services& services) {
         }
     }
 
-    SDL_Log("LevelScene: %u units, physics '%s', spawn '%s'", m_options.unitCount, m_options.physics.c_str(),
-            sim::spawnPatternName(m_options.spawn));
+    SDL_Log("LevelScene: %u units, physics '%s', spawn '%s', %zu walls (%zu primitives)", m_options.unitCount,
+            m_options.physics.c_str(), sim::spawnPatternName(m_options.spawn), m_level.walls.size(),
+            m_walls->primitives().size());
 
     return m_physics->init(services, config);
 }
@@ -142,6 +149,27 @@ void LevelScene::debugUi() {
         ImGui::EndCombo();
     }
 
+    if (ImGui::BeginCombo("Quality preset", "choose...")) {
+        for (const char* preset : {"low", "medium", "high", "ultra"}) {
+            if (ImGui::Selectable(preset)) {
+                sim::collisionPreset(preset, m_pendingOptions.collision);
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    constexpr sim::Broadphase broadphases[] = {sim::Broadphase::CountingSort, sim::Broadphase::Buckets,
+                                               sim::Broadphase::BitonicSort};
+    if (ImGui::BeginCombo("Broadphase", sim::broadphaseName(m_pendingOptions.collision.broadphase))) {
+        for (const sim::Broadphase broadphase : broadphases) {
+            if (ImGui::Selectable(sim::broadphaseName(broadphase),
+                                  broadphase == m_pendingOptions.collision.broadphase)) {
+                m_pendingOptions.collision.broadphase = broadphase;
+            }
+        }
+        ImGui::EndCombo();
+    }
+
     int iterations = static_cast<int>(m_pendingOptions.collision.iterations);
     if (ImGui::SliderInt("Collision passes", &iterations, 0, 16)) {
         m_pendingOptions.collision.iterations = static_cast<std::uint32_t>(iterations);
@@ -153,7 +181,7 @@ void LevelScene::debugUi() {
         m_services->scenes->replace(std::make_unique<LevelScene>(m_pendingOptions));
     }
 
-    if (ImGui::Button("Back to menu", ImVec2(160.0f, 0.0f))) {
+    if (ImGui::Button("Back", ImVec2(160.0f, 0.0f))) {
         m_services->scenes->pop();
     }
 

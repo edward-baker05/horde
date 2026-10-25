@@ -24,9 +24,14 @@ void printUsage() {
         "  --spawn PATTERN    column | random | grid, default column (random under --bench)\n"
         "  --seed N           spawn seed, default 1\n"
         "  --level PATH       level file, default the built-in level\n"
+        "  --level-size WxH   the built-in level at another size, e.g. 8000x8000\n"
         "  --collision-iterations N   relaxation passes per frame, default 4\n"
         "  --relaxation F     fraction of each pass's correction applied, default 0.5\n"
         "  --speed F          unit speed toward the exit, default 60\n"
+        "  --broadphase NAME  counting | buckets | bitonic, default counting\n"
+        "  --bucket-capacity N  units per cell for the buckets broadphase, default 8\n"
+        "  --quality NAME     low | medium | high | ultra: sets passes, relaxation and\n"
+        "                     broadphase together; later flags still override it\n"
         "\n"
         "Benchmarking:\n"
         "  --bench            run headless-style: time the level, write results, quit\n"
@@ -40,6 +45,7 @@ void printUsage() {
         "  --width W --height H   window size, default 1600x900\n"
         "  --vsync / --no-vsync   default on, off under --bench\n"
         "  --gpu-debug / --no-gpu-debug   GPU validation, default on, off under --bench\n"
+        "  --low-power-gpu    prefer an integrated GPU, if the machine has one\n"
         "\n"
         "  --list-physics     print the registered physics systems and exit\n"
         "  --help             print this and exit\n",
@@ -120,6 +126,22 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
             if (!value(v)) return ParseResult::Error;
             level.levelPath = std::filesystem::path(v);
             wantsLevel = true;
+        } else if (arg == "--level-size") {
+            if (!value(v)) return ParseResult::Error;
+            const std::size_t x = v.find('x');
+            glm::vec2 size{0.0f};
+            if (x == std::string_view::npos || !parseNumber(v.substr(0, x), size.x) ||
+                !parseNumber(v.substr(x + 1), size.y) || size.x < 50.0f || size.y < 50.0f) {
+                return bad(v);
+            }
+            // The default level, its markers re-centred on the new edges.
+            logic::Level sized = logic::makeDefaultLevel();
+            sized.size = size;
+            for (logic::Marker& marker : sized.markers) {
+                marker.offset = (logic::edgeLength(sized, marker.edge) - marker.length) * 0.5f;
+            }
+            level.level = sized;
+            wantsLevel = true;
         } else if (arg == "--collision-iterations") {
             if (!value(v) || !parseNumber(v, level.collision.iterations)) return bad(v);
             wantsLevel = true;
@@ -131,6 +153,19 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--speed") {
             if (!value(v) || !parseNumber(v, level.maxSpeed) || level.maxSpeed < 0) return bad(v);
             wantsLevel = true;
+        } else if (arg == "--broadphase") {
+            if (!value(v) || !sim::parseBroadphase(std::string(v), level.collision.broadphase)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--bucket-capacity") {
+            if (!value(v) || !parseNumber(v, level.collision.bucketCapacity) || level.collision.bucketCapacity == 0) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--quality") {
+            if (!value(v) || !sim::collisionPreset(std::string(v), level.collision)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--low-power-gpu") {
+            config.lowPowerGpu = true;
         } else if (arg == "--warmup") {
             if (!value(v) || !parseNumber(v, benchConfig.warmupSeconds) || benchConfig.warmupSeconds < 0) return bad(v);
         } else if (arg == "--duration") {

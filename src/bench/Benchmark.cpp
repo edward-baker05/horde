@@ -104,6 +104,7 @@ bool Recorder::finish(const RunInfo& info) const {
     }
 
     const scene::LevelOptions& level = m_config.level;
+    const sim::CollisionSettings collision = info.collision.value_or(level.collision);
 
     nlohmann::json result = {
         {"status", m_samples.empty() ? "no-samples" : "ok"},
@@ -123,6 +124,7 @@ bool Recorder::finish(const RunInfo& info) const {
 #endif
         {"video_driver", info.videoDriver},
         {"gpu_driver", info.gpuDriver},
+        {"gpu_name", info.gpuName},
         {"shader_format", info.shaderFormat},
         {"present_mode", info.presentMode},
         {"window", {info.windowWidth, info.windowHeight}},
@@ -135,8 +137,12 @@ bool Recorder::finish(const RunInfo& info) const {
         {"render_ms", summarise(column(m_samples, &FrameSample::render))},
         {"acquire_ms", summarise(column(m_samples, &FrameSample::acquire))},
         {"gpu_sync", m_config.syncGpu},
-        {"collision_iterations", level.collision.iterations},
-        {"collision_relaxation", level.collision.relaxation},
+        {"collision_iterations", collision.iterations},
+        {"broadphase", info.collision ? sim::broadphaseName(collision.broadphase) : "n/a"},
+        {"bucket_capacity", collision.bucketCapacity},
+        {"walls", info.wallCount},
+        {"wall_primitives", info.wallPrimitives},
+        {"collision_relaxation", collision.relaxation},
         {"max_speed", level.maxSpeed},
     };
     if (info.quality.measured) {
@@ -148,6 +154,8 @@ bool Recorder::finish(const RunInfo& info) const {
             {"mean_penetration", q.meanPenetration},
             {"max_penetration", q.maxPenetration},
             {"density", q.density},
+            {"units_in_walls", q.unitsInWalls},
+            {"mean_wall_penetration", q.meanWallPenetration},
         };
     }
     if (m_config.syncGpu) {

@@ -9,7 +9,7 @@
 namespace horde::sim {
 
 // The physics system a level uses when nothing asks for another.
-inline constexpr const char* kDefaultPhysics = "gpu-grid";
+inline constexpr const char* kDefaultPhysics = "gpu-collide";
 
 // Every registered system's name, in registration order.
 std::vector<std::string> physicsNames();

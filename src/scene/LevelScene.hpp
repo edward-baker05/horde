@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "gfx/Camera2D.hpp"
@@ -12,6 +13,7 @@
 #include "scene/Scene.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
+#include "sim/WallColliders.hpp"
 
 namespace horde::scene {
 
@@ -20,6 +22,8 @@ namespace horde::scene {
 struct LevelOptions {
     // Empty means the built-in default level.
     std::filesystem::path levelPath;
+    // Play this level instead of loading one: the editor's test play.
+    std::optional<logic::Level> level;
     std::string physics = sim::kDefaultPhysics;
     std::uint32_t unitCount = 10000;
     sim::SpawnPattern spawn = sim::SpawnPattern::Column;
@@ -66,6 +70,10 @@ public:
         return enemy_size;
     }
 
+    const sim::WallColliders& walls() const {
+        return *m_walls;
+    }
+
     gfx::Camera2D& camera() override {
         return m_camera;
     }
@@ -87,6 +95,7 @@ private:
     logic::Level m_level;
 
     float enemy_size = 5.0f;
+    std::shared_ptr<sim::WallColliders> m_walls = std::make_shared<sim::WallColliders>();
     std::unique_ptr<sim::PhysicsSystem> m_physics;
 };
 

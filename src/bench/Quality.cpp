@@ -4,11 +4,28 @@
 #include <cmath>
 #include <numbers>
 
+#include "sim/WallColliders.hpp"
+
 namespace horde::bench {
 
-CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float diameter, glm::vec2 worldSize) {
+CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float diameter, glm::vec2 worldSize,
+                                   const sim::WallColliders* walls) {
     CollisionQuality q;
     q.measured = true;
+
+    if (walls != nullptr && !walls->empty()) {
+        const float radius = diameter * 0.5f;
+        double sum = 0.0;
+        for (const BaseUnitData& u : units) {
+            float distance = 0.0f;
+            glm::vec2 normal;
+            if (walls->nearest(u.pos + radius, distance, normal) && distance < radius - 0.01f * diameter) {
+                ++q.unitsInWalls;
+                sum += (radius - distance) / diameter;
+            }
+        }
+        q.meanWallPenetration = q.unitsInWalls ? sum / q.unitsInWalls : 0.0;
+    }
 
     const auto count = static_cast<std::uint32_t>(units.size());
     const double area = static_cast<double>(worldSize.x) * worldSize.y;

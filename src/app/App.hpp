@@ -22,6 +22,7 @@ struct AppConfig {
     int height = 900;
     bool vsync = true;
     bool gpuDebug = true;
+    bool lowPowerGpu = false;
     // Boot straight into this level instead of stopping at the menu.
     std::optional<scene::LevelOptions> startLevel;
     // Run one benchmark and quit. See bench/Benchmark.hpp.

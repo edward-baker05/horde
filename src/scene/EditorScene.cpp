@@ -12,6 +12,7 @@
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
 #include "logic/LevelValidation.hpp"
+#include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
 
 namespace horde::scene {
@@ -446,10 +447,20 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
 
 void EditorScene::debugUi() {
     bool wantsExit = false;
-    editor::drawEditorUi(m_state, wantsExit);
+    bool wantsPlay = false;
+    editor::drawEditorUi(m_state, wantsExit, wantsPlay);
 
     if (wantsExit) {
         m_services->scenes->pop();
+    } else if (wantsPlay) {
+        // Over the editor, so leaving the level comes straight back here.
+        LevelOptions options;
+        options.level = m_state.level;
+        options.physics = m_state.testPhysics;
+        options.unitCount = static_cast<std::uint32_t>(m_state.testUnits);
+        options.spawn = sim::SpawnPattern::Random;
+        options.fitCamera = true;
+        m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
     }
 }
 

@@ -1,0 +1,1296 @@
+{
+  "version": 1,
+  "size": [
+    2000.0,
+    2000.0
+  ],
+  "backgroundColor": [
+    38,
+    42,
+    50
+  ],
+  "walls": [
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        120
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        300
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        480
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        660
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        840
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        1020
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        1200
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        1380
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        1560
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        250,
+        1740
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        210
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 21
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        390
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 28
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        570
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 21
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        750
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 28
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        930
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 21
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        1110
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 28
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        1290
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 21
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        1470
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 28
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        1650
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 21
+    },
+    {
+      "kind": "circle",
+      "center": [
+        350,
+        1830
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 28
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        120
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 24
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        300
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 31
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        480
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 24
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        660
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 31
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        840
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 24
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        1020
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 31
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        1200
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 24
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        1380
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 31
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        1560
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 24
+    },
+    {
+      "kind": "circle",
+      "center": [
+        450,
+        1740
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 31
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        210
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 27
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        390
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 20
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        570
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 27
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        750
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 20
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        930
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 27
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        1110
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 20
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        1290
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 27
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        1470
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 20
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        1650
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 27
+    },
+    {
+      "kind": "circle",
+      "center": [
+        550,
+        1830
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 20
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        120
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 30
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        300
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 23
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        480
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 30
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        660
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 23
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        840
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 30
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        1020
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 23
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        1200
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 30
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        1380
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 23
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        1560
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 30
+    },
+    {
+      "kind": "circle",
+      "center": [
+        650,
+        1740
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 23
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        210
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 19
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        390
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        570
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 19
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        750
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        930
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 19
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        1110
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        1290
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 19
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        1470
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        1650
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 19
+    },
+    {
+      "kind": "circle",
+      "center": [
+        750,
+        1830
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        120
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 22
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        300
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 29
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        480
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 22
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        660
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 29
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        840
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 22
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        1020
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 29
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        1200
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 22
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        1380
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 29
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        1560
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 22
+    },
+    {
+      "kind": "circle",
+      "center": [
+        850,
+        1740
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 29
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        210
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        390
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        570
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        750
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        930
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        1110
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        1290
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        1470
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        1650
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 25
+    },
+    {
+      "kind": "circle",
+      "center": [
+        950,
+        1830
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "radius": 18
+    },
+    {
+      "kind": "rectangle",
+      "center": [
+        1150,
+        300
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 30,
+      "halfExtents": [
+        90,
+        20
+      ]
+    },
+    {
+      "kind": "rectangle",
+      "center": [
+        1150,
+        1700
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": -30,
+      "halfExtents": [
+        90,
+        20
+      ]
+    },
+    {
+      "kind": "rectangle",
+      "center": [
+        1250,
+        700
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 60,
+      "halfExtents": [
+        90,
+        20
+      ]
+    },
+    {
+      "kind": "rectangle",
+      "center": [
+        1250,
+        1300
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": -60,
+      "halfExtents": [
+        90,
+        20
+      ]
+    },
+    {
+      "kind": "rectangle",
+      "center": [
+        1100,
+        1000
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 0,
+      "halfExtents": [
+        25,
+        160
+      ]
+    },
+    {
+      "kind": "triangle",
+      "center": [
+        1400,
+        450
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 90,
+      "halfExtents": [
+        60,
+        50
+      ]
+    },
+    {
+      "kind": "triangle",
+      "center": [
+        1400,
+        1550
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 90,
+      "halfExtents": [
+        60,
+        50
+      ]
+    },
+    {
+      "kind": "triangle",
+      "center": [
+        1350,
+        1000
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": -90,
+      "halfExtents": [
+        60,
+        50
+      ]
+    },
+    {
+      "kind": "polyline",
+      "center": [
+        1700,
+        500
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 0.0,
+      "thickness": 16,
+      "points": [
+        [
+          -200,
+          -350
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          150,
+          400
+        ]
+      ]
+    },
+    {
+      "kind": "polyline",
+      "center": [
+        1700,
+        1500
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 0.0,
+      "thickness": 16,
+      "points": [
+        [
+          -200,
+          350
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          150,
+          -400
+        ]
+      ]
+    },
+    {
+      "kind": "polyline",
+      "center": [
+        1600,
+        1000
+      ],
+      "color": [
+        150,
+        150,
+        165
+      ],
+      "rotation": 0.0,
+      "thickness": 6,
+      "points": [
+        [
+          -20,
+          -120
+        ],
+        [
+          20,
+          -60
+        ],
+        [
+          -20,
+          0
+        ],
+        [
+          20,
+          60
+        ],
+        [
+          -20,
+          120
+        ]
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "kind": "spawn",
+      "edge": "west",
+      "offset": 950.0,
+      "length": 100.0
+    },
+    {
+      "kind": "exit",
+      "edge": "east",
+      "offset": 950.0,
+      "length": 100.0
+    }
+  ]
+}

@@ -41,7 +41,7 @@ bool App::init(const AppConfig& config) {
         return false;
     }
     // m_gpu is a gfx::GpuContext object created in App.hpp header file, @see GpuContext
-    if (!m_gpu.init(m_window, m_config.gpuDebug)) {
+    if (!m_gpu.init(m_window, m_config.gpuDebug, m_config.lowPowerGpu)) {
         return false;
     }
 
@@ -161,6 +161,7 @@ int App::finishBenchmark() {
     bench::RunInfo info;
     info.videoDriver = SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "";
     info.gpuDriver = m_gpu.driverName() ? m_gpu.driverName() : "";
+    info.gpuName = m_gpu.deviceName();
     info.shaderFormat = m_shaders->formatName();
     info.presentMode = m_presentMode;
     SDL_GetWindowSizeInPixels(m_window, &info.windowWidth, &info.windowHeight);
@@ -169,8 +170,13 @@ int App::finishBenchmark() {
     if (auto* level = dynamic_cast<scene::LevelScene*>(m_scenes->active())) {
         std::vector<BaseUnitData> units;
         if (level->physics().readUnits(units)) {
-            info.quality = bench::measureCollisions(units, level->unitSize(), level->level().size);
+            info.quality = bench::measureCollisions(units, level->unitSize(), level->level().size, &level->walls());
         }
+        if (const sim::CollisionSettings* collision = level->physics().collisionSettings()) {
+            info.collision = *collision;
+        }
+        info.wallCount = static_cast<std::uint32_t>(level->level().walls.size());
+        info.wallPrimitives = static_cast<std::uint32_t>(level->walls().primitives().size());
     }
 
     m_running = false;

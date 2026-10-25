@@ -190,8 +190,16 @@ python tools/bench.py                                  # every system x 1k, 10k,
 python tools/bench.py --physics gpu-grid,cpu-grid --units 1k,10k,100k,1m --repeats 3
 python tools/bench.py --no-build --duration 5 --frames # reuse the build, keep per-frame CSVs
 python tools/bench.py --physics gpu-collide --collision-iterations 8 --relaxation 0.8
+python tools/bench.py --physics gpu-collide-counting,gpu-collide-buckets,gpu-collide-bitonic --level assets/levels/bench_walls.level.json
+python tools/bench.py --physics gpu-collide --quality low,medium,high,ultra --low-power-gpu   # on the integrated GPU
+python tools/bench.py --level-size 8000x8000 --units 1m,4m   # room for a million units
 python tools/bench.py --help
 ```
+
+`assets/levels/bench_walls.level.json` uses every wall kind (regenerate it with
+`python tools/make_bench_level.py`, or edit it in the level editor).
+`--low-power-gpu` runs on the integrated GPU if the machine has one, which is
+the quickest way to check that a change still scales down.
 
 If `cmake` is not on `PATH`, the script looks for CLion's and Visual Studio's
 bundled copies, or uses `HORDE_CMAKE`.
@@ -205,6 +213,8 @@ What the columns mean:
 | gpu sim ms | the scene's `compute()` work on its own command buffer, waited on: GPU-side physics |
 | sim ms | cpu + gpu sim: what the physics system costs per frame |
 | overlap %, penetration | collision quality at the end of the run: share of units overlapping another, and mean overlap depth as a fraction of a unit's diameter |
+| in walls % | share of units overlapping a wall at the end of the run |
+| `name@preset` rows | ran with `--quality preset` |
 
 Benchmarks run with vsync and GPU validation off, a fixed 1/60 s simulation
 step and a seeded random spawn, so runs with the same settings are comparable.
@@ -219,6 +229,41 @@ setup:
 horde --list-physics
 horde --bench --physics gpu-grid --units 100000 --duration 10 --out result.json
 horde --physics cpu-grid --units 5000     # boots straight into that level, playable
+horde --level assets/levels/bench_walls.level.json --quality low --units 50000
+```
+
+### Collision settings
+
+`gpu-collide` (the default) collides units with each other and with walls.
+`gpu-collide-counting`, `-buckets` and `-bitonic` are the same system with
+the broadphase fixed, for comparing them.
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `--quality low\|medium\|high\|ultra` | high | passes, relaxation and broadphase together, from integrated graphics up |
+| `--collision-iterations N` | 4 | relaxation passes per frame: the main cost and quality knob |
+| `--relaxation F` | 0.5 | fraction of each pass's correction applied |
+| `--broadphase counting\|buckets\|bitonic` | counting | how neighbours are found |
+| `--bucket-capacity N` | 8 | units per cell before the buckets broadphase misses some |
+
+Flags after `--quality` override its parts. The level's debug panel has the
+same controls, applied on *Restart level*. Measurements and the reasoning are
+in `docs/adr/0004-wall-collisions-and-broadphases.md`.
+
+### Test play from the level editor
+
+The editor's Level panel has a *Test play* section. Pick a physics system and
+unit count, then press *Test play* to run the level as it stands (saved or not)
+with units spawned at random outside the walls. *Back* returns to the editor.
+
+### Editing shaders
+
+Shaders are HLSL in `shaders/src/`. Shared code lives in `.hlsli` includes.
+After editing one, recompile into `shaders/compiled/` and commit both:
+
+```sh
+tools/compile_shaders.sh                    # all, using tools/bin/shadercross
+tools/compile_shaders.sh unit_collide.comp  # just one
 ```
 
 Units are discs one unit size (5) across. Above roughly 180k units the default
@@ -228,8 +273,11 @@ to climb there whatever the system.
 ### Adding a physics system
 
 GPU systems can reuse the stages `gpu-collide` is built from:
-`sim::GpuSpatialGrid` (neighbour lookup) and `sim::GpuUnitCollisions`
-(unit-unit separation). See `docs/adr/0003-swappable-staged-unit-physics.md`.
+`sim::GpuSpatialGrid` (neighbour lookup, three methods), `sim::GpuUnitCollisions`
+(unit-unit and unit-wall separation) and `sim::GpuWalls` (a level's walls on the
+GPU). `SimConfig::walls` hands every system the level's walls already flattened
+and binned. See `docs/adr/0003-swappable-staged-unit-physics.md` and
+`docs/adr/0004-wall-collisions-and-broadphases.md`.
 
 1. Implement `sim::PhysicsSystem` (`src/sim/PhysicsSystem.hpp`) in
    `src/sim/<Name>.cpp`. Draw through `gfx::UnitRenderer` so every system pays

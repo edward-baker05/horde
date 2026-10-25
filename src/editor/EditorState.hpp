@@ -52,6 +52,10 @@ struct SnapSettings {
 struct EditorState {
     logic::Level level = logic::makeDefaultLevel();
 
+    // Test play: how the level is run from the editor's "Test play" button.
+    std::string testPhysics = "gpu-collide";
+    int testUnits = 5000;
+
     Selection selection;
     Selection hovered;
 
