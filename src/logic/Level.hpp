@@ -92,8 +92,8 @@ inline float edgeLength(const Level& level, Edge edge) {
     return (edge == Edge::North || edge == Edge::South) ? level.size.x : level.size.y;
 }
 
-// A blank level: default size, one spawn centred on the west edge, one exit
-// centred on the east.
+// A blank level: default size, a spawn along the whole west edge and an exit
+// along the whole east edge.
 Level makeDefaultLevel();
 
 // The axis-aligned world-space rectangle a marker occupies, as centre and size.

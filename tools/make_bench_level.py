@@ -2,10 +2,10 @@
 """Writes assets/levels/bench_walls.level.json: a 2000x2000 level using every
 wall kind, for benchmarking unit-vs-wall collision (tools/bench.py --level).
 
-Units spawn on the west edge and head for an exit on the east edge, through a
-field of circular pillars, past rotated boxes and triangles, and into a funnel
-of polylines in front of the exit. Rerun to regenerate; edit freely in the
-level editor afterwards.
+Units spawn along the whole west edge and head for an exit along the whole
+east edge, through a field of circular pillars, past rotated boxes and
+triangles, and around a funnel of polylines near the exit. Rerun to
+regenerate; edit freely in the level editor afterwards.
 """
 
 import json
@@ -61,8 +61,8 @@ level = {
     "backgroundColor": [38, 42, 50],
     "walls": walls,
     "markers": [
-        {"kind": "spawn", "edge": "west", "offset": 950.0, "length": 100.0},
-        {"kind": "exit", "edge": "east", "offset": 950.0, "length": 100.0},
+        {"kind": "spawn", "edge": "west", "offset": 0.0, "length": 2000.0},
+        {"kind": "exit", "edge": "east", "offset": 0.0, "length": 2000.0},
     ],
 }
 

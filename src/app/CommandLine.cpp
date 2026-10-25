@@ -147,11 +147,12 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
                 !parseNumber(v.substr(x + 1), size.y) || size.x < 50.0f || size.y < 50.0f) {
                 return bad(v);
             }
-            // The default level, its markers re-centred on the new edges.
+            // The default level, its markers stretched along the new edges.
             logic::Level sized = logic::makeDefaultLevel();
             sized.size = size;
             for (logic::Marker& marker : sized.markers) {
-                marker.offset = (logic::edgeLength(sized, marker.edge) - marker.length) * 0.5f;
+                marker.offset = 0.0f;
+                marker.length = logic::edgeLength(sized, marker.edge);
             }
             level.level = sized;
             wantsLevel = true;

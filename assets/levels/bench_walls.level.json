@@ -1283,14 +1283,14 @@
     {
       "kind": "spawn",
       "edge": "west",
-      "offset": 950.0,
-      "length": 100.0
+      "offset": 0.0,
+      "length": 2000.0
     },
     {
       "kind": "exit",
       "edge": "east",
-      "offset": 950.0,
-      "length": 100.0
+      "offset": 0.0,
+      "length": 2000.0
     }
   ]
 }

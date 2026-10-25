@@ -5,17 +5,19 @@ namespace horde::logic {
 Level makeDefaultLevel() {
     Level level;
 
+    // Each gate spans its whole side: the horde enters along the full west
+    // edge and leaves along the full east edge.
     Marker spawn;
     spawn.kind = MarkerKind::Spawn;
     spawn.edge = Edge::West;
-    spawn.length = 100.0f;
-    spawn.offset = (level.size.y - spawn.length) * 0.5f;
+    spawn.offset = 0.0f;
+    spawn.length = edgeLength(level, Edge::West);
 
     Marker exit;
     exit.kind = MarkerKind::Exit;
     exit.edge = Edge::East;
-    exit.length = 100.0f;
-    exit.offset = (level.size.y - exit.length) * 0.5f;
+    exit.offset = 0.0f;
+    exit.length = edgeLength(level, Edge::East);
 
     level.markers.push_back(spawn);
     level.markers.push_back(exit);
