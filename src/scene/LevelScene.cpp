@@ -56,6 +56,19 @@ bool LevelScene::onEnter(Services& services) {
     config.unitSize = enemy_size;
     config.initialUnits =
         sim::spawnUnits(m_options.spawn, m_options.unitCount, m_level.size, enemy_size, m_options.seed);
+    config.collision = m_options.collision;
+    config.movement.maxSpeed = m_options.maxSpeed;
+    // Head for the first exit; with none, the middle of the level.
+    config.movement.goal = m_level.size * 0.5f;
+    for (const logic::Marker& marker : m_level.markers) {
+        if (marker.kind == logic::MarkerKind::Exit) {
+            glm::vec2 size;
+            logic::markerRect(m_level, marker, config.movement.goal, size);
+            // Positions are top-left corners; aim the unit's centre at the exit.
+            config.movement.goal -= glm::vec2(enemy_size * 0.5f);
+            break;
+        }
+    }
 
     SDL_Log("LevelScene: %u units, physics '%s', spawn '%s'", m_options.unitCount, m_options.physics.c_str(),
             sim::spawnPatternName(m_options.spawn));
@@ -128,6 +141,13 @@ void LevelScene::debugUi() {
         }
         ImGui::EndCombo();
     }
+
+    int iterations = static_cast<int>(m_pendingOptions.collision.iterations);
+    if (ImGui::SliderInt("Collision passes", &iterations, 0, 16)) {
+        m_pendingOptions.collision.iterations = static_cast<std::uint32_t>(iterations);
+    }
+    ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.05f, 1.0f);
+    ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
 
     if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {
         m_services->scenes->replace(std::make_unique<LevelScene>(m_pendingOptions));

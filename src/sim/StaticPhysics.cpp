@@ -35,6 +35,10 @@ void StaticPhysics::shutdown() {
     }
 }
 
+bool StaticPhysics::readUnits(std::vector<BaseUnitData>& out) {
+    return m_device && downloadUnits(m_device, m_units, m_unitCount, out);
+}
+
 void StaticPhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
                                const glm::mat4& viewProjection) {
     m_renderer.draw(commands, pass, m_units, m_unitCount, viewProjection, m_unitSize);

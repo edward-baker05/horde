@@ -58,6 +58,53 @@ bool uploadUnitsNow(SDL_GPUDevice* device, const BaseUnitData* units, std::uint3
     return true;
 }
 
+bool downloadUnits(SDL_GPUDevice* device, SDL_GPUBuffer* source, std::uint32_t count,
+                   std::vector<BaseUnitData>& out) {
+    out.resize(count);
+    if (count == 0) {
+        return true;
+    }
+
+    const Uint32 size = static_cast<Uint32>(sizeof(BaseUnitData) * count);
+    SDL_GPUTransferBufferCreateInfo transferInfo{};
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    transferInfo.size = size;
+
+    SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    if (transfer == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_GPU, "Failed to create unit download buffer: %s", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(device);
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commands);
+
+    SDL_GPUBufferRegion src{};
+    src.buffer = source;
+    src.size = size;
+
+    SDL_GPUTransferBufferLocation dst{};
+    dst.transfer_buffer = transfer;
+
+    SDL_DownloadFromGPUBuffer(copyPass, &src, &dst);
+    SDL_EndGPUCopyPass(copyPass);
+
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(commands);
+    bool ok = fence != nullptr && SDL_WaitForGPUFences(device, true, &fence, 1);
+    if (fence) {
+        SDL_ReleaseGPUFence(device, fence);
+    }
+
+    if (ok) {
+        const void* mapped = SDL_MapGPUTransferBuffer(device, transfer, false);
+        SDL_memcpy(out.data(), mapped, size);
+        SDL_UnmapGPUTransferBuffer(device, transfer);
+    }
+
+    SDL_ReleaseGPUTransferBuffer(device, transfer);
+    return ok;
+}
+
 UnitStreamer::~UnitStreamer() {
     shutdown();
 }

@@ -1,0 +1,56 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_StructuredBuffer_v2float
+{
+    float2 _m0[1];
+};
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_RWStructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_FinalizeParams
+{
+    float2 WorldMin;
+    float2 WorldMax;
+    float InvDt;
+    uint UnitCount;
+    float MaxSpeed;
+    float Padding;
+};
+
+kernel void main0(constant type_FinalizeParams& FinalizeParams [[buffer(0)]], device type_StructuredBuffer_v2float& PrevPos [[buffer(1)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= FinalizeParams.UnitCount)
+        {
+            break;
+        }
+        float2 _53 = fast::clamp(Units._m0[gl_GlobalInvocationID.x].pos, FinalizeParams.WorldMin, FinalizeParams.WorldMax);
+        float2 _59 = (_53 - PrevPos._m0[gl_GlobalInvocationID.x]) * FinalizeParams.InvDt;
+        float _60 = length(_59);
+        float2 _68;
+        if (_60 > FinalizeParams.MaxSpeed)
+        {
+            _68 = _59 * (FinalizeParams.MaxSpeed / _60);
+        }
+        else
+        {
+            _68 = _59;
+        }
+        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _53, _68 };
+        break;
+    } while(false);
+}
+

@@ -21,6 +21,11 @@ public:
     void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
                     const glm::mat4& viewProjection) override;
 
+    bool readUnits(std::vector<BaseUnitData>& out) override {
+        out = m_staging;
+        return true;
+    }
+
     std::uint32_t unitCount() const override {
         return static_cast<std::uint32_t>(m_units.GetCurrentUnits());
     }

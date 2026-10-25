@@ -21,6 +21,7 @@ public:
     void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
                     const glm::mat4& viewProjection) override;
     void debugUi() override;
+    bool readUnits(std::vector<BaseUnitData>& out) override;
 
     std::uint32_t unitCount() const override {
         return m_unitCount;

@@ -1,0 +1,158 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_StructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_StructuredBuffer_v2uint
+{
+    uint2 _m0[1];
+};
+
+struct type_RWStructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_CollideParams
+{
+    float2 WorldMin;
+    float2 WorldMax;
+    uint2 GridDim;
+    float InvCellSize;
+    uint UnitCount;
+    float Diameter;
+    float Relaxation;
+    float MaxCorrection;
+    float Padding;
+};
+
+kernel void main0(constant type_CollideParams& CollideParams [[buffer(0)]], device type_StructuredBuffer_UnitData& InUnits [[buffer(1)]], device type_StructuredBuffer_v2uint& SortedKeys [[buffer(2)]], device type_StructuredBuffer_v2uint& CellRanges [[buffer(3)]], device type_RWStructuredBuffer_UnitData& OutUnits [[buffer(4)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= CollideParams.UnitCount)
+        {
+            break;
+        }
+        int _77 = int(CollideParams.GridDim.x);
+        int _79 = clamp(int(InUnits._m0[gl_GlobalInvocationID.x].pos.x * CollideParams.InvCellSize), 0, _77 - 1);
+        int _85 = int(CollideParams.GridDim.y);
+        int _87 = clamp(int(InUnits._m0[gl_GlobalInvocationID.x].pos.y * CollideParams.InvCellSize), 0, _85 - 1);
+        float _90 = CollideParams.Diameter * CollideParams.Diameter;
+        float2 _92;
+        _92 = float2(0.0);
+        float2 _93;
+        for (int _95 = -1; _95 <= 1; _92 = _93, _95++)
+        {
+            int _100 = _87 + _95;
+            bool _105;
+            if (_100 >= 0)
+            {
+                _105 = _100 >= _85;
+            }
+            else
+            {
+                _105 = true;
+            }
+            if (_105)
+            {
+                _93 = _92;
+                continue;
+            }
+            float2 _109;
+            _109 = _92;
+            float2 _110;
+            for (int _112 = -1; _112 <= 1; _109 = _110, _112++)
+            {
+                int _117 = _79 + _112;
+                bool _122;
+                if (_117 >= 0)
+                {
+                    _122 = _117 >= _77;
+                }
+                else
+                {
+                    _122 = true;
+                }
+                if (_122)
+                {
+                    _110 = _109;
+                    continue;
+                }
+                uint _128 = uint(_117) + (uint(_100) * CollideParams.GridDim.x);
+                if (CellRanges._m0[_128].x == 4294967295u)
+                {
+                    _110 = _109;
+                    continue;
+                }
+                float2 _136;
+                _136 = _109;
+                float2 _137;
+                for (uint _139 = CellRanges._m0[_128].x; _139 < CellRanges._m0[_128].y; _136 = _137, _139++)
+                {
+                    if (((device uint*)&SortedKeys._m0[_139])[1] == gl_GlobalInvocationID.x)
+                    {
+                        _137 = _136;
+                        continue;
+                    }
+                    float2 _152 = InUnits._m0[gl_GlobalInvocationID.x].pos - InUnits._m0[((device uint*)&SortedKeys._m0[_139])[1]].pos;
+                    float _153 = dot(_152, _152);
+                    if (_153 >= _90)
+                    {
+                        _137 = _136;
+                        continue;
+                    }
+                    float _157 = sqrt(_153);
+                    float2 _182;
+                    if (_157 > 9.9999997473787516355514526367188e-05)
+                    {
+                        _182 = _152 / float2(_157);
+                    }
+                    else
+                    {
+                        float _172 = fract(sin(float((min(gl_GlobalInvocationID.x, ((device uint*)&SortedKeys._m0[_139])[1]) * 7919u) + max(gl_GlobalInvocationID.x, ((device uint*)&SortedKeys._m0[_139])[1]))) * 43758.546875) * 6.283185482025146484375;
+                        float2 _175 = float2(cos(_172), sin(_172));
+                        float2 _181;
+                        if (gl_GlobalInvocationID.x < ((device uint*)&SortedKeys._m0[_139])[1])
+                        {
+                            _181 = _175;
+                        }
+                        else
+                        {
+                            _181 = -_175;
+                        }
+                        _182 = _181;
+                    }
+                    _137 = _136 + (_182 * ((CollideParams.Diameter - _157) * 0.5));
+                }
+                _110 = _136;
+            }
+            _93 = _109;
+        }
+        float2 _189 = _92 * CollideParams.Relaxation;
+        float _190 = length(_189);
+        float2 _198;
+        if (_190 > CollideParams.MaxCorrection)
+        {
+            _198 = _189 * (CollideParams.MaxCorrection / _190);
+        }
+        else
+        {
+            _198 = _189;
+        }
+        OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ fast::clamp(InUnits._m0[gl_GlobalInvocationID.x].pos + _198, CollideParams.WorldMin, CollideParams.WorldMax), InUnits._m0[gl_GlobalInvocationID.x].vel };
+        break;
+    } while(false);
+}
+

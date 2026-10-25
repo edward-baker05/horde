@@ -3,6 +3,7 @@
 #include <SDL3/SDL_gpu.h>
 
 #include <cstdint>
+#include <vector>
 
 #include "logic/UnitData.hpp"
 
@@ -15,6 +16,11 @@ SDL_GPUBuffer* createUnitBuffer(SDL_GPUDevice* device, std::uint32_t count, SDL_
 // its own, submitted immediately. For one-off initial uploads.
 bool uploadUnitsNow(SDL_GPUDevice* device, const BaseUnitData* units, std::uint32_t count,
                     SDL_GPUBuffer* const* targets, int targetCount);
+
+// Copies `count` units from `source` back to the CPU, waiting for the GPU.
+// Slow: for tests and measurements, not every frame.
+bool downloadUnits(SDL_GPUDevice* device, SDL_GPUBuffer* source, std::uint32_t count,
+                   std::vector<BaseUnitData>& out);
 
 // Per-frame CPU -> GPU streaming of unit data, for systems that simulate on
 // the CPU but draw through UnitRenderer.

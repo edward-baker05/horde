@@ -5,6 +5,7 @@
 #include <SDL3/SDL_timer.h>
 
 #include <algorithm>
+#include <vector>
 
 #include "core/Paths.hpp"
 #include "gfx/Camera2D.hpp"
@@ -163,6 +164,14 @@ int App::finishBenchmark() {
     info.shaderFormat = m_shaders->formatName();
     info.presentMode = m_presentMode;
     SDL_GetWindowSizeInPixels(m_window, &info.windowWidth, &info.windowHeight);
+
+    // The benchmark always runs a LevelScene; measure where its units ended up.
+    if (auto* level = dynamic_cast<scene::LevelScene*>(m_scenes->active())) {
+        std::vector<BaseUnitData> units;
+        if (level->physics().readUnits(units)) {
+            info.quality = bench::measureCollisions(units, level->unitSize(), level->level().size);
+        }
+    }
 
     m_running = false;
     return m_recorder->finish(info) ? 0 : 3;

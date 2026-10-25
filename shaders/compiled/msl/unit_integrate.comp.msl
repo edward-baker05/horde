@@ -1,0 +1,59 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_RWStructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_RWStructuredBuffer_v2float
+{
+    float2 _m0[1];
+};
+
+struct type_IntegrateParams
+{
+    float2 Goal;
+    float Dt;
+    uint UnitCount;
+    float MaxSpeed;
+    float Steering;
+    float2 Padding;
+};
+
+kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(1)]], device type_RWStructuredBuffer_v2float& PrevPos [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= IntegrateParams.UnitCount)
+        {
+            break;
+        }
+        float2 _53 = Units._m0[gl_GlobalInvocationID.x].pos;
+        float2 _55 = Units._m0[gl_GlobalInvocationID.x].vel;
+        PrevPos._m0[gl_GlobalInvocationID.x] = _53;
+        float2 _59 = IntegrateParams.Goal - _53;
+        float _60 = length(_59);
+        float2 _70;
+        if (_60 > 0.001000000047497451305389404296875)
+        {
+            _70 = (_59 / float2(_60)) * IntegrateParams.MaxSpeed;
+        }
+        else
+        {
+            _70 = float2(0.0);
+        }
+        float2 _79 = _55 + ((_70 - _55) * fast::clamp(IntegrateParams.Steering * IntegrateParams.Dt, 0.0, 1.0));
+        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _53 + (_79 * IntegrateParams.Dt), _79 };
+        break;
+    } while(false);
+}
+

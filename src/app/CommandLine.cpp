@@ -24,6 +24,9 @@ void printUsage() {
         "  --spawn PATTERN    column | random | grid, default column (random under --bench)\n"
         "  --seed N           spawn seed, default 1\n"
         "  --level PATH       level file, default the built-in level\n"
+        "  --collision-iterations N   relaxation passes per frame, default 4\n"
+        "  --relaxation F     fraction of each pass's correction applied, default 0.5\n"
+        "  --speed F          unit speed toward the exit, default 60\n"
         "\n"
         "Benchmarking:\n"
         "  --bench            run headless-style: time the level, write results, quit\n"
@@ -116,6 +119,17 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--level") {
             if (!value(v)) return ParseResult::Error;
             level.levelPath = std::filesystem::path(v);
+            wantsLevel = true;
+        } else if (arg == "--collision-iterations") {
+            if (!value(v) || !parseNumber(v, level.collision.iterations)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--relaxation") {
+            if (!value(v) || !parseNumber(v, level.collision.relaxation) || level.collision.relaxation <= 0) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--speed") {
+            if (!value(v) || !parseNumber(v, level.maxSpeed) || level.maxSpeed < 0) return bad(v);
             wantsLevel = true;
         } else if (arg == "--warmup") {
             if (!value(v) || !parseNumber(v, benchConfig.warmupSeconds) || benchConfig.warmupSeconds < 0) return bad(v);

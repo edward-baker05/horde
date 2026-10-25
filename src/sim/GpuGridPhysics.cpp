@@ -271,6 +271,10 @@ void GpuGridPhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPas
     m_renderer.draw(commands, pass, m_unitBuffers[m_currentBufferIndex], m_unitCount, viewProjection, m_unitSize);
 }
 
+bool GpuGridPhysics::readUnits(std::vector<BaseUnitData>& out) {
+    return m_device && downloadUnits(m_device, m_unitBuffers[m_currentBufferIndex], m_unitCount, out);
+}
+
 void GpuGridPhysics::debugUi() {
     ImGui::Text("Grid Dim: %u x %u (%u cells)", m_gridDim.x, m_gridDim.y, m_totalCells);
     ImGui::Text("Allocated Keys: %u (padded for bitonic sort)", m_allocatedUnits);

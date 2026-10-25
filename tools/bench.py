@@ -116,6 +116,10 @@ def run_one(exe: Path, args: argparse.Namespace, physics: str, units: int, repea
         cmd += ["--fixed-dt", str(args.fixed_dt)]
     if args.level:
         cmd += ["--level", args.level]
+    for flag, value in (("--collision-iterations", args.collision_iterations), ("--relaxation", args.relaxation),
+                        ("--speed", args.speed)):
+        if value is not None:
+            cmd += [flag, str(value)]
     if args.frames:
         cmd += ["--frames-out", str(out_dir / "frames" / f"{stem}.csv")]
     if args.no_gpu_sync:
@@ -143,6 +147,11 @@ def stat(result: dict, key: str, field: str = "mean") -> float | None:
     if isinstance(value, dict):
         return value.get(field)
     return value
+
+
+def mean_of_quality(runs: list[dict], field: str) -> float | None:
+    values = [r["quality"][field] for r in runs if field in r.get("quality", {})]
+    return statistics.fmean(values) if values else None
 
 
 def aggregate(results: list[dict]) -> list[dict]:
@@ -176,6 +185,10 @@ def aggregate(results: list[dict]) -> list[dict]:
             "sim_gpu_ms_mean": sim_gpu,
             # What the physics itself costs per frame, CPU and GPU together.
             "sim_ms_mean": (update or 0.0) + (sim_gpu or 0.0),
+            "overlap_pct": (lambda v: v * 100 if v is not None else None)(
+                mean_of_quality(ok, "overlapping_fraction")),
+            "penetration_mean": mean_of_quality(ok, "mean_penetration"),
+            "penetration_max": mean_of_quality(ok, "max_penetration"),
             "fps_spread": (max(r["fps_mean"] for r in ok) - min(r["fps_mean"] for r in ok)) if len(ok) > 1 else 0.0,
         })
         rows.append(row)
@@ -194,13 +207,15 @@ def fmt(value, digits: int = 2) -> str:
 
 def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
     columns = ["physics", "units", "status", "fps_mean", "fps_1pct_low", "frame_ms_mean", "frame_ms_p99",
-               "update_ms_mean", "sim_gpu_ms_mean", "sim_ms_mean", "fps_spread", "runs", "ok"]
+               "update_ms_mean", "sim_gpu_ms_mean", "sim_ms_mean", "overlap_pct", "penetration_mean", "penetration_max",
+               "fps_spread", "runs", "ok"]
     with open(out_dir / "summary.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
-    headers = ["physics", "units", "fps", "1% low", "frame ms", "p99 ms", "cpu sim ms", "gpu sim ms", "sim ms"]
+    headers = ["physics", "units", "fps", "1% low", "frame ms", "p99 ms", "cpu sim ms", "gpu sim ms", "sim ms",
+               "overlap %", "penetration"]
     lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
     for r in rows:
         if r.get("status") != "ok":
@@ -209,7 +224,8 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
         lines.append("| " + " | ".join([
             r["physics"], f"{r['units']:,}", fmt(r["fps_mean"], 1), fmt(r["fps_1pct_low"], 1),
             fmt(r["frame_ms_mean"]), fmt(r["frame_ms_p99"]), fmt(r["update_ms_mean"], 3),
-            fmt(r["sim_gpu_ms_mean"], 3), fmt(r["sim_ms_mean"], 3)]) + " |")
+            fmt(r["sim_gpu_ms_mean"], 3), fmt(r["sim_ms_mean"], 3), fmt(r["overlap_pct"], 1),
+            fmt(r["penetration_mean"], 3)]) + " |")
     table = "\n".join(lines)
 
     notes = []
@@ -226,7 +242,8 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
           f"- backend `{meta.get('gpu_driver', '?')}`, present mode `{meta.get('present_mode', '?')}`",
           "", *notes, "" if notes else "", table, "",
           "*cpu sim ms* is the scene update on the CPU, *gpu sim ms* the physics compute work on the GPU, "
-          "timed in isolation; *sim ms* is their sum.", ""]
+          "timed in isolation; *sim ms* is their sum. *overlap %* is the share of units overlapping another at the "
+          "end of the run, *penetration* the mean overlap depth as a fraction of a unit's diameter.", ""]
     (out_dir / "summary.md").write_text("\n".join(md), encoding="utf-8")
     return table + ("\n\n" + notes[0] if notes else "")
 
@@ -253,6 +270,9 @@ def main() -> int:
     parser.add_argument("--spawn", default="random", choices=["random", "grid", "column"])
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--level", help="level file (default: built-in level)")
+    parser.add_argument("--collision-iterations", type=int, help="relaxation passes per frame (game default 4)")
+    parser.add_argument("--relaxation", type=float, help="fraction of each pass's correction applied (default 0.5)")
+    parser.add_argument("--speed", type=float, help="unit speed toward the exit (default 60)")
     parser.add_argument("--fixed-dt", type=float, help="simulation step per frame (game default 1/60; 0 = real)")
     parser.add_argument("--width", type=int, default=1600)
     parser.add_argument("--height", type=int, default=900)

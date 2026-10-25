@@ -189,6 +189,7 @@ one JSON per run in `runs/`, and the game's output in `logs/`.
 python tools/bench.py                                  # every system x 1k, 10k, 100k
 python tools/bench.py --physics gpu-grid,cpu-grid --units 1k,10k,100k,1m --repeats 3
 python tools/bench.py --no-build --duration 5 --frames # reuse the build, keep per-frame CSVs
+python tools/bench.py --physics gpu-collide --collision-iterations 8 --relaxation 0.8
 python tools/bench.py --help
 ```
 
@@ -203,6 +204,7 @@ What the columns mean:
 | cpu sim ms | the scene's `update()`: CPU-side physics |
 | gpu sim ms | the scene's `compute()` work on its own command buffer, waited on: GPU-side physics |
 | sim ms | cpu + gpu sim: what the physics system costs per frame |
+| overlap %, penetration | collision quality at the end of the run: share of units overlapping another, and mean overlap depth as a fraction of a unit's diameter |
 
 Benchmarks run with vsync and GPU validation off, a fixed 1/60 s simulation
 step and a seeded random spawn, so runs with the same settings are comparable.
@@ -219,7 +221,15 @@ horde --bench --physics gpu-grid --units 100000 --duration 10 --out result.json
 horde --physics cpu-grid --units 5000     # boots straight into that level, playable
 ```
 
+Units are discs one unit size (5) across. Above roughly 180k units the default
+2000x2000 level physically can't hold them without overlap, so expect overlap %
+to climb there whatever the system.
+
 ### Adding a physics system
+
+GPU systems can reuse the stages `gpu-collide` is built from:
+`sim::GpuSpatialGrid` (neighbour lookup) and `sim::GpuUnitCollisions`
+(unit-unit separation). See `docs/adr/0003-swappable-staged-unit-physics.md`.
 
 1. Implement `sim::PhysicsSystem` (`src/sim/PhysicsSystem.hpp`) in
    `src/sim/<Name>.cpp`. Draw through `gfx::UnitRenderer` so every system pays

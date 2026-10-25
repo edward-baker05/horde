@@ -135,7 +135,21 @@ bool Recorder::finish(const RunInfo& info) const {
         {"render_ms", summarise(column(m_samples, &FrameSample::render))},
         {"acquire_ms", summarise(column(m_samples, &FrameSample::acquire))},
         {"gpu_sync", m_config.syncGpu},
+        {"collision_iterations", level.collision.iterations},
+        {"collision_relaxation", level.collision.relaxation},
+        {"max_speed", level.maxSpeed},
     };
+    if (info.quality.measured) {
+        const CollisionQuality& q = info.quality;
+        result["quality"] = {
+            {"overlapping_pairs", q.overlappingPairs},
+            {"overlapping_units", q.overlappingUnits},
+            {"overlapping_fraction", level.unitCount ? static_cast<double>(q.overlappingUnits) / level.unitCount : 0.0},
+            {"mean_penetration", q.meanPenetration},
+            {"max_penetration", q.maxPenetration},
+            {"density", q.density},
+        };
+    }
     if (m_config.syncGpu) {
         result["sim_gpu_ms"] = summarise(column(m_samples, &FrameSample::gpu));
     }

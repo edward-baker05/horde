@@ -17,7 +17,7 @@ bool CpuGridPhysics::init(scene::Services& services, const SimConfig& config) {
     for (const BaseUnitData& unit : config.initialUnits) {
         m_units.SpawnUnit(unit.pos, unit.vel, 10);
     }
-    m_staging.resize(count);
+    m_staging = config.initialUnits;
 
     return m_renderer.init(services) && m_streamer.init(services.gpu->device(), count);
 }

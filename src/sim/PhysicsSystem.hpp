@@ -16,10 +16,35 @@ struct Services;
 
 namespace horde::sim {
 
+// Unit-vs-unit collision rules. Shared by every system that resolves
+// collisions, so that two systems are benchmarked against the same problem.
+//
+// Units are discs whose diameter is SimConfig::unitSize: two overlap when their
+// positions are closer than that.
+struct CollisionSettings {
+    // Relaxation passes per frame. More converge further (less overlap left in
+    // dense crowds) at a linear cost.
+    std::uint32_t iterations = 4;
+    // Fraction of each pass's summed correction applied. Below 1 because a unit
+    // pushed by several neighbours at once would otherwise overshoot.
+    float relaxation = 0.5f;
+    // Largest correction per pass, as a fraction of the diameter.
+    float maxCorrection = 0.5f;
+};
+
+// Where units are trying to go, and how fast.
+struct MovementSettings {
+    glm::vec2 goal{0.0f, 0.0f};
+    float maxSpeed = 60.0f; // world units per second
+    float steering = 4.0f;  // per second: how quickly velocity turns toward the goal
+};
+
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
     glm::vec2 worldSize{2000.0f, 2000.0f};
     float unitSize = 5.0f;
+    CollisionSettings collision;
+    MovementSettings movement;
     // Starting position and velocity of every unit. Its length is the unit
     // count; systems size their buffers from it.
     std::vector<BaseUnitData> initialUnits;
@@ -59,6 +84,14 @@ public:
     virtual void debugUi() {}
 
     virtual std::uint32_t unitCount() const = 0;
+
+    // Copies the current units to the CPU. Slow (GPU systems stall for a
+    // download), so for tests and benchmark measurements, not every frame.
+    // Returns false if the system cannot.
+    virtual bool readUnits(std::vector<BaseUnitData>& out) {
+        (void)out;
+        return false;
+    }
 };
 
 // How starting units are laid out. All are deterministic for a given seed, so

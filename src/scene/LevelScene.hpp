@@ -26,6 +26,9 @@ struct LevelOptions {
     std::uint32_t seed = 1;
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;
+    sim::CollisionSettings collision;
+    // Unit speed; the goal is always the level's first exit.
+    float maxSpeed = sim::MovementSettings{}.maxSpeed;
 };
 
 // The game world. Currently a level full of simulated units and a button back
@@ -50,6 +53,18 @@ public:
     void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) override;
     void debugUi() override;
     void onResize(float width, float height) override;
+
+    sim::PhysicsSystem& physics() {
+        return *m_physics;
+    }
+
+    const logic::Level& level() const {
+        return m_level;
+    }
+
+    float unitSize() const {
+        return enemy_size;
+    }
 
     gfx::Camera2D& camera() override {
         return m_camera;

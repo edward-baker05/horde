@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "bench/Quality.hpp"
 #include "scene/LevelScene.hpp"
 
 namespace horde::bench {
@@ -46,6 +47,8 @@ struct RunInfo {
     std::string presentMode;
     int windowWidth = 0;
     int windowHeight = 0;
+    // Of the units at the end of the run, if the physics system can read them back.
+    CollisionQuality quality;
 };
 
 // Collects frame samples across the warmup and measurement windows.
