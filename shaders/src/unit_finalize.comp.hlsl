@@ -1,7 +1,8 @@
 // Last step of the gpu-collide pipeline: keep units out of walls and inside
-// the level, and set each unit's velocity from where it actually ended up, so
-// collisions slow and deflect units rather than only moving them
-// (position-based dynamics).
+// the level, set each unit's velocity from where it actually ended up (so
+// collisions slow and deflect units rather than only moving them:
+// position-based dynamics), and send units that reached an exit back to a
+// spawn.
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -17,6 +18,8 @@ StructuredBuffer<float2> PrevPos : register(t0, space0);
 // t1..t3: walls, declared by walls.hlsli
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
 
+#define MAX_MARKERS 8
+
 // Matches GPUFinalizeUniforms in sim/GpuCollidePhysics.cpp
 cbuffer FinalizeParams : register(b0, space2) {
     float2 WorldMin;
@@ -28,12 +31,38 @@ cbuffer FinalizeParams : register(b0, space2) {
     uint2 WallBinDim;
     float WallBinSize;
     uint WallCount;
+    uint ExitCount;
+    uint SpawnCount;
+    uint Frame;         // varies the respawn position from frame to frame
+    uint RespawnOnExit; // 0: units that reach an exit stay there
+    float4 Exits[MAX_MARKERS];  // xy = centre, zw = half size
+    float4 Spawns[MAX_MARKERS]; // xy = centre, zw = half size
 };
 
 #define WALL_PRIMS_SLOT t1
 #define WALL_BINS_SLOT t2
 #define WALL_BIN_INDICES_SLOT t3
 #include "walls.hlsli"
+
+// PCG hash: a well-mixed uint from a uint.
+uint hash(uint v) {
+    uint state = v * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float unitFloat(uint v) {
+    return float(v & 0x00FFFFFFu) / 16777216.0f;
+}
+
+bool reachedExit(float2 centre) {
+    for (uint i = 0; i < ExitCount; ++i) {
+        if (all(abs(centre - Exits[i].xy) <= Exits[i].zw + Radius)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 [numthreads(256, 1, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
@@ -52,6 +81,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         vel *= MaxSpeed / speed;
     }
     unit.vel = vel;
+
+    // Through the exit: back in at a random point of a random spawn, at rest.
+    if (RespawnOnExit != 0 && SpawnCount > 0 && reachedExit(unit.pos + Radius)) {
+        uint h = hash(index ^ hash(Frame));
+        float4 spawn = Spawns[h % SpawnCount];
+        float2 r = float2(unitFloat(hash(h)), unitFloat(hash(h ^ 0x9E3779B9u))) * 2.0f - 1.0f;
+        unit.pos = clamp(spawn.xy + r * spawn.zw - Radius, WorldMin, WorldMax);
+        unit.vel = float2(0.0f, 0.0f);
+    }
 
     Units[index] = unit;
 }

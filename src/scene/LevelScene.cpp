@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -60,25 +61,42 @@ bool LevelScene::onEnter(Services& services) {
     config.worldSize = m_level.size;
     config.unitSize = enemy_size;
     config.walls = m_walls;
-    config.initialUnits = sim::spawnUnits(m_options.spawn, m_options.unitCount, m_level.size, enemy_size,
-                                          m_options.seed, m_walls.get());
     config.collision = m_options.collision;
     config.movement.maxSpeed = m_options.maxSpeed;
-    // Head for the first exit; with none, the middle of the level.
-    config.movement.goal = m_level.size * 0.5f;
+
+    // The green spawns and red exits, as areas units appear in and head for.
     for (const logic::Marker& marker : m_level.markers) {
-        if (marker.kind == logic::MarkerKind::Exit) {
-            glm::vec2 size;
-            logic::markerRect(m_level, marker, config.movement.goal, size);
-            // Positions are top-left corners; aim the unit's centre at the exit.
-            config.movement.goal -= glm::vec2(enemy_size * 0.5f);
-            break;
+        glm::vec2 center;
+        glm::vec2 size;
+        logic::markerRect(m_level, marker, center, size);
+        auto& areas = marker.kind == logic::MarkerKind::Spawn ? config.flow.spawns : config.flow.exits;
+        areas.push_back({center, size * 0.5f});
+    }
+    config.flow.spawnRate = m_options.spawnRate;
+    config.flow.respawnAtExit = m_options.respawnAtExit;
+    config.flow.seed = m_options.seed;
+    // Systems that don't steer to exits head for the first exit's centre, or
+    // the middle of a level without one. Positions are top-left corners.
+    config.movement.goal = (config.flow.exits.empty() ? m_level.size * 0.5f : config.flow.exits.front().center) -
+                           glm::vec2(enemy_size * 0.5f);
+
+    if (m_options.spawn == sim::SpawnPattern::Markers) {
+        if (m_physics->supportsFlow()) {
+            // Streamed in at the spawns as the level runs.
+            config.flow.toSpawn = m_options.unitCount;
+        } else {
+            std::mt19937 rng(m_options.seed);
+            config.initialUnits = sim::spawnInAreas(m_options.unitCount, config.flow.spawns, m_level.size,
+                                                    enemy_size, rng, m_walls.get());
         }
+    } else {
+        config.initialUnits = sim::spawnUnits(m_options.spawn, m_options.unitCount, m_level.size, enemy_size,
+                                              m_options.seed, m_walls.get());
     }
 
-    SDL_Log("LevelScene: %u units, physics '%s', spawn '%s', %zu walls (%zu primitives)", m_options.unitCount,
-            m_options.physics.c_str(), sim::spawnPatternName(m_options.spawn), m_level.walls.size(),
-            m_walls->primitives().size());
+    SDL_Log("LevelScene: %u units, physics '%s', spawn '%s' (%zu spawns, %zu exits), %zu walls (%zu primitives)",
+            m_options.unitCount, m_options.physics.c_str(), sim::spawnPatternName(m_options.spawn),
+            config.flow.spawns.size(), config.flow.exits.size(), m_level.walls.size(), m_walls->primitives().size());
 
     return m_physics->init(services, config);
 }
@@ -138,8 +156,8 @@ void LevelScene::debugUi() {
         m_pendingOptions.unitCount = static_cast<std::uint32_t>(std::clamp(units, 0, 4'000'000));
     }
 
-    constexpr sim::SpawnPattern patterns[] = {sim::SpawnPattern::Column, sim::SpawnPattern::Random,
-                                              sim::SpawnPattern::Grid};
+    constexpr sim::SpawnPattern patterns[] = {sim::SpawnPattern::Markers, sim::SpawnPattern::Random,
+                                              sim::SpawnPattern::Grid, sim::SpawnPattern::Column};
     if (ImGui::BeginCombo("Spawn", sim::spawnPatternName(m_pendingOptions.spawn))) {
         for (const sim::SpawnPattern pattern : patterns) {
             if (ImGui::Selectable(sim::spawnPatternName(pattern), pattern == m_pendingOptions.spawn)) {
@@ -148,6 +166,11 @@ void LevelScene::debugUi() {
         }
         ImGui::EndCombo();
     }
+    if (m_pendingOptions.spawn == sim::SpawnPattern::Markers) {
+        ImGui::SliderFloat("Spawn rate", &m_pendingOptions.spawnRate, 0.0f, 20000.0f, "%.0f/s",
+                           ImGuiSliderFlags_Logarithmic);
+    }
+    ImGui::Checkbox("Respawn at exit", &m_pendingOptions.respawnAtExit);
 
     if (ImGui::BeginCombo("Quality preset", "choose...")) {
         for (const char* preset : {"low", "medium", "high", "ultra"}) {

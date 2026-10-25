@@ -234,6 +234,26 @@ horde --physics cpu-grid --units 5000     # boots straight into that level, play
 horde --level assets/levels/bench_walls.level.json --quality low --units 50000
 ```
 
+### Spawns and exits
+
+In normal play and editor test play, units stream in at the level's green
+spawn markers (`--spawn markers`, the game's default) and steer straight for
+the nearest point of the nearest red exit, sliding along walls on the way.
+A unit that reaches an exit re-enters at a random spawn, which keeps a steady
+flow going. Benchmarks keep `--spawn random` unless told otherwise, so units
+start spread over the level and flow from there.
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `--spawn markers\|random\|grid\|column` | markers (random under `--bench`) | where units start |
+| `--spawn-rate N` | 1000 | markers: units entering per second; 0 brings them all in at once |
+| `--no-respawn` | off | units stop at the exit instead of re-entering |
+| `--units-out FILE` | | bench: write every unit's final position as CSV |
+
+Streaming, exit steering and respawning are `gpu-collide`'s. Other systems get
+every unit placed at the spawns up front and head for the first exit's centre.
+Up to 8 spawns and 8 exits are used.
+
 ### Collision settings
 
 `gpu-collide` (the default) collides units with each other and with walls.

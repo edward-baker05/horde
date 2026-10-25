@@ -112,6 +112,8 @@ bool Recorder::finish(const RunInfo& info) const {
         {"physics", level.physics},
         {"units", level.unitCount},
         {"spawn", sim::spawnPatternName(level.spawn)},
+        {"spawn_rate", level.spawnRate},
+        {"respawn_at_exit", level.respawnAtExit},
         {"seed", level.seed},
         {"level", level.levelPath.empty() ? "default" : level.levelPath.generic_string()},
         {"warmup_s", m_config.warmupSeconds},

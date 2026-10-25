@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -83,6 +84,31 @@ struct MovementSettings {
     float steering = 4.0f;  // per second: how quickly velocity turns toward the goal
 };
 
+// An axis-aligned area of the level: a spawn or exit marker's band.
+struct MarkerArea {
+    glm::vec2 center{0.0f, 0.0f};
+    glm::vec2 halfSize{0.0f, 0.0f};
+};
+
+// How units enter and leave a level, for systems that support it
+// (PhysicsSystem::supportsFlow).
+struct FlowSettings {
+    std::vector<MarkerArea> spawns;
+    std::vector<MarkerArea> exits;
+    // Units still to come in at the spawns after the start, spawnRate per
+    // second; 0 brings them all in on the first frame.
+    std::uint32_t toSpawn = 0;
+    float spawnRate = 1000.0f;
+    // A unit that reaches an exit re-enters at a spawn, keeping the flow
+    // going. Otherwise it stops there.
+    bool respawnAtExit = true;
+    std::uint32_t seed = 1;
+};
+
+// GPU flow shaders hold at most this many spawns and this many exits; any
+// beyond are ignored, with a warning.
+inline constexpr std::size_t kMaxFlowMarkers = 8;
+
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
     glm::vec2 worldSize{2000.0f, 2000.0f};
@@ -91,6 +117,7 @@ struct SimConfig {
     MovementSettings movement;
     // The level's walls, flattened and binned. Null or empty: no walls.
     std::shared_ptr<const WallColliders> walls;
+    FlowSettings flow;
     // Starting position and velocity of every unit. Its length is the unit
     // count; systems size their buffers from it.
     std::vector<BaseUnitData> initialUnits;
@@ -145,6 +172,13 @@ public:
     virtual const CollisionSettings* collisionSettings() const {
         return nullptr;
     }
+
+    // Whether the system honours SimConfig::flow: streaming units in at the
+    // spawns, steering them to the exits and respawning them there. Systems
+    // that don't get every unit up front instead.
+    virtual bool supportsFlow() const {
+        return false;
+    }
 };
 
 // How starting units are laid out. All are deterministic for a given seed, so
@@ -153,6 +187,7 @@ enum class SpawnPattern {
     Column, // the original wrapping column from the middle of the level
     Random, // uniform over the level
     Grid,   // an even lattice over the level
+    Markers, // at the level's spawn markers, streamed in over time where the system supports it
 };
 
 bool parseSpawnPattern(const std::string& text, SpawnPattern& out);
@@ -162,5 +197,11 @@ const char* spawnPatternName(SpawnPattern pattern);
 // the regular patterns are pushed out to the nearest wall surface.
 std::vector<BaseUnitData> spawnUnits(SpawnPattern pattern, std::uint32_t count, glm::vec2 worldSize, float unitSize,
                                      std::uint32_t seed, const WallColliders* walls = nullptr);
+
+// `count` units at random points of random `areas` (positions are top-left
+// corners, inside the level), avoiding walls where it can. For the Markers
+// pattern and for streaming spawns in.
+std::vector<BaseUnitData> spawnInAreas(std::uint32_t count, const std::vector<MarkerArea>& areas, glm::vec2 worldSize,
+                                       float unitSize, std::mt19937& rng, const WallColliders* walls = nullptr);
 
 } // namespace horde::sim

@@ -2,11 +2,26 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <numbers>
 
 #include "sim/WallColliders.hpp"
 
 namespace horde::bench {
+
+bool writeUnitsCsv(const std::vector<BaseUnitData>& units, float diameter, const std::filesystem::path& path) {
+    std::error_code ec;
+    if (path.has_parent_path()) {
+        std::filesystem::create_directories(path.parent_path(), ec);
+    }
+    std::ofstream out(path);
+    out << "x,y,vx,vy\n";
+    const float radius = diameter * 0.5f;
+    for (const BaseUnitData& u : units) {
+        out << u.pos.x + radius << ',' << u.pos.y + radius << ',' << u.vel.x << ',' << u.vel.y << '\n';
+    }
+    return static_cast<bool>(out);
+}
 
 CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float diameter, glm::vec2 worldSize,
                                    const sim::WallColliders* walls) {

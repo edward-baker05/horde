@@ -17,13 +17,16 @@ namespace {
 
 // Matches cbuffer IntegrateParams in unit_integrate.comp.hlsl
 struct alignas(16) GPUIntegrateUniforms {
-    glm::vec2 goal;
     float dt;
     Uint32 unitCount;
     float maxSpeed;
     float steering;
-    glm::vec2 padding;
+    glm::vec2 fallbackGoal;
+    float radius;
+    Uint32 exitCount;
+    glm::vec4 exits[kMaxFlowMarkers]; // xy = centre, zw = half size
 };
+static_assert(sizeof(GPUIntegrateUniforms) == 32 + 16 * kMaxFlowMarkers);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -36,8 +39,23 @@ struct alignas(16) GPUFinalizeUniforms {
     glm::uvec2 wallBinDim;
     float wallBinSize;
     Uint32 wallCount;
+    Uint32 exitCount;
+    Uint32 spawnCount;
+    Uint32 frame;
+    Uint32 respawnOnExit;
+    glm::vec4 exits[kMaxFlowMarkers];
+    glm::vec4 spawns[kMaxFlowMarkers];
 };
-static_assert(sizeof(GPUFinalizeUniforms) == 48);
+static_assert(sizeof(GPUFinalizeUniforms) == 64 + 32 * kMaxFlowMarkers);
+
+// Packs up to kMaxFlowMarkers areas as (centre, half size).
+Uint32 packAreas(const std::vector<MarkerArea>& areas, glm::vec4* out) {
+    const auto count = static_cast<Uint32>(std::min(areas.size(), kMaxFlowMarkers));
+    for (Uint32 i = 0; i < count; ++i) {
+        out[i] = glm::vec4(areas[i].center, areas[i].halfSize);
+    }
+    return count;
+}
 
 Uint32 groups(Uint32 threads) {
     return std::max<Uint32>(1, (threads + 255) / 256);
@@ -56,7 +74,14 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         m_config.collision.broadphase = *m_forcedBroadphase;
     }
     m_unitCount = static_cast<std::uint32_t>(config.initialUnits.size());
+    m_capacity = m_unitCount + config.flow.toSpawn;
     m_config.initialUnits.clear(); // only needed for the upload below
+    m_spawnRng.seed(config.flow.seed);
+    m_spawnDue = 0.0;
+    m_frame = 0;
+    if (config.flow.spawns.size() > kMaxFlowMarkers || config.flow.exits.size() > kMaxFlowMarkers) {
+        SDL_Log("GpuCollidePhysics: only the first %zu spawns and exits are used", kMaxFlowMarkers);
+    }
 
     // unit_integrate.comp: 2 rw buffers (units, previous positions), 1 uniform buffer
     m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 2, 1, 256, 1, 1);
@@ -70,7 +95,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     // One cell per unit diameter, so the collision shader's 3x3 search is complete.
     const CollisionSettings& collision = m_config.collision;
     if (!m_renderer.init(services) ||
-        !m_grid.init(services, m_unitCount, config.worldSize, config.unitSize, collision.broadphase,
+        !m_grid.init(services, m_capacity, config.worldSize, config.unitSize, collision.broadphase,
                      collision.bucketCapacity) ||
         !m_collisions.init(services, collision, config.unitSize, config.worldSize) ||
         !m_walls.init(m_device, config.walls.get())) {
@@ -80,18 +105,30 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     const SDL_GPUBufferUsageFlags usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ |
                                           SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE |
                                           SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
-    m_units[0] = createUnitBuffer(m_device, m_unitCount, usage);
-    m_units[1] = createUnitBuffer(m_device, m_unitCount, usage);
+    m_units[0] = createUnitBuffer(m_device, m_capacity, usage);
+    m_units[1] = createUnitBuffer(m_device, m_capacity, usage);
 
     SDL_GPUBufferCreateInfo prevInfo{};
     prevInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
-    prevInfo.size = static_cast<Uint32>(sizeof(glm::vec2) * std::max<std::uint32_t>(m_unitCount, 1));
+    prevInfo.size = static_cast<Uint32>(sizeof(glm::vec2) * std::max<std::uint32_t>(m_capacity, 1));
     m_prevPositions = SDL_CreateGPUBuffer(m_device, &prevInfo);
 
     if (!m_units[0] || !m_units[1] || !m_prevPositions) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s",
                      SDL_GetError());
         return false;
+    }
+
+    if (config.flow.toSpawn > 0 && !config.flow.spawns.empty()) {
+        SDL_GPUTransferBufferCreateInfo transferInfo{};
+        transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        transferInfo.size = static_cast<Uint32>(sizeof(BaseUnitData) * config.flow.toSpawn);
+        m_spawnTransfer = SDL_CreateGPUTransferBuffer(m_device, &transferInfo);
+        if (m_spawnTransfer == nullptr) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create spawn buffer: %s",
+                         SDL_GetError());
+            return false;
+        }
     }
 
     m_current = 0;
@@ -116,6 +153,11 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
+    if (m_spawnTransfer) {
+        SDL_ReleaseGPUTransferBuffer(m_device, m_spawnTransfer);
+        m_spawnTransfer = nullptr;
+    }
+
     SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
@@ -131,21 +173,71 @@ void GpuCollidePhysics::update(float dt) {
     m_dt = dt;
 }
 
-void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
-    if (!m_finalizePipeline || m_unitCount == 0 || m_dt <= 0.0f) {
+void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
+    if (m_spawnTransfer == nullptr || m_unitCount >= m_capacity) {
         return;
     }
 
+    // A rate of 0 brings everyone in at once; otherwise whole units as they fall due.
+    const FlowSettings& flow = m_config.flow;
+    std::uint32_t count = m_capacity - m_unitCount;
+    if (flow.spawnRate > 0.0f) {
+        m_spawnDue += static_cast<double>(flow.spawnRate) * m_dt;
+        count = std::min(count, static_cast<std::uint32_t>(m_spawnDue));
+        m_spawnDue -= count;
+    }
+    if (count == 0) {
+        return;
+    }
+
+    const std::vector<BaseUnitData> units = spawnInAreas(count, flow.spawns, m_config.worldSize, m_config.unitSize,
+                                                         m_spawnRng, m_config.walls.get());
+    const Uint32 size = static_cast<Uint32>(sizeof(BaseUnitData) * count);
+
+    void* mapped = SDL_MapGPUTransferBuffer(m_device, m_spawnTransfer, true);
+    SDL_memcpy(mapped, units.data(), size);
+    SDL_UnmapGPUTransferBuffer(m_device, m_spawnTransfer);
+
+    if (SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(commands)) {
+        SDL_GPUTransferBufferLocation src{};
+        src.transfer_buffer = m_spawnTransfer;
+        // Appends after the live units. Not cycled: the rest of the buffer is live data.
+        SDL_GPUBufferRegion dst{};
+        dst.buffer = m_units[m_current];
+        dst.offset = static_cast<Uint32>(sizeof(BaseUnitData) * m_unitCount);
+        dst.size = size;
+        SDL_UploadToGPUBuffer(copy, &src, &dst, false);
+        SDL_EndGPUCopyPass(copy);
+    }
+
+    m_unitCount += count;
+}
+
+void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
+    if (!m_finalizePipeline || m_dt <= 0.0f) {
+        return;
+    }
+
+    // 0. Bring in whoever is due.
+    spawnPending(commands);
+    if (m_unitCount == 0) {
+        return;
+    }
+    ++m_frame;
+
     const glm::vec2 worldMax = glm::max(m_config.worldSize - glm::vec2(m_config.unitSize), glm::vec2(0.0f));
+    const float radius = m_config.unitSize * 0.5f;
 
     // 1. Steer and predict.
     {
         GPUIntegrateUniforms uniforms{};
-        uniforms.goal = m_config.movement.goal;
         uniforms.dt = m_dt;
         uniforms.unitCount = m_unitCount;
         uniforms.maxSpeed = m_config.movement.maxSpeed;
         uniforms.steering = m_config.movement.steering;
+        uniforms.fallbackGoal = m_config.movement.goal + glm::vec2(radius);
+        uniforms.radius = radius;
+        uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding bindings[2]{};
@@ -173,10 +265,14 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.invDt = 1.0f / m_dt;
         uniforms.unitCount = m_unitCount;
         uniforms.maxSpeed = m_config.movement.maxSpeed;
-        uniforms.radius = m_config.unitSize * 0.5f;
+        uniforms.radius = radius;
         uniforms.wallBinDim = m_walls.binDim();
         uniforms.wallBinSize = m_walls.binSize();
         uniforms.wallCount = m_walls.primitiveCount();
+        uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
+        uniforms.spawnCount = packAreas(m_config.flow.spawns, uniforms.spawns);
+        uniforms.frame = m_frame;
+        uniforms.respawnOnExit = m_config.flow.respawnAtExit ? 1u : 0u;
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding binding{};
@@ -208,8 +304,11 @@ void GpuCollidePhysics::debugUi() {
         ImGui::Text("Collision: %u Jacobi passes, relaxed solver (%.2f)", c.iterations, c.relaxation);
     }
     ImGui::Text("Walls: %u primitives", m_walls.primitiveCount());
-    ImGui::Text("Goal: (%.0f, %.0f) at %.0f u/s", m_config.movement.goal.x, m_config.movement.goal.y,
-                m_config.movement.maxSpeed);
+    if (m_unitCount < m_capacity) {
+        ImGui::Text("Spawning: %u / %u at %.0f/s", m_unitCount, m_capacity, m_config.flow.spawnRate);
+    }
+    ImGui::Text("Heading for %zu exit(s) at %.0f u/s%s", m_config.flow.exits.size(), m_config.movement.maxSpeed,
+                m_config.flow.respawnAtExit ? ", respawning" : "");
 }
 
 bool GpuCollidePhysics::readUnits(std::vector<BaseUnitData>& out) {

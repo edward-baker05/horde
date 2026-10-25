@@ -29,6 +29,8 @@ struct BenchConfig {
     std::filesystem::path outPath;
     // Optional per-frame CSV.
     std::filesystem::path framesPath;
+    // Optional CSV of every unit's final position and velocity.
+    std::filesystem::path unitsPath;
 };
 
 // One frame's timings, in nanoseconds.

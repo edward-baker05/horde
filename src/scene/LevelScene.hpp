@@ -26,12 +26,16 @@ struct LevelOptions {
     std::optional<logic::Level> level;
     std::string physics = sim::kDefaultPhysics;
     std::uint32_t unitCount = 10000;
-    sim::SpawnPattern spawn = sim::SpawnPattern::Column;
+    // Markers: units stream in at the green spawns, spawnRate per second.
+    sim::SpawnPattern spawn = sim::SpawnPattern::Markers;
+    float spawnRate = 1000.0f;
+    // A unit reaching a red exit re-enters at a spawn; otherwise it stops there.
+    bool respawnAtExit = true;
     std::uint32_t seed = 1;
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;
     sim::CollisionSettings collision;
-    // Unit speed; the goal is always the level's first exit.
+    // Unit speed; units head for the nearest point of the nearest exit.
     float maxSpeed = sim::MovementSettings{}.maxSpeed;
 };
 

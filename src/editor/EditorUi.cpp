@@ -106,7 +106,8 @@ void drawLevelPanel(EditorState& state, bool& wantsExit, bool& wantsPlay) {
     ImGui::InputInt("Units", &state.testUnits, 1000, 10000);
     state.testUnits = std::clamp(state.testUnits, 0, 4'000'000);
 
-    // Plays the level as it is now, saved or not; leaving returns here.
+    // Plays the level as it is now, saved or not: units stream in at the green
+    // spawns and head for the red exits. Leaving returns here.
     if (ImGui::Button("Test play", ImVec2(160.0f, 0.0f))) {
         wantsPlay = true;
     }

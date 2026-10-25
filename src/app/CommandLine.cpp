@@ -21,7 +21,9 @@ void printUsage() {
         "Level setup (boots straight into a level when any is given):\n"
         "  --physics NAME     physics system (see --list-physics), default %s\n"
         "  --units N          number of units, default 10000\n"
-        "  --spawn PATTERN    column | random | grid, default column (random under --bench)\n"
+        "  --spawn PATTERN    markers | random | grid | column, default markers (random under --bench)\n"
+        "  --spawn-rate N     markers: units entering per second, default 1000; 0 = all at once\n"
+        "  --no-respawn       units stop at the exit instead of re-entering at a spawn\n"
         "  --seed N           spawn seed, default 1\n"
         "  --level PATH       level file, default the built-in level\n"
         "  --level-size WxH   the built-in level at another size, e.g. 8000x8000\n"
@@ -43,6 +45,8 @@ void printUsage() {
         "  --fixed-dt S       simulation step per frame, default 1/60; 0 = real time\n"
         "  --out FILE         write the JSON summary here\n"
         "  --frames-out FILE  write per-frame timings as CSV here\n"
+        "  --units-out FILE   write every unit's final position and velocity as CSV here\n"
+        "  --no-gpu-sync      don't time the physics' GPU work separately each frame\n"
         "\n"
         "Window and device:\n"
         "  --width W --height H   window size, default 1600x900\n"
@@ -122,6 +126,12 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
             if (!value(v) || !sim::parseSpawnPattern(std::string(v), level.spawn)) return bad(v);
             spawnGiven = true;
             wantsLevel = true;
+        } else if (arg == "--spawn-rate") {
+            if (!value(v) || !parseNumber(v, level.spawnRate) || level.spawnRate < 0) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--no-respawn") {
+            level.respawnAtExit = false;
+            wantsLevel = true;
         } else if (arg == "--seed") {
             if (!value(v) || !parseNumber(v, level.seed)) return bad(v);
             wantsLevel = true;
@@ -192,6 +202,9 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--frames-out") {
             if (!value(v)) return ParseResult::Error;
             benchConfig.framesPath = std::filesystem::path(v);
+        } else if (arg == "--units-out") {
+            if (!value(v)) return ParseResult::Error;
+            benchConfig.unitsPath = std::filesystem::path(v);
         } else if (arg == "--no-gpu-sync") {
             benchConfig.syncGpu = false;
         } else if (arg == "--width") {

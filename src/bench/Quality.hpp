@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <vector>
 
 #include "logic/UnitData.hpp"
@@ -29,6 +30,9 @@ struct CollisionQuality {
     std::uint32_t unitsInWalls = 0;
     double meanWallPenetration = 0.0;
 };
+
+// Writes units as CSV (x, y = centre; vx, vy). Returns false on failure.
+bool writeUnitsCsv(const std::vector<BaseUnitData>& units, float diameter, const std::filesystem::path& path);
 
 // Exact, via a CPU uniform grid. O(n) for evenly spread units.
 // `walls` may be null.

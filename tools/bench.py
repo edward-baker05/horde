@@ -130,6 +130,10 @@ def run_one(exe: Path, args: argparse.Namespace, physics: str, quality: str | No
         cmd += ["--level", args.level]
     if args.level_size:
         cmd += ["--level-size", args.level_size]
+    if args.spawn_rate is not None:
+        cmd += ["--spawn-rate", str(args.spawn_rate)]
+    if args.no_respawn:
+        cmd.append("--no-respawn")
     # The preset first, so the individual flags below can override parts of it.
     if quality:
         cmd += ["--quality", quality]
@@ -302,7 +306,10 @@ def main() -> int:
     parser.add_argument("--repeats", type=int, default=1, help="runs per combination (seed varies per repeat)")
     parser.add_argument("--warmup", type=float, default=2.0, help="seconds before measuring")
     parser.add_argument("--duration", type=float, default=10.0, help="seconds measured")
-    parser.add_argument("--spawn", default="random", choices=["random", "grid", "column"])
+    parser.add_argument("--spawn", default="random", choices=["random", "grid", "column", "markers"],
+                        help="starting layout; markers streams units in at the spawns (see --spawn-rate)")
+    parser.add_argument("--spawn-rate", type=float, help="markers: units per second (game default 1000; 0 = all at once)")
+    parser.add_argument("--no-respawn", action="store_true", help="units stop at the exit instead of re-entering")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--level", help="level file (default: built-in level)")
     parser.add_argument("--level-size", help="built-in level at another size, e.g. 8000x8000")

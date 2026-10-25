@@ -458,7 +458,7 @@ void EditorScene::debugUi() {
         options.level = m_state.level;
         options.physics = m_state.testPhysics;
         options.unitCount = static_cast<std::uint32_t>(m_state.testUnits);
-        options.spawn = sim::SpawnPattern::Random;
+        options.spawn = sim::SpawnPattern::Markers;
         options.fitCamera = true;
         m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
     }

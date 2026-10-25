@@ -171,6 +171,9 @@ int App::finishBenchmark() {
         std::vector<BaseUnitData> units;
         if (level->physics().readUnits(units)) {
             info.quality = bench::measureCollisions(units, level->unitSize(), level->level().size, &level->walls());
+            if (!m_recorder->config().unitsPath.empty()) {
+                bench::writeUnitsCsv(units, level->unitSize(), m_recorder->config().unitsPath);
+            }
         }
         if (const sim::CollisionSettings* collision = level->physics().collisionSettings()) {
             info.collision = *collision;

@@ -14,6 +14,8 @@ bool parseSpawnPattern(const std::string& text, SpawnPattern& out) {
         out = SpawnPattern::Random;
     } else if (text == "grid") {
         out = SpawnPattern::Grid;
+    } else if (text == "markers") {
+        out = SpawnPattern::Markers;
     } else {
         return false;
     }
@@ -102,8 +104,39 @@ const char* spawnPatternName(SpawnPattern pattern) {
             return "random";
         case SpawnPattern::Grid:
             return "grid";
+        case SpawnPattern::Markers:
+            return "markers";
     }
     return "?";
+}
+
+std::vector<BaseUnitData> spawnInAreas(std::uint32_t count, const std::vector<MarkerArea>& areas, glm::vec2 worldSize,
+                                       float unitSize, std::mt19937& rng, const WallColliders* walls) {
+    std::vector<BaseUnitData> units(count);
+    if (areas.empty()) {
+        return units;
+    }
+
+    const float radius = unitSize * 0.5f;
+    const glm::vec2 maxP = glm::max(worldSize - glm::vec2(unitSize), glm::vec2(0.0f));
+    const bool hasWalls = walls != nullptr && !walls->empty();
+    std::uniform_int_distribution<std::size_t> pick(0, areas.size() - 1);
+    std::uniform_real_distribution<float> along(-1.0f, 1.0f);
+
+    for (BaseUnitData& unit : units) {
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            const MarkerArea& area = areas[pick(rng)];
+            const glm::vec2 centre = area.center + glm::vec2(along(rng), along(rng)) * area.halfSize;
+            unit.pos = glm::clamp(centre - radius, glm::vec2(0.0f), maxP);
+
+            float distance = 0.0f;
+            glm::vec2 normal;
+            if (!hasWalls || !walls->nearest(unit.pos + radius, distance, normal) || distance >= radius) {
+                break;
+            }
+        }
+    }
+    return units;
 }
 
 std::vector<BaseUnitData> spawnUnits(SpawnPattern pattern, std::uint32_t count, glm::vec2 worldSize, float unitSize,
@@ -143,6 +176,9 @@ std::vector<BaseUnitData> spawnUnits(SpawnPattern pattern, std::uint32_t count, 
             }
             break;
         }
+        case SpawnPattern::Markers:
+            // Needs the level's markers: LevelScene uses spawnInAreas instead.
+            break;
         case SpawnPattern::Grid: {
             // Square-ish lattice with the level's aspect ratio.
             const float aspect = worldSize.x / std::max(worldSize.y, 1.0f);
