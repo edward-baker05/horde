@@ -73,10 +73,25 @@ a diameter) on the walls level:
 | 10k, 8 | 0.07 | 0.15 |
 | 100k, 8 | 0.17 | 0.26 |
 
-Both fully separate a stationary random spawn. Averaging could be sped up with
-over-relaxation (scaling the mean by 1–2, as in Müller et al.'s PBD). That
-would be a third solver if the overshoot-free behaviour turns out to matter
-more than convergence.
+Both fully separate a stationary random spawn.
+
+The average solver can be over-relaxed: `averageOmega` (`--omega`, 1–2,
+default 1 = the plain average) scales the mean, as in Müller et al.'s PBD.
+Overlap depth for the same runs:
+
+| units, passes | ω 1 | 1.25 | 1.5 | 1.75 | 2 | relaxed |
+|---|---|---|---|---|---|---|
+| 10k, 4 | 0.218 | 0.195 | 0.175 | 0.161 | 0.147 | 0.117 |
+| 100k, 4 | 0.303 | 0.289 | 0.278 | 0.267 | 0.257 | 0.222 |
+| 10k, 8 | 0.148 | 0.127 | 0.113 | 0.100 | 0.091 | 0.070 |
+| 100k, 8 | 0.257 | 0.240 | 0.226 | 0.213 | 0.202 | 0.173 |
+
+Each step up in ω helps, and nothing diverged even at 2, but the relaxed
+solver still converges further. The reason is that summing at relaxation 0.5
+across a typical 4–6 overlapping neighbours pushes harder than any ω ≤ 2 on the
+mean. ω makes no difference to GPU time. The average solver is worth choosing
+when the hard no-overshoot guarantee at ω = 1 matters (for example tiny
+time steps or very dense spawns); otherwise relaxed is the better default.
 
 ## Scaling down
 

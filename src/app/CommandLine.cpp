@@ -29,6 +29,7 @@ void printUsage() {
         "  --solver NAME      how a Jacobi pass combines a unit's overlaps: relaxed (sum x\n"
         "                     relaxation, the default) | average (mean of the overlaps)\n"
         "  --relaxation F     relaxed solver: fraction of each pass's correction applied, default 0.5\n"
+        "  --omega F          average solver: over-relaxation on the mean, 1 (plain) to 2, default 1\n"
         "  --speed F          unit speed toward the exit, default 60\n"
         "  --broadphase NAME  counting | buckets | bitonic, default counting\n"
         "  --bucket-capacity N  units per cell for the buckets broadphase, default 8\n"
@@ -165,6 +166,12 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
             wantsLevel = true;
         } else if (arg == "--solver") {
             if (!value(v) || !sim::parseSolver(std::string(v), level.collision.solver)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--omega") {
+            if (!value(v) || !parseNumber(v, level.collision.averageOmega) || level.collision.averageOmega <= 0 ||
+                level.collision.averageOmega > 2.0f) {
+                return bad(v);
+            }
             wantsLevel = true;
         } else if (arg == "--quality") {
             if (!value(v) || !sim::collisionPreset(std::string(v), level.collision)) return bad(v);

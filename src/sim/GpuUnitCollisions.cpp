@@ -29,7 +29,8 @@ struct alignas(16) GPUCollideUniforms {
     float wallBinSize;
     Uint32 wallCount;
     Uint32 solver; // 0 relaxed, 1 average: matches SOLVER_* in collide_common.hlsli
-    Uint32 solverPadding[3];
+    float averageOmega;
+    Uint32 solverPadding[2];
 };
 static_assert(sizeof(GPUCollideUniforms) == 80);
 
@@ -86,6 +87,7 @@ std::uint32_t GpuUnitCollisions::resolve(SDL_GPUCommandBuffer* commands, SDL_GPU
     uniforms.wallBinSize = walls.binSize();
     uniforms.wallCount = walls.primitiveCount();
     uniforms.solver = m_settings.solver == CollisionSolver::Average ? 1u : 0u;
+    uniforms.averageOmega = m_settings.averageOmega;
 
     for (std::uint32_t i = 0; i < m_settings.iterations; ++i) {
         const std::uint32_t next = 1 - current;

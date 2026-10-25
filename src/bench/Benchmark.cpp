@@ -144,6 +144,7 @@ bool Recorder::finish(const RunInfo& info) const {
         {"wall_primitives", info.wallPrimitives},
         {"collision_relaxation", collision.relaxation},
         {"solver", info.collision ? sim::solverName(collision.solver) : "n/a"},
+        {"average_omega", collision.averageOmega},
         {"max_speed", level.maxSpeed},
     };
     if (info.quality.measured) {

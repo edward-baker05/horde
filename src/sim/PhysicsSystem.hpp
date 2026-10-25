@@ -37,9 +37,9 @@ enum class CollisionSolver {
     // in light contact; can overshoot in dense crowds if relaxation is high.
     Relaxed,
     // Shift by the average of the corrections (position-based dynamics'
-    // constraint averaging). Never overshoots however many neighbours push at
-    // once, at the cost of slower convergence in deep crowds. Ignores
-    // `relaxation`.
+    // constraint averaging) times `averageOmega`. At 1 it never overshoots
+    // however many neighbours push at once, but converges slowly in deep
+    // crowds; over-relaxing (omega 1-2) speeds that up. Ignores `relaxation`.
     Average,
 };
 
@@ -60,6 +60,10 @@ struct CollisionSettings {
     // 1 because a unit pushed by several neighbours at once would otherwise
     // overshoot.
     float relaxation = 0.5f;
+    // Average solver: over-relaxation factor on the mean correction. 1 is the
+    // plain average; up to 2 converges faster (successive over-relaxation, as
+    // in Mueller et al.'s PBD). Beyond 2 it diverges.
+    float averageOmega = 1.0f;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;
     Broadphase broadphase = Broadphase::CountingSort;

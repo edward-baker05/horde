@@ -43,14 +43,15 @@ cbuffer CollideParams : register(b0, space2) {
     uint2 WallBinDim;
     float WallBinSize;
     uint WallCount;
-    uint Solver; // SOLVER_RELAXED or SOLVER_AVERAGE
-    uint3 SolverPadding;
+    uint Solver;        // SOLVER_RELAXED or SOLVER_AVERAGE
+    float AverageOmega; // average solver: over-relaxation factor on the mean, 1 = plain average
+    uint2 SolverPadding;
 };
 
 // Both are Jacobi: every unit reads the same state (InUnits) and writes the
 // next (OutUnits). They differ in how a unit combines its pair corrections:
 static const uint SOLVER_RELAXED = 0; // sum of corrections, scaled by Relaxation
-static const uint SOLVER_AVERAGE = 1; // mean of corrections: shift by the average overlap
+static const uint SOLVER_AVERAGE = 1; // mean of corrections times AverageOmega
 
 #define WALL_PRIMS_SLOT t3
 #define WALL_BINS_SLOT t4
@@ -92,7 +93,7 @@ int2 cellOf(float2 pos) {
 // Applies the combined unit correction, then walls, then the level bounds.
 void writeResolved(uint index, UnitData unit, float2 correction, uint overlaps) {
     if (Solver == SOLVER_AVERAGE) {
-        correction /= (float)max(overlaps, 1u);
+        correction *= AverageOmega / (float)max(overlaps, 1u);
     } else {
         correction *= Relaxation;
     }

@@ -203,7 +203,7 @@ void GpuCollidePhysics::debugUi() {
     ImGui::Text("Broadphase: %s, %u x %u cells, %u passes", broadphaseName(c.broadphase), m_grid.gridDim().x,
                 m_grid.gridDim().y, m_grid.passCount());
     if (c.solver == CollisionSolver::Average) {
-        ImGui::Text("Collision: %u Jacobi passes, average solver", c.iterations);
+        ImGui::Text("Collision: %u Jacobi passes, average solver (omega %.2f)", c.iterations, c.averageOmega);
     } else {
         ImGui::Text("Collision: %u Jacobi passes, relaxed solver (%.2f)", c.iterations, c.relaxation);
     }

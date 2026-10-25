@@ -184,9 +184,11 @@ void LevelScene::debugUi() {
     if (ImGui::SliderInt("Collision passes", &iterations, 0, 16)) {
         m_pendingOptions.collision.iterations = static_cast<std::uint32_t>(iterations);
     }
-    ImGui::BeginDisabled(m_pendingOptions.collision.solver != sim::CollisionSolver::Relaxed);
-    ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.05f, 1.0f);
-    ImGui::EndDisabled();
+    if (m_pendingOptions.collision.solver == sim::CollisionSolver::Relaxed) {
+        ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.05f, 1.0f);
+    } else {
+        ImGui::SliderFloat("Omega", &m_pendingOptions.collision.averageOmega, 0.5f, 2.0f);
+    }
     ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
 
     if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {
