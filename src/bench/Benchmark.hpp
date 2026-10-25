@@ -37,9 +37,10 @@ struct BenchConfig {
 struct FrameSample {
     Uint64 frame = 0;  // whole loop iteration, start to start
     Uint64 update = 0; // scene update (CPU simulation)
-    Uint64 render = 0;  // command recording, swapchain wait and submit
+    Uint64 render = 0;  // everything in render(): recording, the waits below, and presenting
     Uint64 acquire = 0; // the swapchain wait alone: time blocked on the display/GPU
     Uint64 gpu = 0;     // the scene's compute work alone, waited on (syncGpu only)
+    Uint64 present = 0; // submitting the frame for display, where a frame cap or vsync can sleep
 };
 
 // Run metadata the recorder cannot see for itself.

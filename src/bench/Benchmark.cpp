@@ -138,6 +138,7 @@ bool Recorder::finish(const RunInfo& info) const {
         {"update_ms", summarise(column(m_samples, &FrameSample::update))},
         {"render_ms", summarise(column(m_samples, &FrameSample::render))},
         {"acquire_ms", summarise(column(m_samples, &FrameSample::acquire))},
+        {"present_ms", summarise(column(m_samples, &FrameSample::present))},
         {"gpu_sync", m_config.syncGpu},
         {"collision_iterations", collision.iterations},
         {"broadphase", info.collision ? sim::broadphaseName(collision.broadphase) : "n/a"},
@@ -191,12 +192,14 @@ bool Recorder::finish(const RunInfo& info) const {
             std::filesystem::create_directories(m_config.framesPath.parent_path(), ec);
         }
         std::ofstream out(m_config.framesPath);
-        out << "frame,frame_ms,update_ms,render_ms\n";
+        out << "frame,frame_ms,update_ms,render_ms,acquire_ms,sim_gpu_ms,present_ms\n";
         for (std::size_t i = 0; i < m_samples.size(); ++i) {
             const FrameSample& s = m_samples[i];
-            out << i << ',' << static_cast<double>(s.frame) / kNsPerMs << ','
-                << static_cast<double>(s.update) / kNsPerMs << ',' << static_cast<double>(s.render) / kNsPerMs
-                << '\n';
+            out << i;
+            for (const Uint64 ns : {s.frame, s.update, s.render, s.acquire, s.gpu, s.present}) {
+                out << ',' << static_cast<double>(ns) / kNsPerMs;
+            }
+            out << '\n';
         }
         if (!out) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not write %s", m_config.framesPath.string().c_str());

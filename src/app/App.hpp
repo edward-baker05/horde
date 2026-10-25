@@ -68,6 +68,7 @@ private:
     Uint64 m_lastRenderNs = 0;
     Uint64 m_lastAcquireNs = 0;
     Uint64 m_lastGpuNs = 0;
+    Uint64 m_lastPresentNs = 0;
     Uint64 m_lastSceneUpdateNs = 0;
     bool m_haveFrame = false;
 

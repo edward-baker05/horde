@@ -131,7 +131,7 @@ int App::run() {
 
         if (m_recorder) {
             // The previous iteration has now fully completed, so its sample is whole.
-            if (m_haveFrame && !m_recorder->record({frameNs, m_lastUpdateNs, m_lastRenderNs, m_lastAcquireNs, m_lastGpuNs})) {
+            if (m_haveFrame && !m_recorder->record({frameNs, m_lastUpdateNs, m_lastRenderNs, m_lastAcquireNs, m_lastGpuNs, m_lastPresentNs})) {
                 return finishBenchmark();
             }
             m_haveFrame = true;
@@ -200,7 +200,7 @@ int App::finishBenchmark() {
 void App::accumulateStats(Uint64 frameNs) {
     // Render time includes the swapchain wait and the timed compute wait;
     // what remains is the CPU building and submitting the frame.
-    const Uint64 waits = m_lastAcquireNs + (m_measureSimGpu ? m_lastGpuNs : 0);
+    const Uint64 waits = m_lastAcquireNs + m_lastPresentNs + (m_measureSimGpu ? m_lastGpuNs : 0);
     const Uint64 record = m_lastRenderNs > waits ? m_lastRenderNs - waits : 0;
 
     m_statsWindow.frames++;
@@ -209,7 +209,7 @@ void App::accumulateStats(Uint64 frameNs) {
     m_statsWindow.frameMax = std::max(m_statsWindow.frameMax, frameNs);
     m_statsWindow.update += m_lastSceneUpdateNs;
     m_statsWindow.record += record;
-    m_statsWindow.wait += m_lastAcquireNs;
+    m_statsWindow.wait += m_lastAcquireNs + m_lastPresentNs;
     if (m_measureSimGpu) {
         m_statsWindow.gpu += m_lastGpuNs;
         m_statsWindow.gpuMax = std::max(m_statsWindow.gpuMax, m_lastGpuNs);
@@ -285,6 +285,7 @@ void App::update(float deltaTime) {
 }
 
 void App::render() {
+    m_lastPresentNs = 0;
     SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(m_gpu.device());
 
     if (commands == nullptr) {
@@ -374,7 +375,12 @@ void App::render() {
         SDL_EndGPURenderPass(pass);
     }
 
+    // Submitting the swapchain's command buffer presents the frame, and that is
+    // where a driver frame limiter (NVIDIA's cap, Reflex) or a full present
+    // queue sleeps, so it is timed as waiting rather than as work.
+    const Uint64 presentStart = SDL_GetTicksNS();
     SDL_SubmitGPUCommandBuffer(commands);
+    m_lastPresentNs = SDL_GetTicksNS() - presentStart;
 }
 
 void App::shutdown() {

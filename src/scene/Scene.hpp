@@ -26,7 +26,8 @@ struct FrameStats {
     float recordMs = 0.0f;     // CPU: building and submitting the frame's GPU work, waits excluded
     float simGpuMs = 0.0f;     // GPU: the scene's compute() work alone, i.e. GPU-side physics
     float simGpuMaxMs = 0.0f;
-    float waitMs = 0.0f;       // blocked on the display, frame cap or a GPU still busy with earlier frames
+    float waitMs = 0.0f;       // blocked acquiring the next image or presenting: the display, a frame cap,
+                               // or a GPU still busy with earlier frames
     float otherMs = 0.0f;      // the rest: events, ImGui, scene transitions
     bool simGpuMeasured = false;
 };
