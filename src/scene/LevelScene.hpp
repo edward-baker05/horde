@@ -35,6 +35,9 @@ struct LevelOptions {
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;
     sim::CollisionSettings collision;
+    // Physics steps per second, independent of the frame rate; drawing blends
+    // between steps. 0 steps once per frame, with the frame's own dt.
+    float physicsRate = 60.0f;
     // Unit speed; units head for the nearest point of the nearest exit.
     float maxSpeed = sim::MovementSettings{}.maxSpeed;
 };
@@ -101,6 +104,14 @@ private:
     logic::Level m_level;
 
     float enemy_size = 5.0f;
+
+    // Fixed-rate stepping: time not yet simulated, and the steps this frame owes compute().
+    float m_stepAccumulator = 0.0f;
+    std::uint32_t m_stepsThisFrame = 0;
+    float m_stepsPerFrame = 0.0f; // smoothed, for the panel
+    // Most steps one frame may run before the simulation is allowed to fall
+    // behind real time, so a slow frame can't snowball into slower ones.
+    static constexpr std::uint32_t kMaxStepsPerFrame = 4;
     std::shared_ptr<sim::WallColliders> m_walls = std::make_shared<sim::WallColliders>();
     std::unique_ptr<sim::PhysicsSystem> m_physics;
 };

@@ -55,17 +55,23 @@ struct type_StructuredBuffer_UnitData
     UnitData _m0[1];
 };
 
+struct type_StructuredBuffer_v2float
+{
+    float2 _m0[1];
+};
+
 struct type_UnitUniforms
 {
     float4x4 ViewProjection;
     float4 UvRect;
     float4 Color;
     float2 UnitSize;
-    float2 Padding;
+    float Alpha;
+    float MaxJump;
 };
 
-constant spvUnsafeArray<uint, 6> _55 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
-constant spvUnsafeArray<float2, 4> _56 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
+constant spvUnsafeArray<uint, 6> _62 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
+constant spvUnsafeArray<float2, 4> _63 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
 
 struct main0_out
 {
@@ -74,25 +80,43 @@ struct main0_out
     float4 gl_Position [[position]];
 };
 
-vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], const device type_StructuredBuffer_UnitData& Units [[buffer(1)]], uint gl_VertexIndex [[vertex_id]])
+vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], const device type_StructuredBuffer_UnitData& Units [[buffer(1)]], const device type_StructuredBuffer_v2float& PrevPos [[buffer(2)]], uint gl_VertexIndex [[vertex_id]])
 {
     main0_out out = {};
-    uint _60 = gl_VertexIndex / 6u;
-    uint _61 = gl_VertexIndex % 6u;
-    spvUnsafeArray<float2, 4> _78 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
-    spvUnsafeArray<float2, 4> _58 = _78;
-    float4 _99;
-    if (_60 == 0u)
+    uint _67 = gl_VertexIndex / 6u;
+    uint _68 = gl_VertexIndex % 6u;
+    spvUnsafeArray<float2, 4> _85 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
+    spvUnsafeArray<float2, 4> _65 = _85;
+    float2 _107;
+    if (UnitUniforms.MaxJump > 0.0)
     {
-        _99 = float4(1.0, 0.0, 0.0, 1.0);
+        float2 _106;
+        if (distance(PrevPos._m0[_67], Units._m0[_67].pos) <= UnitUniforms.MaxJump)
+        {
+            _106 = mix(PrevPos._m0[_67], Units._m0[_67].pos, float2(UnitUniforms.Alpha));
+        }
+        else
+        {
+            _106 = Units._m0[_67].pos;
+        }
+        _107 = _106;
     }
     else
     {
-        _99 = UnitUniforms.Color;
+        _107 = Units._m0[_67].pos;
     }
-    out.out_var_TEXCOORD0 = _99;
-    out.out_var_TEXCOORD1 = _58[_55[_61]];
-    out.gl_Position = UnitUniforms.ViewProjection * float4(Units._m0[_60].pos + (_56[_55[_61]] * UnitUniforms.UnitSize), 0.0, 1.0);
+    float4 _123;
+    if (_67 == 0u)
+    {
+        _123 = float4(1.0, 0.0, 0.0, 1.0);
+    }
+    else
+    {
+        _123 = UnitUniforms.Color;
+    }
+    out.out_var_TEXCOORD0 = _123;
+    out.out_var_TEXCOORD1 = _65[_62[_68]];
+    out.gl_Position = UnitUniforms.ViewProjection * float4(_107 + (_63[_62[_68]] * UnitUniforms.UnitSize), 0.0, 1.0);
     return out;
 }
 

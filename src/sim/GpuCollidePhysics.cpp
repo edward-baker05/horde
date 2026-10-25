@@ -290,8 +290,15 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 }
 
 void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                                   const glm::mat4& viewProjection) {
-    m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize);
+                                   const glm::mat4& viewProjection, float alpha) {
+    // m_prevPositions holds where each unit started the latest step, which
+    // unit_integrate writes before moving it: exactly the previous state.
+    gfx::UnitRenderer::Interpolation blend;
+    blend.previous = m_frame > 0 ? m_prevPositions : nullptr;
+    blend.alpha = alpha;
+    // Further than a unit could move in one step is a respawn, not motion.
+    blend.maxJump = std::max(4.0f * m_config.unitSize, 2.0f * m_config.movement.maxSpeed * m_dt);
+    m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, blend);
 }
 
 void GpuCollidePhysics::debugUi() {

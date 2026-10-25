@@ -40,7 +40,8 @@ bool StaticPhysics::readUnits(std::vector<BaseUnitData>& out) {
 }
 
 void StaticPhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                               const glm::mat4& viewProjection) {
+                                    const glm::mat4& viewProjection, float alpha) {
+    (void)alpha; // no previous step kept: drawn as of the latest step
     m_renderer.draw(commands, pass, m_units, m_unitCount, viewProjection, m_unitSize);
 }
 

@@ -127,11 +127,15 @@ struct SimConfig {
 //
 // Systems are swappable at runtime through the registry in PhysicsRegistry.cpp,
 // which is what lets the benchmark run the same level against each of them.
-// The hooks mirror Scene's, and LevelScene forwards to them in the same order:
+// The hooks mirror Scene's. Physics runs at a fixed rate (LevelOptions::
+// physicsRate), so a frame holds zero or more physics steps: LevelScene calls
+// update(stepDt) once per step during the scene update, then compute() once
+// per step on the frame's command buffer, then renderPass() once:
 //
-//   update()      CPU work for this frame
-//   compute()     GPU dispatches and uploads, before the render pass begins
-//   renderPass()  draws inside the frame's render pass
+//   update()      CPU work for one step; must not rely on compute() running in between
+//   compute()     GPU dispatches and uploads for one step, before the render pass begins
+//   renderPass()  draws inside the frame's render pass, `alpha` of the way from
+//                 the previous step's state to the latest
 class PhysicsSystem {
 public:
     virtual ~PhysicsSystem() = default;
@@ -150,8 +154,8 @@ public:
         (void)commands;
     }
 
-    virtual void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                            const glm::mat4& viewProjection) = 0;
+    virtual void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, const glm::mat4& viewProjection,
+                            float alpha) = 0;
 
     // Extra lines for the level's debug panel.
     virtual void debugUi() {}

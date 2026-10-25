@@ -13,8 +13,8 @@ public:
 
     bool init(scene::Services& services, const SimConfig& config) override;
     void shutdown() override;
-    void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                    const glm::mat4& viewProjection) override;
+    void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, const glm::mat4& viewProjection,
+                    float alpha) override;
     bool readUnits(std::vector<BaseUnitData>& out) override;
 
     std::uint32_t unitCount() const override {

@@ -18,7 +18,8 @@ struct alignas(16) UnitDrawUniforms {
     glm::vec4 uvRect;   // xy = top-left, zw = bottom-right
     glm::vec4 color;    // tint color
     glm::vec2 unitSize; // width, height
-    glm::vec2 padding;
+    float alpha;
+    float maxJump;
 };
 
 } // namespace
@@ -31,10 +32,10 @@ bool UnitRenderer::init(scene::Services& services) {
     m_device = services.gpu->device();
     m_atlas = services.atlas->handle();
 
-    // unit.vert: 1 storage buffer (t0, space0), 1 uniform buffer (b0, space1)
+    // unit.vert: 2 storage buffers (units t0, previous positions t1, space0), 1 uniform buffer (b0, space1)
     SDL_GPUShader* vertexShader = services.shaders->loadGraphics(
         "unit.vert", SDL_GPU_SHADERSTAGE_VERTEX,
-        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 1, .uniformBuffers = 1});
+        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 2, .uniformBuffers = 1});
 
     // sprite.frag: 1 sampler (s0, space2), 1 sampled texture (t0, space2)
     SDL_GPUShader* fragmentShader = services.shaders->loadGraphics(
@@ -109,19 +110,23 @@ void UnitRenderer::shutdown() {
 }
 
 void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, SDL_GPUBuffer* units,
-                        Uint32 count, const glm::mat4& viewProjection, float unitSize) const {
+                        Uint32 count, const glm::mat4& viewProjection, float unitSize, const Interpolation& blend) const {
     if (!m_pipeline || !units || count == 0) {
         return;
     }
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
-    SDL_BindGPUVertexStorageBuffers(pass, 0, &units, 1);
+    // Without previous positions the shader never reads slot 1, but something must be bound there.
+    SDL_GPUBuffer* buffers[2] = {units, blend.previous ? blend.previous : units};
+    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 2);
 
     UnitDrawUniforms uniforms{};
     uniforms.viewProjection = viewProjection;
     uniforms.uvRect = atlasCell(1, 0, 4, 4);
     uniforms.color = glm::vec4(0.0f, 1.0f, 0.2f, 1.0f);
     uniforms.unitSize = glm::vec2(unitSize, unitSize);
+    uniforms.alpha = blend.alpha;
+    uniforms.maxJump = blend.previous ? blend.maxJump : 0.0f;
     SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
     SDL_GPUTextureSamplerBinding atlasBinding{};

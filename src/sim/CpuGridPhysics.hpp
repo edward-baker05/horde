@@ -18,8 +18,8 @@ public:
     void shutdown() override;
     void update(float dt) override;
     void compute(SDL_GPUCommandBuffer* commands) override;
-    void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                    const glm::mat4& viewProjection) override;
+    void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, const glm::mat4& viewProjection,
+                    float alpha) override;
 
     bool readUnits(std::vector<BaseUnitData>& out) override {
         out = m_staging;

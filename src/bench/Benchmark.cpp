@@ -113,6 +113,7 @@ bool Recorder::finish(const RunInfo& info) const {
         {"units", level.unitCount},
         {"spawn", sim::spawnPatternName(level.spawn)},
         {"spawn_rate", level.spawnRate},
+        {"physics_rate", level.physicsRate},
         {"respawn_at_exit", level.respawnAtExit},
         {"seed", level.seed},
         {"level", level.levelPath.empty() ? "default" : level.levelPath.generic_string()},

@@ -13,13 +13,17 @@ struct UnitData {
 };
 
 StructuredBuffer<UnitData> Units : register(t0, space0);
+// Where each unit was one physics step earlier, when MaxJump > 0. Physics runs
+// at a fixed rate below the frame rate, so drawing blends the last two steps.
+StructuredBuffer<float2> PrevPos : register(t1, space0);
 
 cbuffer UnitUniforms : register(b0, space1) {
     float4x4 ViewProjection;
     float4 UvRect;   // xy = top-left, zw = bottom-right
     float4 Color;    // tint color
     float2 UnitSize; // width, height
-    float2 Padding;
+    float Alpha;     // 0 = draw at PrevPos, 1 = draw at Units[].pos
+    float MaxJump;   // 0: no PrevPos. Moves longer than this (a respawn) are not blended.
 };
 
 struct Output {
@@ -51,7 +55,14 @@ Output main(uint id : SV_VertexID) {
     };
 
     float2 local = QuadCorners[corner] * UnitSize;
-    float2 world = unit.pos + local;
+    float2 pos = unit.pos;
+    if (MaxJump > 0.0f) {
+        float2 prev = PrevPos[unitIndex];
+        if (distance(prev, pos) <= MaxJump) {
+            pos = lerp(prev, pos, Alpha);
+        }
+    }
+    float2 world = pos + local;
 
     Output output;
     output.Position = mul(ViewProjection, float4(world, 0.0f, 1.0f));

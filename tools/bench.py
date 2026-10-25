@@ -130,6 +130,8 @@ def run_one(exe: Path, args: argparse.Namespace, physics: str, quality: str | No
         cmd += ["--level", args.level]
     if args.level_size:
         cmd += ["--level-size", args.level_size]
+    if args.physics_rate is not None:
+        cmd += ["--physics-rate", str(int(args.physics_rate))]
     if args.spawn_rate is not None:
         cmd += ["--spawn-rate", str(args.spawn_rate)]
     if args.no_respawn:
@@ -309,6 +311,8 @@ def main() -> int:
     parser.add_argument("--spawn", default="random", choices=["random", "grid", "column", "markers"],
                         help="starting layout; markers streams units in at the spawns (see --spawn-rate)")
     parser.add_argument("--spawn-rate", type=float, help="markers: units per second (game default 1000; 0 = all at once)")
+    parser.add_argument("--physics-rate", type=float, choices=[0, 60, 120],
+                        help="physics steps per second (bench default 0: one step per frame)")
     parser.add_argument("--no-respawn", action="store_true", help="units stop at the exit instead of re-entering")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--level", help="level file (default: built-in level)")

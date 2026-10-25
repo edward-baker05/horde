@@ -254,6 +254,28 @@ Streaming, exit steering and respawning are `gpu-collide`'s. Other systems get
 every unit placed at the spawns up front and head for the first exit's centre.
 Up to 8 spawns and 8 exits are used.
 
+### Physics rate
+
+Physics steps at a fixed rate, independent of the frame rate: 60 Hz by
+default, or 120 Hz. Drawing blends each unit between its last two steps, so
+motion stays smooth at 240 fps. A frame runs zero, one or more steps as time
+demands (at most 4, after which the simulation slows rather than falling
+further behind). Switch it live with the *Physics rate* buttons in the
+level panel, or `--physics-rate 60|120`.
+
+At a 240 fps cap, physics GPU time per frame on an RTX 5080:
+
+| | every frame | 120 Hz | 60 Hz |
+| --- | --- | --- | --- |
+| 100k units | 0.37 ms | 0.21 ms | 0.12 ms |
+| 1M units (8000x8000) | 1.87 ms | 0.97 ms | 0.49 ms |
+
+Those are averages. A frame that runs a step still pays the full step, so the
+panel's *worst* figures don't drop. Benchmarks default to `--physics-rate 0`
+(one step per frame, at `--fixed-dt`), so their per-frame numbers are
+per-step costs. Pass `--physics-rate 60 --fixed-dt 0` to measure real-time
+play instead.
+
 ### Collision settings
 
 `gpu-collide` (the default) collides units with each other and with walls.

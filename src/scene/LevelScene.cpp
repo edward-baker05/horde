@@ -113,11 +113,29 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
 }
 
 void LevelScene::update(float dt) {
-    m_physics->update(dt);
+    // Rate 0: one step per frame, as long as the frame took.
+    if (m_options.physicsRate <= 0.0f) {
+        m_stepsThisFrame = 1;
+        m_stepAccumulator = 0.0f;
+        m_physics->update(dt);
+    } else {
+        const float step = 1.0f / m_options.physicsRate;
+        m_stepAccumulator += dt;
+        m_stepsThisFrame = std::min(static_cast<std::uint32_t>(m_stepAccumulator / step), kMaxStepsPerFrame);
+        m_stepAccumulator -= static_cast<float>(m_stepsThisFrame) * step;
+        // Too far behind to catch up: let the simulation run slow rather than spiral.
+        m_stepAccumulator = std::min(m_stepAccumulator, step);
+        for (std::uint32_t i = 0; i < m_stepsThisFrame; ++i) {
+            m_physics->update(step);
+        }
+    }
+    m_stepsPerFrame += (static_cast<float>(m_stepsThisFrame) - m_stepsPerFrame) * 0.05f;
 }
 
 void LevelScene::compute(SDL_GPUCommandBuffer* commands) {
-    m_physics->compute(commands);
+    for (std::uint32_t i = 0; i < m_stepsThisFrame; ++i) {
+        m_physics->compute(commands);
+    }
 }
 
 void LevelScene::render(gfx::SpriteBatch& batch) {
@@ -126,7 +144,10 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
 }
 
 void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) {
-    m_physics->renderPass(commands, pass, m_camera.viewProjection());
+    // How far between the last physics step and the next this frame falls.
+    const float alpha = m_options.physicsRate > 0.0f ? std::clamp(m_stepAccumulator * m_options.physicsRate, 0.0f, 1.0f)
+                                                     : 1.0f;
+    m_physics->renderPass(commands, pass, m_camera.viewProjection(), alpha);
 }
 
 void LevelScene::debugUi() {
@@ -138,6 +159,17 @@ void LevelScene::debugUi() {
     ImGui::Text("Physics: %s", m_options.physics.c_str());
     ImGui::TextWrapped("%s", sim::physicsDescription(m_options.physics));
     m_physics->debugUi();
+
+    // Applies immediately: stepping is the scene's, not the physics system's.
+    int rate = m_options.physicsRate >= 120.0f ? 1 : 0;
+    ImGui::TextUnformatted("Physics rate");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("60 Hz", &rate, 0) || ImGui::RadioButton("120 Hz", &rate, 1)) {
+        m_options.physicsRate = rate == 1 ? 120.0f : 60.0f;
+        m_pendingOptions.physicsRate = m_options.physicsRate;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%.2f steps/frame", m_stepsPerFrame);
 
     ImGui::SeparatorText("Restart with");
 

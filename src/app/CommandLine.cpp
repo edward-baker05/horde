@@ -23,6 +23,8 @@ void printUsage() {
         "  --units N          number of units, default 10000\n"
         "  --spawn PATTERN    markers | random | grid | column, default markers (random under --bench)\n"
         "  --spawn-rate N     markers: units entering per second, default 1000; 0 = all at once\n"
+        "  --physics-rate HZ  physics steps per second, 60 or 120 (default 60; 0 = once per frame,\n"
+        "                     the default under --bench so each frame is one step)\n"
         "  --no-respawn       units stop at the exit instead of re-entering at a spawn\n"
         "  --seed N           spawn seed, default 1\n"
         "  --level PATH       level file, default the built-in level\n"
@@ -74,6 +76,7 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
     bool bench = false;
     bool wantsLevel = false;
     bool spawnGiven = false;
+    bool physicsRateGiven = false;
     int vsync = -1; // -1 = not given
     int gpuDebug = -1;
 
@@ -125,6 +128,13 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--spawn") {
             if (!value(v) || !sim::parseSpawnPattern(std::string(v), level.spawn)) return bad(v);
             spawnGiven = true;
+            wantsLevel = true;
+        } else if (arg == "--physics-rate") {
+            if (!value(v) || !parseNumber(v, level.physicsRate) ||
+                (level.physicsRate != 0.0f && level.physicsRate != 60.0f && level.physicsRate != 120.0f)) {
+                return bad(v);
+            }
+            physicsRateGiven = true;
             wantsLevel = true;
         } else if (arg == "--spawn-rate") {
             if (!value(v) || !parseNumber(v, level.spawnRate) || level.spawnRate < 0) return bad(v);
@@ -233,6 +243,10 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         config.gpuDebug = false;
         if (!spawnGiven) {
             level.spawn = sim::SpawnPattern::Random;
+        }
+        // One physics step per frame, so per-frame timings are per-step costs.
+        if (!physicsRateGiven) {
+            level.physicsRate = 0.0f;
         }
         level.fitCamera = true;
         benchConfig.level = level;
