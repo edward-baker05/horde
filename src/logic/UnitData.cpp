@@ -23,6 +23,7 @@ UnitManager::UnitManager(const size_t MaxUnits, const glm::vec2 WorldBounds, con
 
 void UnitManager::Reserve(const size_t newMaxUnits) {
     maxUnits = newMaxUnits;
+    baseUnits.resize(newMaxUnits);
     positions.resize(newMaxUnits);
     velocities.resize(newMaxUnits);
     health.resize(newMaxUnits);
@@ -67,41 +68,44 @@ void UnitManager::SpawnUnit(glm::vec2 pos, glm::vec2 vel, int hp, float invM) {
     velocities[currentUnits] = vel;
     health[currentUnits] = hp;
     invMass[currentUnits] = invM;
+    baseUnits[currentUnits] = BaseUnitData{pos, vel};
 
     currentUnits++;
 }
 
 // Main Loop
 void UnitManager::UpdatePhysics(float dt) {
+    // NOTE: In GPU-driven simulation mode, position integration and bounds
+    // collisions are executed on the GPU in update_positions.comp.hlsl.
+    // The CPU loop is preserved below for reference / CPU simulation fallback.
+    (void)dt;
+    /*
     int steps = 4;
     for (int step = 0; step < steps; ++step) {
         UpdatePositions(dt / steps);
         PopulateUniformGrid();
         ResolveEntityCollisions(dt);
     }
+    */
 }
 
 void UnitManager::UpdatePositions(float dt) {
     for (size_t i = 0; i < currentUnits; ++i) {
-
         velocities[i].y += 10 * dt;
-        velocities[i] = clamp(velocities[i], 0.0f, 25.0f);
+        velocities[i] = glm::clamp(velocities[i], -25.0f, 25.0f);
         positions[i] += velocities[i] * dt;
+        baseUnits[i].pos = positions[i];
+        baseUnits[i].vel = velocities[i];
     }
 }
 
 inline void UnitManager::ResolveEdgeCollisions(glm::vec2& pos, glm::vec2& vel) const {
     if (pos.x > maxP.x || pos.x < worldOrigin.x) {
-        // vel.x = 0;
         vel.x *= restitution;
-        // vel.y *= 0.5f;
     }
     if (pos.y > maxP.y || pos.y < worldOrigin.y) {
-        // vel.y = 0;
         vel.y *= restitution;
-        // vel.x *= 0.5f;
     }
-    // pos = glm::clamp(pos, worldOrigin, maxP);
     pos.x = std::clamp(pos.x, worldOrigin.x, maxP.x);
     pos.y = std::clamp(pos.y, worldOrigin.y, maxP.y);
 }
@@ -123,10 +127,10 @@ void UnitManager::getNeighbours(const int cellIndex, std::vector<int>& neighbour
             }
         }
     }
-};
+}
 
 void UnitManager::ResolveEntityCollisions(float dt) {
-    // TODO: fix, doesnt quite work yet.
+    (void)dt;
     const float desiredDistSquared = unitSize * unitSize;
     std::vector<int> neighbours;
     neighbours.reserve(64);
@@ -165,26 +169,13 @@ void UnitManager::ResolveEntityCollisions(float dt) {
                                 if (normalVelocity < 0.0f) {
                                     float impulse = -(1.0f - restitution) * normalVelocity * 0.5f;
                                     velocities[unit] -= normal * impulse;
-                                    velocities[i] += normal * impulse;
+                                    velocities[i] -= normal * impulse;
                                 }
                             }
                         }
                     }
                 }
-
-                // glm::vec2 rpos = ipos - pos;
-                // glm::vec2 rvel = ivel-vel;
-                // glm::vec2 normal = normalize(rpos);
-                // float distance = length(rpos);
-                // float normalVel = dot(normal, rvel);
-                // if (distance <= unitSize) {
-                //     pos -= normal * (unitSize - distance);
-                //     ipos += normal * (unitSize - distance);
-                //     // vel -= normalVel*invMass[unit];
-                //     // ivel += normalVel*invMass[unit];
-                // }
             }
-
         }
     }
 }
@@ -208,4 +199,12 @@ const glm::vec2* UnitManager::GetPositionsPtr() const {
 
 const int* UnitManager::GetHealthsPtr() const {
     return health.data();
+}
+
+const std::vector<BaseUnitData>& UnitManager::GetBaseUnits() const {
+    return baseUnits;
+}
+
+const BaseUnitData* UnitManager::GetBaseUnitsPtr() const {
+    return baseUnits.data();
 }

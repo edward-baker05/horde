@@ -1,0 +1,235 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_RWStructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_StructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_StructuredBuffer_v2uint
+{
+    uint2 _m0[1];
+};
+
+struct type_SimParams
+{
+    float2 worldOrigin;
+    float2 worldBounds;
+    float dt;
+    uint UnitCount;
+    float Restitution;
+    float Gravity;
+    float UnitSize;
+    float CellSize;
+    uint2 GridDim;
+    float2 InvCellSize;
+    float2 padding;
+};
+
+kernel void main0(constant type_SimParams& SimParams [[buffer(0)]], device type_StructuredBuffer_UnitData& InUnits [[buffer(1)]], device type_StructuredBuffer_v2uint& SortedKeys [[buffer(2)]], device type_StructuredBuffer_v2uint& CellRanges [[buffer(3)]], device type_RWStructuredBuffer_UnitData& OutUnits [[buffer(4)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= SimParams.UnitCount)
+        {
+            break;
+        }
+        float2 _69 = InUnits._m0[gl_GlobalInvocationID.x].vel;
+        float _76 = _69.y + (SimParams.Gravity * SimParams.dt);
+        float2 _77 = _69;
+        _77.y = _76;
+        float2 _79 = InUnits._m0[gl_GlobalInvocationID.x].pos + (_77 * SimParams.dt);
+        int _90 = int(SimParams.GridDim.x);
+        int _92 = clamp(int((_79.x - SimParams.worldOrigin.x) * SimParams.InvCellSize.x), 0, _90 - 1);
+        int _103 = int(SimParams.GridDim.y);
+        int _105 = clamp(int((_79.y - SimParams.worldOrigin.y) * SimParams.InvCellSize.y), 0, _103 - 1);
+        float _108 = SimParams.UnitSize * SimParams.UnitSize;
+        float2 _110;
+        uint _113;
+        _110 = float2(0.0);
+        _113 = 0u;
+        float2 _111;
+        uint _114;
+        for (int _115 = -1; _115 <= 1; _110 = _111, _113 = _114, _115++)
+        {
+            int _120 = _105 + _115;
+            bool _125;
+            if (_120 >= 0)
+            {
+                _125 = _120 >= _103;
+            }
+            else
+            {
+                _125 = true;
+            }
+            if (_125)
+            {
+                _111 = _110;
+                _114 = _113;
+                continue;
+            }
+            uint _129;
+            float2 _132;
+            _129 = _113;
+            _132 = _110;
+            uint _130;
+            float2 _133;
+            for (int _134 = -1; _134 <= 1; _129 = _130, _132 = _133, _134++)
+            {
+                int _139 = _92 + _134;
+                bool _144;
+                if (_139 >= 0)
+                {
+                    _144 = _139 >= _90;
+                }
+                else
+                {
+                    _144 = true;
+                }
+                if (_144)
+                {
+                    _130 = _129;
+                    _133 = _132;
+                    continue;
+                }
+                uint _150 = uint(_139) + (uint(_120) * SimParams.GridDim.x);
+                if (CellRanges._m0[_150].x == 4294967295u)
+                {
+                    _130 = _129;
+                    _133 = _132;
+                    continue;
+                }
+                uint _158;
+                float2 _161;
+                _158 = _129;
+                _161 = _132;
+                uint _159;
+                float2 _162;
+                for (uint _163 = CellRanges._m0[_150].x; _163 < CellRanges._m0[_150].y; _158 = _159, _161 = _162, _163++)
+                {
+                    if (((device uint*)&SortedKeys._m0[_163])[1] == gl_GlobalInvocationID.x)
+                    {
+                        _159 = _158;
+                        _162 = _161;
+                        continue;
+                    }
+                    float2 _176 = _79 - InUnits._m0[((device uint*)&SortedKeys._m0[_163])[1]].pos;
+                    float _177 = dot(_176, _176);
+                    uint _195;
+                    float2 _196;
+                    if (_177 < _108)
+                    {
+                        float _182 = sqrt(precise::max(_177, 9.9999997473787516355514526367188e-05));
+                        float2 _189;
+                        if (_177 > 9.9999997473787516355514526367188e-05)
+                        {
+                            _189 = _176 / float2(_182);
+                        }
+                        else
+                        {
+                            _189 = float2(0.0, 1.0);
+                        }
+                        _195 = _158 + 1u;
+                        _196 = _161 + (_189 * ((SimParams.UnitSize - _182) * 0.5));
+                    }
+                    else
+                    {
+                        _195 = _158;
+                        _196 = _161;
+                    }
+                    _159 = _195;
+                    _162 = _196;
+                }
+                _130 = _158;
+                _133 = _161;
+            }
+            _111 = _132;
+            _114 = _129;
+        }
+        float2 _204;
+        if (_113 > 0u)
+        {
+            _204 = _79 + (_110 / float2(float(_113)));
+        }
+        else
+        {
+            _204 = _79;
+        }
+        float2 _231;
+        float2 _232;
+        if (_204.x < SimParams.worldOrigin.x)
+        {
+            float2 _210 = _204;
+            _210.x = SimParams.worldOrigin.x;
+            _231 = float2((-_69.x) * SimParams.Restitution, _76);
+            _232 = _210;
+        }
+        else
+        {
+            float2 _229;
+            float2 _230;
+            if (_204.x > SimParams.worldBounds.x)
+            {
+                float2 _222 = _204;
+                _222.x = SimParams.worldBounds.x;
+                _229 = float2((-_69.x) * SimParams.Restitution, _76);
+                _230 = _222;
+            }
+            else
+            {
+                _229 = _77;
+                _230 = _204;
+            }
+            _231 = _229;
+            _232 = _230;
+        }
+        float2 _259;
+        float2 _260;
+        if (_232.y < SimParams.worldOrigin.y)
+        {
+            float2 _238 = _232;
+            _238.y = SimParams.worldOrigin.y;
+            float2 _244 = _231;
+            _244.y = (-_231.y) * SimParams.Restitution;
+            _259 = _238;
+            _260 = _244;
+        }
+        else
+        {
+            float2 _257;
+            float2 _258;
+            if (_232.y > SimParams.worldBounds.y)
+            {
+                float2 _250 = _232;
+                _250.y = SimParams.worldBounds.y;
+                float2 _256 = _231;
+                _256.y = (-_231.y) * SimParams.Restitution;
+                _257 = _250;
+                _258 = _256;
+            }
+            else
+            {
+                _257 = _232;
+                _258 = _231;
+            }
+            _259 = _257;
+            _260 = _258;
+        }
+        OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _259, _260 };
+        break;
+    } while(false);
+}
+

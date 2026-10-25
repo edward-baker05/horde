@@ -64,6 +64,13 @@ public:
         (void)batch;
     }
 
+    // Direct drawing into the render pass (e.g. custom pipelines / GPU instancing).
+    // Called after SpriteBatch has flushed its draws.
+    virtual void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) {
+        (void)commands;
+        (void)pass;
+    }
+
     // Dear ImGui calls for developer tooling. Game-facing UI belongs in
     // render() as sprites.
     virtual void debugUi() {}

@@ -222,6 +222,7 @@ void App::render() {
         if (active != nullptr) {
             active->camera().setViewport(static_cast<float>(swapchainWidth), static_cast<float>(swapchainHeight));
             m_batch.flush(commands, pass, active->camera().viewProjection());
+            active->renderPass(commands, pass);
         }
 
         m_imgui.draw(commands, pass);
