@@ -26,6 +26,7 @@ void printUsage() {
         "  --physics-rate HZ  physics steps per second, 60 or 120 (default 60; 0 = once per frame,\n"
         "                     the default under --bench so each frame is one step)\n"
         "  --no-respawn       units stop at the exit instead of re-entering at a spawn\n"
+        "  --random-health    debug: units start at random health, to see health shading\n"
         "  --seed N           spawn seed, default 1\n"
         "  --level PATH       level file, default the built-in level\n"
         "  --level-size WxH   the built-in level at another size, e.g. 8000x8000\n"
@@ -138,6 +139,9 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
             wantsLevel = true;
         } else if (arg == "--spawn-rate") {
             if (!value(v) || !parseNumber(v, level.spawnRate) || level.spawnRate < 0) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--random-health") {
+            level.randomStartHealth = true;
             wantsLevel = true;
         } else if (arg == "--no-respawn") {
             level.respawnAtExit = false;

@@ -118,6 +118,9 @@ struct SimConfig {
     // The level's walls, flattened and binned. Null or empty: no walls.
     std::shared_ptr<const WallColliders> walls;
     FlowSettings flow;
+    // Debug: start (and respawn) units at a random health instead of full, to
+    // see health shading before anything deals damage.
+    bool randomStartHealth = false;
     // Starting position and velocity of every unit. Its length is the unit
     // count; systems size their buffers from it.
     std::vector<BaseUnitData> initialUnits;

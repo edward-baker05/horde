@@ -59,6 +59,8 @@ public:
 
 private:
     void spawnPending(SDL_GPUCommandBuffer* commands);
+    // Starting health for `count` new units: full, or random in debug mode.
+    std::vector<float> startingHealth(std::uint32_t count);
 
     SDL_GPUDevice* m_device = nullptr;
     gfx::UnitRenderer m_renderer;
@@ -73,11 +75,14 @@ private:
     // Collision passes ping-pong between these; m_current holds the latest units.
     SDL_GPUBuffer* m_units[2] = {nullptr, nullptr};
     SDL_GPUBuffer* m_prevPositions = nullptr;
+    // Per unit, 0 (dead) to 1 (full). Not ping-ponged: only positions are.
+    SDL_GPUBuffer* m_health = nullptr;
     std::uint32_t m_current = 0;
 
     // Streaming spawns: units [m_unitCount, m_capacity) are still to come.
     std::uint32_t m_capacity = 0;
     SDL_GPUTransferBuffer* m_spawnTransfer = nullptr;
+    SDL_GPUTransferBuffer* m_spawnHealthTransfer = nullptr;
     std::mt19937 m_spawnRng;
     double m_spawnDue = 0.0;
     std::uint32_t m_frame = 0;

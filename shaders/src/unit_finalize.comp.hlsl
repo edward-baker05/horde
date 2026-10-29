@@ -17,6 +17,7 @@ struct UnitData {
 StructuredBuffer<float2> PrevPos : register(t0, space0);
 // t1..t3: walls, declared by walls.hlsli
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
+RWStructuredBuffer<float> Health : register(u1, space1); // 0 to 1
 
 #define MAX_MARKERS 8
 
@@ -35,6 +36,8 @@ cbuffer FinalizeParams : register(b0, space2) {
     uint SpawnCount;
     uint Frame;         // varies the respawn position from frame to frame
     uint RespawnOnExit; // 0: units that reach an exit stay there
+    uint RandomHealth;  // debug: respawn at a random health instead of full
+    uint3 HealthPadding;
     float4 Exits[MAX_MARKERS];  // xy = centre, zw = half size
     float4 Spawns[MAX_MARKERS]; // xy = centre, zw = half size
 };
@@ -89,6 +92,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         float2 r = float2(unitFloat(hash(h)), unitFloat(hash(h ^ 0x9E3779B9u))) * 2.0f - 1.0f;
         unit.pos = clamp(spawn.xy + r * spawn.zw - Radius, WorldMin, WorldMax);
         unit.vel = float2(0.0f, 0.0f);
+        Health[index] = RandomHealth != 0 ? unitFloat(hash(h ^ 0x85EBCA6Bu)) : 1.0f;
     }
 
     Units[index] = unit;

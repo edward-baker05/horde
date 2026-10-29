@@ -74,6 +74,7 @@ bool LevelScene::onEnter(Services& services) {
     }
     config.flow.spawnRate = m_options.spawnRate;
     config.flow.respawnAtExit = m_options.respawnAtExit;
+    config.randomStartHealth = m_options.randomStartHealth;
     config.flow.seed = m_options.seed;
     // Systems that don't steer to exits head for the first exit's centre, or
     // the middle of a level without one. Positions are top-left corners.
@@ -202,6 +203,7 @@ void LevelScene::debugUi() {
                            ImGuiSliderFlags_Logarithmic);
     }
     ImGui::Checkbox("Respawn at exit", &m_pendingOptions.respawnAtExit);
+    ImGui::Checkbox("Random starting health", &m_pendingOptions.randomStartHealth);
 
     if (ImGui::BeginCombo("Quality preset", "choose...")) {
         for (const char* preset : {"low", "medium", "high", "ultra"}) {

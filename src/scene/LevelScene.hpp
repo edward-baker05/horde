@@ -31,6 +31,8 @@ struct LevelOptions {
     float spawnRate = 1000.0f;
     // A unit reaching a red exit re-enters at a spawn; otherwise it stops there.
     bool respawnAtExit = true;
+    // Debug: units start at random health, to see health shading.
+    bool randomStartHealth = false;
     std::uint32_t seed = 1;
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;

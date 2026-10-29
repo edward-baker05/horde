@@ -20,7 +20,10 @@ struct alignas(16) UnitDrawUniforms {
     glm::vec2 unitSize; // width, height
     float alpha;
     float maxJump;
+    float hasHealth;
+    float padding[3];
 };
+static_assert(sizeof(UnitDrawUniforms) == 128);
 
 } // namespace
 
@@ -32,10 +35,10 @@ bool UnitRenderer::init(scene::Services& services) {
     m_device = services.gpu->device();
     m_atlas = services.atlas->handle();
 
-    // unit.vert: 2 storage buffers (units t0, previous positions t1, space0), 1 uniform buffer (b0, space1)
+    // unit.vert: 3 storage buffers (units t0, previous positions t1, health t2, space0), 1 uniform buffer (b0, space1)
     SDL_GPUShader* vertexShader = services.shaders->loadGraphics(
         "unit.vert", SDL_GPU_SHADERSTAGE_VERTEX,
-        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 2, .uniformBuffers = 1});
+        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 3, .uniformBuffers = 1});
 
     // sprite.frag: 1 sampler (s0, space2), 1 sampled texture (t0, space2)
     SDL_GPUShader* fragmentShader = services.shaders->loadGraphics(
@@ -110,23 +113,26 @@ void UnitRenderer::shutdown() {
 }
 
 void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, SDL_GPUBuffer* units,
-                        Uint32 count, const glm::mat4& viewProjection, float unitSize, const Interpolation& blend) const {
+                        Uint32 count, const glm::mat4& viewProjection, float unitSize,
+                        const DrawOptions& options) const {
     if (!m_pipeline || !units || count == 0) {
         return;
     }
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
-    // Without previous positions the shader never reads slot 1, but something must be bound there.
-    SDL_GPUBuffer* buffers[2] = {units, blend.previous ? blend.previous : units};
-    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 2);
+    // Slots the shader won't read still need something bound.
+    SDL_GPUBuffer* buffers[3] = {units, options.previous ? options.previous : units,
+                                 options.health ? options.health : units};
+    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 3);
 
     UnitDrawUniforms uniforms{};
     uniforms.viewProjection = viewProjection;
     uniforms.uvRect = atlasCell(1, 0, 4, 4);
     uniforms.color = glm::vec4(0.0f, 1.0f, 0.2f, 1.0f);
     uniforms.unitSize = glm::vec2(unitSize, unitSize);
-    uniforms.alpha = blend.alpha;
-    uniforms.maxJump = blend.previous ? blend.maxJump : 0.0f;
+    uniforms.alpha = options.alpha;
+    uniforms.maxJump = options.previous ? options.maxJump : 0.0f;
+    uniforms.hasHealth = options.health ? 1.0f : 0.0f;
     SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
     SDL_GPUTextureSamplerBinding atlasBinding{};

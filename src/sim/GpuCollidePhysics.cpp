@@ -43,10 +43,12 @@ struct alignas(16) GPUFinalizeUniforms {
     Uint32 spawnCount;
     Uint32 frame;
     Uint32 respawnOnExit;
+    Uint32 randomHealth;
+    Uint32 healthPadding[3];
     glm::vec4 exits[kMaxFlowMarkers];
     glm::vec4 spawns[kMaxFlowMarkers];
 };
-static_assert(sizeof(GPUFinalizeUniforms) == 64 + 32 * kMaxFlowMarkers);
+static_assert(sizeof(GPUFinalizeUniforms) == 80 + 32 * kMaxFlowMarkers);
 
 // Packs up to kMaxFlowMarkers areas as (centre, half size).
 Uint32 packAreas(const std::vector<MarkerArea>& areas, glm::vec4* out) {
@@ -85,8 +87,8 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
 
     // unit_integrate.comp: 2 rw buffers (units, previous positions), 1 uniform buffer
     m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 2, 1, 256, 1, 1);
-    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 1 rw buffer (units), 1 uniform buffer
-    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 1, 1, 256, 1, 1);
+    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 2 rw buffers (units, health), 1 uniform buffer
+    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 2, 1, 256, 1, 1);
     if (!m_integratePipeline || !m_finalizePipeline) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to load pipelines");
         return false;
@@ -108,12 +110,18 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     m_units[0] = createUnitBuffer(m_device, m_capacity, usage);
     m_units[1] = createUnitBuffer(m_device, m_capacity, usage);
 
+    // Both are read by unit.vert when drawing, as well as by compute.
     SDL_GPUBufferCreateInfo prevInfo{};
-    prevInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    prevInfo.usage = usage;
     prevInfo.size = static_cast<Uint32>(sizeof(glm::vec2) * std::max<std::uint32_t>(m_capacity, 1));
     m_prevPositions = SDL_CreateGPUBuffer(m_device, &prevInfo);
 
-    if (!m_units[0] || !m_units[1] || !m_prevPositions) {
+    SDL_GPUBufferCreateInfo healthInfo{};
+    healthInfo.usage = usage;
+    healthInfo.size = static_cast<Uint32>(sizeof(float) * std::max<std::uint32_t>(m_capacity, 1));
+    m_health = SDL_CreateGPUBuffer(m_device, &healthInfo);
+
+    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s",
                      SDL_GetError());
         return false;
@@ -124,7 +132,9 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
         transferInfo.size = static_cast<Uint32>(sizeof(BaseUnitData) * config.flow.toSpawn);
         m_spawnTransfer = SDL_CreateGPUTransferBuffer(m_device, &transferInfo);
-        if (m_spawnTransfer == nullptr) {
+        transferInfo.size = static_cast<Uint32>(sizeof(float) * config.flow.toSpawn);
+        m_spawnHealthTransfer = SDL_CreateGPUTransferBuffer(m_device, &transferInfo);
+        if (m_spawnTransfer == nullptr || m_spawnHealthTransfer == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create spawn buffer: %s",
                          SDL_GetError());
             return false;
@@ -132,7 +142,9 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     }
 
     m_current = 0;
-    return uploadUnitsNow(m_device, config.initialUnits.data(), m_unitCount, m_units, 1);
+    const std::vector<float> health = startingHealth(m_unitCount);
+    return uploadUnitsNow(m_device, config.initialUnits.data(), m_unitCount, m_units, 1) &&
+           uploadBytesNow(m_device, health.data(), static_cast<std::uint32_t>(sizeof(float) * health.size()), m_health);
 }
 
 void GpuCollidePhysics::shutdown() {
@@ -153,12 +165,14 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
-    if (m_spawnTransfer) {
-        SDL_ReleaseGPUTransferBuffer(m_device, m_spawnTransfer);
-        m_spawnTransfer = nullptr;
+    for (SDL_GPUTransferBuffer** transfer : {&m_spawnTransfer, &m_spawnHealthTransfer}) {
+        if (*transfer) {
+            SDL_ReleaseGPUTransferBuffer(m_device, *transfer);
+            *transfer = nullptr;
+        }
     }
 
-    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions};
+    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions, &m_health};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
             SDL_ReleaseGPUBuffer(m_device, *buffer);
@@ -171,6 +185,17 @@ void GpuCollidePhysics::shutdown() {
 
 void GpuCollidePhysics::update(float dt) {
     m_dt = dt;
+}
+
+std::vector<float> GpuCollidePhysics::startingHealth(std::uint32_t count) {
+    std::vector<float> health(count, 1.0f);
+    if (m_config.randomStartHealth) {
+        std::uniform_real_distribution<float> any(0.0f, 1.0f);
+        for (float& h : health) {
+            h = any(m_spawnRng);
+        }
+    }
+    return health;
 }
 
 void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
@@ -198,6 +223,12 @@ void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
     SDL_memcpy(mapped, units.data(), size);
     SDL_UnmapGPUTransferBuffer(m_device, m_spawnTransfer);
 
+    const std::vector<float> health = startingHealth(count);
+    const Uint32 healthSize = static_cast<Uint32>(sizeof(float) * count);
+    void* healthMapped = SDL_MapGPUTransferBuffer(m_device, m_spawnHealthTransfer, true);
+    SDL_memcpy(healthMapped, health.data(), healthSize);
+    SDL_UnmapGPUTransferBuffer(m_device, m_spawnHealthTransfer);
+
     if (SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(commands)) {
         SDL_GPUTransferBufferLocation src{};
         src.transfer_buffer = m_spawnTransfer;
@@ -207,6 +238,14 @@ void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
         dst.offset = static_cast<Uint32>(sizeof(BaseUnitData) * m_unitCount);
         dst.size = size;
         SDL_UploadToGPUBuffer(copy, &src, &dst, false);
+
+        SDL_GPUTransferBufferLocation healthSrc{};
+        healthSrc.transfer_buffer = m_spawnHealthTransfer;
+        SDL_GPUBufferRegion healthDst{};
+        healthDst.buffer = m_health;
+        healthDst.offset = static_cast<Uint32>(sizeof(float) * m_unitCount);
+        healthDst.size = healthSize;
+        SDL_UploadToGPUBuffer(copy, &healthSrc, &healthDst, false);
         SDL_EndGPUCopyPass(copy);
     }
 
@@ -273,12 +312,14 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.spawnCount = packAreas(m_config.flow.spawns, uniforms.spawns);
         uniforms.frame = m_frame;
         uniforms.respawnOnExit = m_config.flow.respawnAtExit ? 1u : 0u;
+        uniforms.randomHealth = m_config.randomStartHealth ? 1u : 0u;
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding binding{};
-        binding.buffer = m_units[m_current];
+        SDL_GPUStorageBufferReadWriteBinding bindings[2]{};
+        bindings[0].buffer = m_units[m_current];
+        bindings[1].buffer = m_health;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, &binding, 1)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 2)) {
             SDL_BindGPUComputePipeline(pass, m_finalizePipeline);
             SDL_GPUBuffer* readOnly[4] = {m_prevPositions, m_walls.buffers()[0], m_walls.buffers()[1],
                                           m_walls.buffers()[2]};
@@ -293,12 +334,13 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
                                    const glm::mat4& viewProjection, float alpha) {
     // m_prevPositions holds where each unit started the latest step, which
     // unit_integrate writes before moving it: exactly the previous state.
-    gfx::UnitRenderer::Interpolation blend;
-    blend.previous = m_frame > 0 ? m_prevPositions : nullptr;
-    blend.alpha = alpha;
+    gfx::UnitRenderer::DrawOptions options;
+    options.previous = m_frame > 0 ? m_prevPositions : nullptr;
+    options.alpha = alpha;
     // Further than a unit could move in one step is a respawn, not motion.
-    blend.maxJump = std::max(4.0f * m_config.unitSize, 2.0f * m_config.movement.maxSpeed * m_dt);
-    m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, blend);
+    options.maxJump = std::max(4.0f * m_config.unitSize, 2.0f * m_config.movement.maxSpeed * m_dt);
+    options.health = m_health;
+    m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
 }
 
 void GpuCollidePhysics::debugUi() {
