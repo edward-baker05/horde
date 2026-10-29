@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
 
@@ -24,6 +26,9 @@ public:
     }
 
 private:
+    // Pushes a LevelScene for the level file at `path` (empty: the built-in level).
+    void playLevel(const std::filesystem::path& path);
+
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
 

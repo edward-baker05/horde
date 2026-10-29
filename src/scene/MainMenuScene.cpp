@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "logic/LevelFiles.hpp"
 #include "scene/EditorScene.hpp"
@@ -25,16 +26,26 @@ bool MainMenuScene::onEnter(Services& services) {
     return true;
 }
 
+void MainMenuScene::playLevel(const std::filesystem::path& path) {
+    // Empty path: the built-in level. Zoomed to fit, so the whole level is in view.
+    LevelOptions options;
+    options.levelPath = path;
+    options.fitCamera = true;
+    m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
+}
+
 void MainMenuScene::debugUi() {
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("horde");
 
     if (ImGui::Button("Play", ImVec2(160.0f, 0.0f))) {
-        // One level means there is nothing to choose between: go straight in.
-        if (logic::listLevels().size() > 1) {
+        // One level means there is nothing to choose between: go straight into
+        // it. With none saved, play the built-in level.
+        const std::vector<std::filesystem::path> levels = logic::listLevels();
+        if (levels.size() > 1) {
             m_choosingLevel = true;
         } else {
-            m_services->scenes->push(std::make_unique<LevelScene>());
+            playLevel(levels.empty() ? std::filesystem::path{} : levels.front());
         }
     }
 
@@ -53,7 +64,7 @@ void MainMenuScene::debugUi() {
             const std::string name = logic::levelDisplayName(path);
             if (ImGui::Button(name.c_str(), ImVec2(160.0f, 0.0f))) {
                 m_choosingLevel = false;
-                m_services->scenes->push(std::make_unique<LevelScene>(path));
+                playLevel(path);
             }
         }
 
