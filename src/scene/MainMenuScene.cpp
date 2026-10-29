@@ -10,6 +10,7 @@
 #include "logic/LevelFiles.hpp"
 #include "scene/EditorScene.hpp"
 #include "scene/LevelScene.hpp"
+#include "scene/Presets.hpp"
 #include "scene/SceneStack.hpp"
 #include "scene/TechTreeScene.hpp"
 
@@ -55,6 +56,36 @@ void MainMenuScene::debugUi() {
 
     if (ImGui::Button("Level Editor", ImVec2(160.0f, 0.0f))) {
         m_services->scenes->push(std::make_unique<EditorScene>());
+    }
+
+    // Shared test setups from assets/presets.
+    const std::vector<std::filesystem::path> presets = listPresets();
+    if (!presets.empty()) {
+        ImGui::SeparatorText("Presets");
+        for (const std::filesystem::path& path : presets) {
+            const std::string name = presetName(path);
+            if (ImGui::Button(name.c_str(), ImVec2(220.0f, 0.0f))) {
+                Preset preset;
+                std::string error;
+                if (loadPreset(name, LevelOptions{}, preset, error)) {
+                    preset.options.fitCamera = true;
+                    m_services->scenes->push(std::make_unique<LevelScene>(std::move(preset.options)));
+                    m_presetError.clear();
+                } else {
+                    m_presetError = error;
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                Preset preset;
+                std::string error;
+                if (loadPreset(name, LevelOptions{}, preset, error) && !preset.description.empty()) {
+                    ImGui::SetTooltip("%s", preset.description.c_str());
+                }
+            }
+        }
+        if (!m_presetError.empty()) {
+            ImGui::TextWrapped("%s", m_presetError.c_str());
+        }
     }
 
     if (m_choosingLevel) {

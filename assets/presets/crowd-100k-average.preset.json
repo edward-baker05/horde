@@ -1,0 +1,12 @@
+{
+  "description": "100k units on the walls level, average solver: 16 passes at omega 2.0, speed 200",
+  "level": "bench_walls",
+  "physics": "gpu-collide",
+  "units": 100000,
+  "spawn": "markers",
+  "spawnRate": 4000,
+  "solver": "average",
+  "collisionIterations": 16,
+  "omega": 2.0,
+  "speed": 200
+}

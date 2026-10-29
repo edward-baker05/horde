@@ -41,6 +41,8 @@ struct LevelOptions {
     float physicsRate = 60.0f;
     // Unit speed; units head for the nearest point of the nearest exit.
     float maxSpeed = sim::MovementSettings{}.maxSpeed;
+    // The preset these options came from, if any, for display.
+    std::string presetName;
 };
 
 // The game world. Currently a level full of simulated units and a button back

@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+#include "scene/Presets.hpp"
 #include "sim/PhysicsRegistry.hpp"
 
 namespace horde::app {
@@ -19,6 +20,8 @@ void printUsage() {
         "With no options the game starts at the main menu.\n"
         "\n"
         "Level setup (boots straight into a level when any is given):\n"
+        "  --preset NAME      a test setup from assets/presets (see --list-presets); flags\n"
+        "                     after it override its settings\n"
         "  --physics NAME     physics system (see --list-physics), default %s\n"
         "  --units N          number of units, default 10000\n"
         "  --spawn PATTERN    markers | random | grid | column, default markers (random under --bench)\n"
@@ -59,6 +62,7 @@ void printUsage() {
         "  --low-power-gpu    prefer an integrated GPU, if the machine has one\n"
         "\n"
         "  --list-physics     print the registered physics systems and exit\n"
+        "  --list-presets     print the presets in assets/presets and exit\n"
         "  --help             print this and exit\n",
         sim::kDefaultPhysics);
 }
@@ -105,6 +109,31 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         if (arg == "--help" || arg == "-h") {
             printUsage();
             return ParseResult::Exit;
+        } else if (arg == "--list-presets") {
+            for (const std::filesystem::path& path : scene::listPresets()) {
+                scene::Preset preset;
+                std::string error;
+                const std::string name = scene::presetName(path);
+                if (scene::loadPreset(name, scene::LevelOptions{}, preset, error)) {
+                    std::printf("%-24s %s\n", name.c_str(), preset.description.c_str());
+                } else {
+                    std::printf("%-24s (broken: %s)\n", name.c_str(), error.c_str());
+                }
+            }
+            return ParseResult::Exit;
+        } else if (arg == "--preset") {
+            // Applies where it appears: flags after it override its settings.
+            if (!value(v)) return ParseResult::Error;
+            scene::Preset preset;
+            std::string error;
+            if (!scene::loadPreset(std::string(v), level, preset, error)) {
+                std::fprintf(stderr, "horde: %s\n", error.c_str());
+                return ParseResult::Error;
+            }
+            level = std::move(preset.options);
+            spawnGiven = spawnGiven || preset.setsSpawn;
+            physicsRateGiven = physicsRateGiven || preset.setsPhysicsRate;
+            wantsLevel = true;
         } else if (arg == "--list-physics") {
             for (const std::string& name : sim::physicsNames()) {
                 std::printf("%-12s %s\n", name.c_str(), sim::physicsDescription(name));

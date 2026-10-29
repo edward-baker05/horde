@@ -110,6 +110,7 @@ bool Recorder::finish(const RunInfo& info) const {
         {"status", m_samples.empty() ? "no-samples" : "ok"},
         {"timestamp", timestamp()},
         {"physics", level.physics},
+        {"preset", level.presetName},
         {"units", level.unitCount},
         {"spawn", sim::spawnPatternName(level.spawn)},
         {"spawn_rate", level.spawnRate},

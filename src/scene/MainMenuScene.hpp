@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 
 #include "gfx/Camera2D.hpp"
 #include "scene/Scene.hpp"
@@ -35,6 +36,8 @@ private:
     // Levels are only offered as a choice once there is more than one, so the
     // extra click appears only when it has been earned.
     bool m_choosingLevel = false;
+    // Why the last preset clicked failed to load, shown under the presets.
+    std::string m_presetError;
 };
 
 } // namespace horde::scene

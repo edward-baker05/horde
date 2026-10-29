@@ -15,6 +15,7 @@
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
 #include "logic/LevelIO.hpp"
+#include "scene/Presets.hpp"
 #include "scene/SceneStack.hpp"
 
 namespace horde::scene {
@@ -158,6 +159,9 @@ void LevelScene::debugUi() {
 
     frameCostUi();
     ImGui::Text("Units: %u", m_physics->unitCount());
+    if (!m_options.presetName.empty()) {
+        ImGui::Text("Preset: %s", m_options.presetName.c_str());
+    }
     ImGui::Text("Physics: %s", m_options.physics.c_str());
     ImGui::TextWrapped("%s", sim::physicsDescription(m_options.physics));
     m_physics->debugUi();
@@ -175,6 +179,26 @@ void LevelScene::debugUi() {
     ImGui::TextDisabled("%.2f steps/frame", m_stepsPerFrame);
 
     ImGui::SeparatorText("Restart with");
+
+    // Loading a preset fills in everything below; edit further before restarting.
+    const char* presetLabel = m_pendingOptions.presetName.empty() ? "(none)" : m_pendingOptions.presetName.c_str();
+    if (ImGui::BeginCombo("Preset", presetLabel)) {
+        for (const std::filesystem::path& path : listPresets()) {
+            const std::string name = presetName(path);
+            if (ImGui::Selectable(name.c_str(), name == m_pendingOptions.presetName)) {
+                Preset preset;
+                std::string error;
+                LevelOptions base;
+                base.fitCamera = m_options.fitCamera;
+                if (loadPreset(name, base, preset, error)) {
+                    m_pendingOptions = std::move(preset.options);
+                } else {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", error.c_str());
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
 
     if (ImGui::BeginCombo("Physics", m_pendingOptions.physics.c_str())) {
         for (const std::string& name : sim::physicsNames()) {

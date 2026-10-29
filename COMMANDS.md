@@ -177,6 +177,47 @@ sudo dnf install -y cmake ninja-build gcc-c++ git \
 
 ---
 
+## Test presets
+
+A preset is a saved test setup (level, unit count, spawn rate, solver,
+collision settings, speed) in `assets/presets/<name>.preset.json`. Share one by
+committing the file; anyone with the build can then run it.
+
+| Preset | Setup |
+| --- | --- |
+| `crowd-100k-relaxed` | walls level, 100k units, 4000/s spawn, relaxed solver, 16 passes, relaxation 1.0, speed 200 |
+| `crowd-100k-average` | the same, but the average solver at omega 2.0 |
+
+**To try one:** start the game and click it under *Presets* in the main menu, or
+
+```powershell
+.\build\windows\bin\Release\horde.exe --preset crowd-100k-relaxed
+```
+
+The Level panel's *Frame cost* section shows what each frame costs (physics
+GPU and CPU time, and the frame rate it could reach uncapped), which is the
+number to compare between presets and machines. Its *Preset* dropdown loads
+another preset into "Restart with". Settings can be tweaked there before
+pressing *Restart level*.
+
+**To benchmark one** (results land in `bench_results/`):
+
+```sh
+python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average
+horde --bench --preset crowd-100k-relaxed --duration 20 --out result.json
+```
+
+With `--preset`, only flags you pass yourself override the preset.
+`horde --list-presets` lists them.
+
+**To add one,** copy an existing file and change it. Every key is optional;
+anything left out uses the game's default. Unknown keys are an error, so a
+typo fails loudly instead of quietly testing the default. The keys are:
+`description`, `level`, `physics`, `units`, `spawn`, `spawnRate`,
+`respawnAtExit`, `speed`, `physicsRate`, `maxHp`, `exitDamage`, `quality`,
+`solver`, `collisionIterations`, `relaxation`, `omega`, `broadphase`,
+`bucketCapacity` and `seed`. `src/scene/Presets.hpp` says what each takes.
+
 ## Benchmarking physics
 
 `tools/bench.py` builds the release config, then runs the game once per

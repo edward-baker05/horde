@@ -14,6 +14,7 @@ Examples:
     python tools/bench.py --physics gpu-collide --quality low,medium,high,ultra --units 10k,100k,1m
     python tools/bench.py --physics gpu-collide --solver relaxed,average --collision-iterations 8
     python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,1.9
+    python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average   # shared test setups
     python tools/bench.py --low-power-gpu --level assets/levels/bench_walls.level.json
 
 Results land in bench_results/<timestamp>/ (git-ignored).
@@ -106,24 +107,37 @@ def git_info() -> dict:
             "dirty": bool(git("status", "--porcelain", "--untracked-files=no"))}
 
 
-def variant_label(physics: str, quality: str | None, solver: str | None, omega: str | None) -> str:
-    """'gpu-collide', 'gpu-collide@low', 'gpu-collide/average', 'gpu-collide@low/average w1.5'"""
-    return (physics + (f"@{quality}" if quality else "") + (f"/{solver}" if solver else "")
+def variant_label(preset: str | None, physics: str | None, quality: str | None, solver: str | None,
+                  omega: str | None) -> str:
+    """'gpu-collide', 'gpu-collide@low/average w1.5', 'crowd-100k-relaxed', 'crowd-100k-relaxed:gpu-grid'"""
+    base = ":".join(part for part in (preset, physics) if part)
+    return (base + (f"@{quality}" if quality else "") + (f"/{solver}" if solver else "")
             + (f" w{omega}" if omega else ""))
 
 
-def run_one(exe: Path, args: argparse.Namespace, physics: str, quality: str | None, solver: str | None,
-            omega: str | None, units: int, repeat: int, out_dir: Path) -> dict:
-    label = variant_label(physics, quality, solver, omega)
-    stem = f"{label.replace('@', '_').replace('/', '_').replace(' ', '_')}_{units}_r{repeat}"
+def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: str | None, quality: str | None,
+            solver: str | None, omega: str | None, units: int | None, repeat: int, out_dir: Path) -> dict:
+    label = variant_label(preset, physics, quality, solver, omega)
+    stem = (f"{label.replace('@', '_').replace('/', '_').replace(' ', '_').replace(':', '_')}"
+            f"_{units if units is not None else 'preset'}_r{repeat}")
     json_path = out_dir / "runs" / f"{stem}.json"
     log_path = out_dir / "logs" / f"{stem}.log"
 
-    cmd = [str(exe), "--bench", "--physics", physics, "--units", str(units),
-           "--warmup", str(args.warmup), "--duration", str(args.duration),
-           "--spawn", args.spawn, "--seed", str(args.seed + repeat),
-           "--width", str(args.width), "--height", str(args.height),
-           "--out", str(json_path)]
+    # The preset first: everything after it on the command line overrides it,
+    # and only what was asked for explicitly is passed when there is one.
+    cmd = [str(exe), "--bench"]
+    if preset:
+        cmd += ["--preset", preset]
+    if physics:
+        cmd += ["--physics", physics]
+    if units is not None:
+        cmd += ["--units", str(units)]
+    if args.spawn:
+        cmd += ["--spawn", args.spawn]
+    cmd += ["--warmup", str(args.warmup), "--duration", str(args.duration),
+            "--seed", str(args.seed + repeat),
+            "--width", str(args.width), "--height", str(args.height),
+            "--out", str(json_path)]
     if args.fixed_dt is not None:
         cmd += ["--fixed-dt", str(args.fixed_dt)]
     if args.level:
@@ -163,10 +177,11 @@ def run_one(exe: Path, args: argparse.Namespace, physics: str, quality: str | No
         log_path.write_text(proc.stdout + proc.stderr, encoding="utf-8")
     except subprocess.TimeoutExpired as e:
         log_path.write_text(f"TIMEOUT after {timeout}s\n{e.stdout or ''}{e.stderr or ''}", encoding="utf-8")
-        return {"label": label, "physics": physics, "units": units, "repeat": repeat, "status": "timeout"}
+        return {"label": label, "physics": physics or "-", "units": units or 0, "repeat": repeat,
+                "status": "timeout"}
 
     if proc.returncode != 0 or not json_path.exists():
-        return {"label": label, "physics": physics, "units": units, "repeat": repeat,
+        return {"label": label, "physics": physics or "-", "units": units or 0, "repeat": repeat,
                 "status": f"exit {proc.returncode}"}
 
     result = json.loads(json_path.read_text(encoding="utf-8"))
@@ -303,13 +318,17 @@ def detect_cap(rows: list[dict]) -> int | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--physics", default="all", help="comma-separated names, or 'all' (default)")
-    parser.add_argument("--units", default="1000,10000,100000", help="comma-separated counts; 1e5, 100k, 1m work")
+    parser.add_argument("--preset", help="comma-separated presets from assets/presets to run; with presets, only "
+                                         "the other flags you pass override them")
+    parser.add_argument("--physics", help="comma-separated names, or 'all' (default without --preset)")
+    parser.add_argument("--units", help="comma-separated counts; 1e5, 100k, 1m work (default 1k,10k,100k "
+                                        "without --preset)")
     parser.add_argument("--repeats", type=int, default=1, help="runs per combination (seed varies per repeat)")
     parser.add_argument("--warmup", type=float, default=2.0, help="seconds before measuring")
     parser.add_argument("--duration", type=float, default=10.0, help="seconds measured")
-    parser.add_argument("--spawn", default="random", choices=["random", "grid", "column", "markers"],
-                        help="starting layout; markers streams units in at the spawns (see --spawn-rate)")
+    parser.add_argument("--spawn", choices=["random", "grid", "column", "markers"],
+                        help="starting layout (default random without --preset); markers streams units in at the "
+                             "spawns (see --spawn-rate)")
     parser.add_argument("--spawn-rate", type=float, help="markers: units per second (game default 1000; 0 = all at once)")
     parser.add_argument("--physics-rate", type=float, choices=[0, 60, 120],
                         help="physics steps per second (bench default 0: one step per frame)")
@@ -345,12 +364,21 @@ def main() -> int:
     if not exe.exists():
         sys.exit(f"bench: {exe} not found (build first, or drop --no-build)")
 
+    presets: list[str | None] = [p.strip() for p in args.preset.split(",") if p.strip()] if args.preset else [None]
+    if not args.preset:
+        args.physics = args.physics or "all"
+        args.units = args.units or "1000,10000,100000"
+        args.spawn = args.spawn or "random"
+
     available = list_physics(exe)
-    physics = available if args.physics == "all" else [p.strip() for p in args.physics.split(",") if p.strip()]
-    unknown = [p for p in physics if p not in available]
+    if args.physics is None:
+        physics: list[str | None] = [None]  # whatever each preset says
+    else:
+        physics = available if args.physics == "all" else [p.strip() for p in args.physics.split(",") if p.strip()]
+    unknown = [p for p in physics if p is not None and p not in available]
     if unknown:
         sys.exit(f"bench: unknown physics {unknown}; available: {available}")
-    counts = sorted(parse_counts(args.units))
+    counts: list[int | None] = sorted(parse_counts(args.units)) if args.units else [None]
 
     started = dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_dir = args.out_dir or ROOT / "bench_results" / started
@@ -360,29 +388,30 @@ def main() -> int:
     qualities: list[str | None] = [q.strip() for q in args.quality.split(",") if q.strip()] if args.quality else [None]
     solvers: list[str | None] = [v.strip() for v in args.solver.split(",") if v.strip()] if args.solver else [None]
     omegas: list[str | None] = [v.strip() for v in args.omega.split(",") if v.strip()] if args.omega else [None]
-    variants = [(name, quality, solver, omega) for name in physics for quality in qualities for solver in solvers
-                for omega in omegas]
+    variants = [(preset, name, quality, solver, omega) for preset in presets for name in physics
+                for quality in qualities for solver in solvers for omega in omegas]
 
     total = len(variants) * len(counts) * args.repeats
-    print(f"== {total} run(s): physics {physics} x quality {qualities} x solver {solvers} x omega {omegas} "
+    print(f"== {total} run(s): presets {presets} x physics {physics} x quality {qualities} x solver {solvers} x omega {omegas} "
           f"x units {counts} "
           f"x {args.repeats} "
           f"-> {out_dir}", flush=True)
 
     results: list[dict] = []
     n = 0
-    for name, quality, solver, omega in variants:
-        label = variant_label(name, quality, solver, omega)
+    for preset, name, quality, solver, omega in variants:
+        label = variant_label(preset, name, quality, solver, omega)
         too_slow = False
         for units in counts:
             for repeat in range(args.repeats):
                 n += 1
                 if too_slow:
-                    results.append({"label": label, "physics": name, "units": units, "repeat": repeat,
+                    results.append({"label": label, "physics": name or "-", "units": units or 0, "repeat": repeat,
                                     "status": "skipped"})
                     continue
-                print(f"[{n}/{total}] {label:<24} {units:>9,} units  run {repeat + 1}... ", end="", flush=True)
-                r = run_one(exe, args, name, quality, solver, omega, units, repeat, out_dir)
+                units_text = f"{units:>9,} units" if units is not None else "preset units"
+                print(f"[{n}/{total}] {label:<24} {units_text}  run {repeat + 1}... ", end="", flush=True)
+                r = run_one(exe, args, preset, name, quality, solver, omega, units, repeat, out_dir)
                 results.append(r)
                 if r.get("status") == "ok":
                     print(f"{r['fps_mean']:8.1f} fps  frame {stat(r, 'frame_ms'):7.2f} ms  "
