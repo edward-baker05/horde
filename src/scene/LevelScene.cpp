@@ -1,6 +1,7 @@
 #include "LevelScene.hpp"
 
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_timer.h>
 
 #include <imgui.h>
 
@@ -74,7 +75,7 @@ bool LevelScene::onEnter(Services& services) {
     }
     config.flow.spawnRate = m_options.spawnRate;
     config.flow.respawnAtExit = m_options.respawnAtExit;
-    config.randomStartHealth = m_options.randomStartHealth;
+    config.health = m_options.health;
     config.flow.seed = m_options.seed;
     // Systems that don't steer to exits head for the first exit's centre, or
     // the middle of a level without one. Positions are top-left corners.
@@ -160,6 +161,7 @@ void LevelScene::debugUi() {
     ImGui::Text("Physics: %s", m_options.physics.c_str());
     ImGui::TextWrapped("%s", sim::physicsDescription(m_options.physics));
     m_physics->debugUi();
+    healthUi();
 
     // Applies immediately: stepping is the scene's, not the physics system's.
     int rate = m_options.physicsRate >= 120.0f ? 1 : 0;
@@ -203,7 +205,13 @@ void LevelScene::debugUi() {
                            ImGuiSliderFlags_Logarithmic);
     }
     ImGui::Checkbox("Respawn at exit", &m_pendingOptions.respawnAtExit);
-    ImGui::Checkbox("Random starting health", &m_pendingOptions.randomStartHealth);
+    int maxHp = static_cast<int>(m_pendingOptions.health.maxHp);
+    if (ImGui::InputInt("Max HP", &maxHp)) {
+        m_pendingOptions.health.maxHp = static_cast<std::uint32_t>(std::clamp(maxHp, 1, 100000));
+    }
+    if (ImGui::InputFloat("Damage at exit", &m_pendingOptions.health.exitDamage, 0.5f, 5.0f, "%.1f")) {
+        m_pendingOptions.health.exitDamage = std::max(m_pendingOptions.health.exitDamage, 0.0f);
+    }
 
     if (ImGui::BeginCombo("Quality preset", "choose...")) {
         for (const char* preset : {"low", "medium", "high", "ultra"}) {
@@ -256,6 +264,33 @@ void LevelScene::debugUi() {
     }
 
     ImGui::End();
+}
+
+void LevelScene::healthUi() {
+    // A GPU readback stalls briefly, so only about once a second.
+    const Uint64 now = SDL_GetTicksNS();
+    if (!m_healthSampled || now - m_healthSampledAt > 1'000'000'000) {
+        m_healthSampledAt = now;
+        std::vector<float> health;
+        m_healthSampled = m_physics->readHealth(health) && !health.empty();
+        if (m_healthSampled) {
+            double sum = 0.0;
+            m_healthLowest = health.front();
+            m_healthAtZero = 0;
+            for (const float hp : health) {
+                sum += hp;
+                m_healthLowest = std::min(m_healthLowest, hp);
+                m_healthAtZero += hp <= 0.0f ? 1u : 0u;
+            }
+            m_healthMean = static_cast<float>(sum / static_cast<double>(health.size()));
+        }
+    }
+
+    if (m_healthSampled) {
+        // Max HP is whole; hit points after damage need not be.
+        ImGui::Text("Health: mean %.1f / %u, lowest %.1f, %u at 0", m_healthMean, m_options.health.maxHp,
+                    m_healthLowest, m_healthAtZero);
+    }
 }
 
 void LevelScene::frameCostUi() {

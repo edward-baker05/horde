@@ -73,7 +73,7 @@ struct type_UnitUniforms
     float2 UnitSize;
     float Alpha;
     float MaxJump;
-    float HasHealth;
+    float InvMaxHealth;
     packed_float3 Padding;
 };
 
@@ -112,16 +112,16 @@ vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], c
     {
         _114 = Units._m0[_74].pos;
     }
-    float _133;
-    if (UnitUniforms.HasHealth > 0.0)
+    float _134;
+    if (UnitUniforms.InvMaxHealth > 0.0)
     {
-        _133 = fast::clamp(Health._m0[_74], 0.0, 1.0);
+        _134 = fast::clamp(Health._m0[_74] * UnitUniforms.InvMaxHealth, 0.0, 1.0);
     }
     else
     {
-        _133 = 1.0;
+        _134 = 1.0;
     }
-    out.out_var_TEXCOORD0 = select(float4(UnitUniforms.Color.xyz * _133, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_74 == 0u));
+    out.out_var_TEXCOORD0 = select(float4(UnitUniforms.Color.xyz * _134, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_74 == 0u));
     out.out_var_TEXCOORD1 = _72[_68[_75]];
     out.gl_Position = UnitUniforms.ViewProjection * float4(_114 + (_69[_68[_75]] * UnitUniforms.UnitSize), 0.0, 1.0);
     return out;

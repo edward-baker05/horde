@@ -105,6 +105,14 @@ struct FlowSettings {
     std::uint32_t seed = 1;
 };
 
+// Unit hit points. Units start at maxHp, are drawn from full colour at maxHp
+// down to black at 0, and lose exitDamage each time they reach an exit.
+// Health is a float so damage can be fractional; maxHp is a whole number.
+struct HealthSettings {
+    std::uint32_t maxHp = 30;
+    float exitDamage = 1.0f;
+};
+
 // GPU flow shaders hold at most this many spawns and this many exits; any
 // beyond are ignored, with a warning.
 inline constexpr std::size_t kMaxFlowMarkers = 8;
@@ -118,9 +126,7 @@ struct SimConfig {
     // The level's walls, flattened and binned. Null or empty: no walls.
     std::shared_ptr<const WallColliders> walls;
     FlowSettings flow;
-    // Debug: start (and respawn) units at a random health instead of full, to
-    // see health shading before anything deals damage.
-    bool randomStartHealth = false;
+    HealthSettings health;
     // Starting position and velocity of every unit. Its length is the unit
     // count; systems size their buffers from it.
     std::vector<BaseUnitData> initialUnits;
@@ -169,6 +175,13 @@ public:
     // download), so for tests and benchmark measurements, not every frame.
     // Returns false if the system cannot.
     virtual bool readUnits(std::vector<BaseUnitData>& out) {
+        (void)out;
+        return false;
+    }
+
+    // Copies every unit's hit points to the CPU, as readUnits does positions.
+    // Returns false for systems that don't track health.
+    virtual bool readHealth(std::vector<float>& out) {
         (void)out;
         return false;
     }

@@ -1,8 +1,8 @@
 // Last step of the gpu-collide pipeline: keep units out of walls and inside
 // the level, set each unit's velocity from where it actually ended up (so
 // collisions slow and deflect units rather than only moving them:
-// position-based dynamics), and send units that reached an exit back to a
-// spawn.
+// position-based dynamics), and damage units that reached an exit and send
+// them back to a spawn.
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -17,7 +17,7 @@ struct UnitData {
 StructuredBuffer<float2> PrevPos : register(t0, space0);
 // t1..t3: walls, declared by walls.hlsli
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
-RWStructuredBuffer<float> Health : register(u1, space1); // 0 to 1
+RWStructuredBuffer<float> Health : register(u1, space1); // hit points, 0 to the max
 
 #define MAX_MARKERS 8
 
@@ -36,7 +36,7 @@ cbuffer FinalizeParams : register(b0, space2) {
     uint SpawnCount;
     uint Frame;         // varies the respawn position from frame to frame
     uint RespawnOnExit; // 0: units that reach an exit stay there
-    uint RandomHealth;  // debug: respawn at a random health instead of full
+    float ExitDamage;   // hit points lost on reaching an exit
     uint3 HealthPadding;
     float4 Exits[MAX_MARKERS];  // xy = centre, zw = half size
     float4 Spawns[MAX_MARKERS]; // xy = centre, zw = half size
@@ -85,14 +85,16 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     }
     unit.vel = vel;
 
-    // Through the exit: back in at a random point of a random spawn, at rest.
+    // Through the exit: take the damage, then back in at a random point of a
+    // random spawn, at rest, keeping whatever health is left.
     if (RespawnOnExit != 0 && SpawnCount > 0 && reachedExit(unit.pos + Radius)) {
+        Health[index] = max(Health[index] - ExitDamage, 0.0f);
+
         uint h = hash(index ^ hash(Frame));
         float4 spawn = Spawns[h % SpawnCount];
         float2 r = float2(unitFloat(hash(h)), unitFloat(hash(h ^ 0x9E3779B9u))) * 2.0f - 1.0f;
         unit.pos = clamp(spawn.xy + r * spawn.zw - Radius, WorldMin, WorldMax);
         unit.vel = float2(0.0f, 0.0f);
-        Health[index] = RandomHealth != 0 ? unitFloat(hash(h ^ 0x85EBCA6Bu)) : 1.0f;
     }
 
     Units[index] = unit;

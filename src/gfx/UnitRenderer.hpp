@@ -32,13 +32,14 @@ public:
     // way from `previous` (one float2 per unit) to their current position;
     // moves longer than `maxJump` (a respawn) snap instead.
     //
-    // `health` (one float per unit, 0 to 1) tints each unit from the full
-    // colour at 1 down to black at 0.
+    // `health` (one float of hit points per unit) tints each unit from the full
+    // colour at `maxHealth` down to black at 0.
     struct DrawOptions {
         SDL_GPUBuffer* previous = nullptr; // null: draw current positions as they are
         float alpha = 1.0f;
         float maxJump = 0.0f;
         SDL_GPUBuffer* health = nullptr; // null: everyone at full health
+        float maxHealth = 1.0f;
     };
 
     // `units` holds at least `count` BaseUnitData entries.

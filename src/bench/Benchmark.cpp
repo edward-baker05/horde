@@ -114,6 +114,8 @@ bool Recorder::finish(const RunInfo& info) const {
         {"spawn", sim::spawnPatternName(level.spawn)},
         {"spawn_rate", level.spawnRate},
         {"physics_rate", level.physicsRate},
+        {"max_hp", level.health.maxHp},
+        {"exit_damage", level.health.exitDamage},
         {"respawn_at_exit", level.respawnAtExit},
         {"seed", level.seed},
         {"level", level.levelPath.empty() ? "default" : level.levelPath.generic_string()},
@@ -151,6 +153,9 @@ bool Recorder::finish(const RunInfo& info) const {
         {"average_omega", collision.averageOmega},
         {"max_speed", level.maxSpeed},
     };
+    if (info.healthMeasured) {
+        result["health"] = {{"mean", info.healthMean}, {"lowest", info.healthLowest}};
+    }
     if (info.quality.measured) {
         const CollisionQuality& q = info.quality;
         result["quality"] = {

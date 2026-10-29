@@ -43,7 +43,7 @@ struct alignas(16) GPUFinalizeUniforms {
     Uint32 spawnCount;
     Uint32 frame;
     Uint32 respawnOnExit;
-    Uint32 randomHealth;
+    float exitDamage;
     Uint32 healthPadding[3];
     glm::vec4 exits[kMaxFlowMarkers];
     glm::vec4 spawns[kMaxFlowMarkers];
@@ -187,15 +187,8 @@ void GpuCollidePhysics::update(float dt) {
     m_dt = dt;
 }
 
-std::vector<float> GpuCollidePhysics::startingHealth(std::uint32_t count) {
-    std::vector<float> health(count, 1.0f);
-    if (m_config.randomStartHealth) {
-        std::uniform_real_distribution<float> any(0.0f, 1.0f);
-        for (float& h : health) {
-            h = any(m_spawnRng);
-        }
-    }
-    return health;
+std::vector<float> GpuCollidePhysics::startingHealth(std::uint32_t count) const {
+    return std::vector<float>(count, static_cast<float>(m_config.health.maxHp));
 }
 
 void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
@@ -312,7 +305,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.spawnCount = packAreas(m_config.flow.spawns, uniforms.spawns);
         uniforms.frame = m_frame;
         uniforms.respawnOnExit = m_config.flow.respawnAtExit ? 1u : 0u;
-        uniforms.randomHealth = m_config.randomStartHealth ? 1u : 0u;
+        uniforms.exitDamage = m_config.health.exitDamage;
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding bindings[2]{};
@@ -340,6 +333,7 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     // Further than a unit could move in one step is a respawn, not motion.
     options.maxJump = std::max(4.0f * m_config.unitSize, 2.0f * m_config.movement.maxSpeed * m_dt);
     options.health = m_health;
+    options.maxHealth = static_cast<float>(m_config.health.maxHp);
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
 }
 
@@ -358,6 +352,48 @@ void GpuCollidePhysics::debugUi() {
     }
     ImGui::Text("Heading for %zu exit(s) at %.0f u/s%s", m_config.flow.exits.size(), m_config.movement.maxSpeed,
                 m_config.flow.respawnAtExit ? ", respawning" : "");
+    ImGui::Text("Max HP %u, %.1f damage per exit", m_config.health.maxHp, m_config.health.exitDamage);
+}
+
+bool GpuCollidePhysics::readHealth(std::vector<float>& out) {
+    out.resize(m_unitCount);
+    if (m_device == nullptr) {
+        return false;
+    }
+    if (m_unitCount == 0) {
+        return true;
+    }
+
+    const Uint32 size = static_cast<Uint32>(sizeof(float) * m_unitCount);
+    SDL_GPUTransferBufferCreateInfo info{};
+    info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    info.size = size;
+    SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(m_device, &info);
+    if (transfer == nullptr) {
+        return false;
+    }
+
+    SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(m_device);
+    SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(commands);
+    SDL_GPUBufferRegion src{};
+    src.buffer = m_health;
+    src.size = size;
+    SDL_GPUTransferBufferLocation dst{};
+    dst.transfer_buffer = transfer;
+    SDL_DownloadFromGPUBuffer(copy, &src, &dst);
+    SDL_EndGPUCopyPass(copy);
+
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(commands);
+    const bool ok = fence != nullptr && SDL_WaitForGPUFences(m_device, true, &fence, 1);
+    if (fence) {
+        SDL_ReleaseGPUFence(m_device, fence);
+    }
+    if (ok) {
+        SDL_memcpy(out.data(), SDL_MapGPUTransferBuffer(m_device, transfer, false), size);
+        SDL_UnmapGPUTransferBuffer(m_device, transfer);
+    }
+    SDL_ReleaseGPUTransferBuffer(m_device, transfer);
+    return ok;
 }
 
 bool GpuCollidePhysics::readUnits(std::vector<BaseUnitData>& out) {

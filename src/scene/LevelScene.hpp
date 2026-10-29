@@ -31,8 +31,7 @@ struct LevelOptions {
     float spawnRate = 1000.0f;
     // A unit reaching a red exit re-enters at a spawn; otherwise it stops there.
     bool respawnAtExit = true;
-    // Debug: units start at random health, to see health shading.
-    bool randomStartHealth = false;
+    sim::HealthSettings health;
     std::uint32_t seed = 1;
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;
@@ -95,6 +94,8 @@ private:
     void fitCameraToLevel(float width, float height);
     // The frame cost breakdown at the top of the debug panel.
     void frameCostUi();
+    // Live health summary, sampled from the GPU about once a second.
+    void healthUi();
 
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
@@ -111,6 +112,13 @@ private:
     float m_stepAccumulator = 0.0f;
     std::uint32_t m_stepsThisFrame = 0;
     float m_stepsPerFrame = 0.0f; // smoothed, for the panel
+
+    // Last health sample: when, and mean / lowest hit points and units at 0.
+    Uint64 m_healthSampledAt = 0;
+    bool m_healthSampled = false;
+    float m_healthMean = 0.0f;
+    float m_healthLowest = 0.0f;
+    std::uint32_t m_healthAtZero = 0;
     // Most steps one frame may run before the simulation is allowed to fall
     // behind real time, so a slow frame can't snowball into slower ones.
     static constexpr std::uint32_t kMaxStepsPerFrame = 4;

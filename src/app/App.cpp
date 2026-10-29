@@ -186,6 +186,17 @@ int App::finishBenchmark() {
                 bench::writeUnitsCsv(units, level->unitSize(), m_recorder->config().unitsPath);
             }
         }
+        std::vector<float> health;
+        if (level->physics().readHealth(health) && !health.empty()) {
+            double sum = 0.0;
+            info.healthLowest = health.front();
+            for (const float hp : health) {
+                sum += hp;
+                info.healthLowest = std::min<double>(info.healthLowest, hp);
+            }
+            info.healthMean = sum / static_cast<double>(health.size());
+            info.healthMeasured = true;
+        }
         if (const sim::CollisionSettings* collision = level->physics().collisionSettings()) {
             info.collision = *collision;
         }

@@ -16,7 +16,7 @@ StructuredBuffer<UnitData> Units : register(t0, space0);
 // Where each unit was one physics step earlier, when MaxJump > 0. Physics runs
 // at a fixed rate below the frame rate, so drawing blends the last two steps.
 StructuredBuffer<float2> PrevPos : register(t1, space0);
-// Each unit's health, 0 (dead) to 1 (full), when HasHealth > 0.
+// Each unit's hit points, when InvMaxHealth > 0.
 StructuredBuffer<float> Health : register(t2, space0);
 
 cbuffer UnitUniforms : register(b0, space1) {
@@ -26,7 +26,7 @@ cbuffer UnitUniforms : register(b0, space1) {
     float2 UnitSize; // width, height
     float Alpha;     // 0 = draw at PrevPos, 1 = draw at Units[].pos
     float MaxJump;   // 0: no PrevPos. Moves longer than this (a respawn) are not blended.
-    float HasHealth; // 0: no Health buffer, draw everyone at full health
+    float InvMaxHealth; // 1 / max hit points; 0: no Health buffer, draw everyone at full health
     float3 Padding;
 };
 
@@ -72,7 +72,7 @@ Output main(uint id : SV_VertexID) {
     output.Position = mul(ViewProjection, float4(world, 0.0f, 1.0f));
     output.Texcoord = texcoords[corner];
     // Full health draws in Color, fading linearly to black at 0.
-    float health = HasHealth > 0.0f ? saturate(Health[unitIndex]) : 1.0f;
+    float health = InvMaxHealth > 0.0f ? saturate(Health[unitIndex] * InvMaxHealth) : 1.0f;
     float4 tint = float4(Color.rgb * health, Color.a);
     output.Color = (unitIndex == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
     return output;

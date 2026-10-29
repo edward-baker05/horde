@@ -20,7 +20,7 @@ struct alignas(16) UnitDrawUniforms {
     glm::vec2 unitSize; // width, height
     float alpha;
     float maxJump;
-    float hasHealth;
+    float invMaxHealth;
     float padding[3];
 };
 static_assert(sizeof(UnitDrawUniforms) == 128);
@@ -132,7 +132,7 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
     uniforms.unitSize = glm::vec2(unitSize, unitSize);
     uniforms.alpha = options.alpha;
     uniforms.maxJump = options.previous ? options.maxJump : 0.0f;
-    uniforms.hasHealth = options.health ? 1.0f : 0.0f;
+    uniforms.invMaxHealth = options.health && options.maxHealth > 0.0f ? 1.0f / options.maxHealth : 0.0f;
     SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
     SDL_GPUTextureSamplerBinding atlasBinding{};

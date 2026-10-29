@@ -56,6 +56,10 @@ struct RunInfo {
     CollisionQuality quality;
     // What the physics system reports it really ran with, if it uses them.
     std::optional<sim::CollisionSettings> collision;
+    // Hit points at the end of the run, if the physics system tracks them.
+    bool healthMeasured = false;
+    double healthMean = 0.0;
+    double healthLowest = 0.0;
     std::uint32_t wallCount = 0;
     std::uint32_t wallPrimitives = 0;
 };

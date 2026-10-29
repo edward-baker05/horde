@@ -43,6 +43,7 @@ public:
                     float alpha) override;
     void debugUi() override;
     bool readUnits(std::vector<BaseUnitData>& out) override;
+    bool readHealth(std::vector<float>& out) override;
 
     const CollisionSettings* collisionSettings() const override {
         return &m_config.collision;
@@ -59,8 +60,8 @@ public:
 
 private:
     void spawnPending(SDL_GPUCommandBuffer* commands);
-    // Starting health for `count` new units: full, or random in debug mode.
-    std::vector<float> startingHealth(std::uint32_t count);
+    // Starting health for `count` new units: all full.
+    std::vector<float> startingHealth(std::uint32_t count) const;
 
     SDL_GPUDevice* m_device = nullptr;
     gfx::UnitRenderer m_renderer;
@@ -75,7 +76,7 @@ private:
     // Collision passes ping-pong between these; m_current holds the latest units.
     SDL_GPUBuffer* m_units[2] = {nullptr, nullptr};
     SDL_GPUBuffer* m_prevPositions = nullptr;
-    // Per unit, 0 (dead) to 1 (full). Not ping-ponged: only positions are.
+    // Hit points per unit, 0 to maxHp. Not ping-ponged: only positions are.
     SDL_GPUBuffer* m_health = nullptr;
     std::uint32_t m_current = 0;
 
