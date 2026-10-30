@@ -21,8 +21,8 @@ class GpuWalls;
 // unit buffers after building a GpuSpatialGrid over them: units are separated
 // from each other, then pushed out of walls.
 //
-// Each iteration is one Jacobi relaxation pass (unit_collide*.comp, chosen to
-// match the grid's broadphase) reading one unit buffer and writing the other,
+// Each iteration is one Jacobi relaxation pass (unit_collide.comp) reading one
+// unit buffer and writing the other,
 // so the caller owns a pair of buffers and resolve() reports which holds the
 // result.
 class GpuUnitCollisions {

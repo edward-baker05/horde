@@ -18,14 +18,11 @@ namespace horde::sim {
 // GPU broadphase: buckets units into a uniform grid so a shader can find every
 // unit near a point by looking at a few cells instead of every unit.
 //
-// Three interchangeable methods (see Broadphase), producing one of two layouts
-// that the unit_collide*.comp shaders read as GridA / GridB:
+// Built with a counting sort (count per cell, prefix sum, scatter), producing
+// the layout unit_collide.comp reads as GridA / GridB:
 //
-//   BitonicSort, CountingSort   GridA = sorted (cellId, unitIndex) keys
-//                               GridB = per cell [start, end) into GridA, or
-//                                       0xFFFFFFFF start when empty
-//   Buckets                     GridA = GridB = per cell [count, unit indices...],
-//                                       bucketCapacity() indices per cell
+//   GridA = sorted (cellId, unitIndex) keys
+//   GridB = per cell [start, end) into GridA, or 0xFFFFFFFF start when empty
 //
 // Anything that needs neighbours can share one grid per frame: unit collisions
 // now, and later separation steering, target finding, area damage and so on.
@@ -39,23 +36,19 @@ public:
 
     // `cellSize` should be at least the largest interaction distance, so that
     // a 3x3 block of cells covers every possible neighbour.
-    bool init(scene::Services& services, std::uint32_t maxUnits, glm::vec2 worldSize, float cellSize,
-              Broadphase method, std::uint32_t bucketCapacity);
+    bool init(scene::Services& services, std::uint32_t maxUnits, glm::vec2 worldSize, float cellSize);
     void shutdown();
 
     // Records the passes that rebuild the grid from `units` (BaseUnitData).
     // Must be called outside any other pass.
     void build(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* units, std::uint32_t unitCount);
 
-    SDL_GPUBuffer* gridA() const;
-    SDL_GPUBuffer* gridB() const;
-
-    Broadphase method() const {
-        return m_method;
+    SDL_GPUBuffer* gridA() const {
+        return m_keys;
     }
 
-    std::uint32_t bucketCapacity() const {
-        return m_bucketCapacity;
+    SDL_GPUBuffer* gridB() const {
+        return m_ranges;
     }
 
     glm::uvec2 gridDim() const {
@@ -74,31 +67,21 @@ public:
     std::uint32_t passCount() const;
 
 private:
-    void buildBitonic(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* units, std::uint32_t unitCount);
-    void buildCounting(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* units, std::uint32_t unitCount);
-    void buildBuckets(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* units, std::uint32_t unitCount);
     void fill(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* buffer, std::uint32_t count, std::uint32_t value,
               std::uint32_t stride);
 
     SDL_GPUDevice* m_device = nullptr;
-    Broadphase m_method = Broadphase::CountingSort;
 
-    // Every pipeline any method uses; unused ones stay null.
-    SDL_GPUComputePipeline* m_clearPipeline = nullptr;  // bitonic: ranges to empty
-    SDL_GPUComputePipeline* m_buildPipeline = nullptr;  // bitonic: one key per unit
-    SDL_GPUComputePipeline* m_sortPipeline = nullptr;   // bitonic: one sort step
-    SDL_GPUComputePipeline* m_rangesPipeline = nullptr; // bitonic: ranges from sorted keys
-    SDL_GPUComputePipeline* m_fillPipeline = nullptr;   // counting, buckets: clear counters
-    SDL_GPUComputePipeline* m_countPipeline = nullptr;  // counting
-    SDL_GPUComputePipeline* m_scanPipeline = nullptr;   // counting
+    SDL_GPUComputePipeline* m_fillPipeline = nullptr; // clear counters
+    SDL_GPUComputePipeline* m_countPipeline = nullptr;
+    SDL_GPUComputePipeline* m_scanPipeline = nullptr;
     SDL_GPUComputePipeline* m_scanAddPipeline = nullptr;
     SDL_GPUComputePipeline* m_scatterPipeline = nullptr;
-    SDL_GPUComputePipeline* m_bucketPipeline = nullptr; // buckets
 
-    // Sorted layout (bitonic, counting).
+    // Sorted layout.
     SDL_GPUBuffer* m_keys = nullptr;
     SDL_GPUBuffer* m_ranges = nullptr;
-    // Counting sort.
+    // Sort scratch.
     SDL_GPUBuffer* m_counts = nullptr;
     SDL_GPUBuffer* m_unitCells = nullptr;
     // Prefix-sum levels: [0] is the per-cell starts, each next one holds the
@@ -109,14 +92,9 @@ private:
     };
     std::vector<ScanLevel> m_scanLevels;
     SDL_GPUBuffer* m_scanScratch = nullptr; // block sum of the last level, unused
-    // Buckets.
-    SDL_GPUBuffer* m_buckets = nullptr;
-    std::uint32_t m_bucketCapacity = 8;
 
     glm::uvec2 m_gridDim{0, 0};
     float m_cellSize = 1.0f;
-    // Bitonic: key count rounded up to a power of two.
-    std::uint32_t m_sortSize = 0;
 };
 
 } // namespace horde::sim

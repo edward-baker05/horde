@@ -24,7 +24,7 @@ struct alignas(16) GPUCollideUniforms {
     float diameter;
     float relaxation;
     float maxCorrection;
-    Uint32 bucketCapacity;
+    Uint32 bucketCapacity; // unused: left over from a removed broadphase, kept for the HLSL layout
     glm::uvec2 wallBinDim;
     float wallBinSize;
     Uint32 wallCount;
@@ -48,11 +48,10 @@ bool GpuUnitCollisions::init(scene::Services& services, const CollisionSettings&
     // Positions are a unit's top-left corner, so the far edges sit one size in.
     m_worldMax = glm::max(worldSize - glm::vec2(diameter), glm::vec2(0.0f));
 
-    // Both variants: 6 ro buffers (units, grid A, grid B, 3 wall buffers), 1 rw buffer, 1 uniform buffer
-    const char* shader = settings.broadphase == Broadphase::Buckets ? "unit_collide_buckets.comp" : "unit_collide.comp";
-    m_pipeline = services.shaders->loadCompute(shader, 0, 0, 6, 0, 1, 1, 256, 1, 1);
+    // 6 ro buffers (units, grid A, grid B, 3 wall buffers), 1 rw buffer, 1 uniform buffer
+    m_pipeline = services.shaders->loadCompute("unit_collide.comp", 0, 0, 6, 0, 1, 1, 256, 1, 1);
     if (m_pipeline == nullptr) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuUnitCollisions: failed to load %s", shader);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuUnitCollisions: failed to load unit_collide.comp");
         return false;
     }
     return true;
@@ -82,7 +81,6 @@ std::uint32_t GpuUnitCollisions::resolve(SDL_GPUCommandBuffer* commands, SDL_GPU
     uniforms.diameter = m_diameter;
     uniforms.relaxation = m_settings.relaxation;
     uniforms.maxCorrection = m_settings.maxCorrection * m_diameter;
-    uniforms.bucketCapacity = grid.bucketCapacity();
     uniforms.wallBinDim = walls.binDim();
     uniforms.wallBinSize = walls.binSize();
     uniforms.wallCount = walls.primitiveCount();

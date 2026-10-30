@@ -8,10 +8,10 @@ those into one results directory with a CSV and a Markdown table.
 
 Examples:
     python tools/bench.py
-    python tools/bench.py --physics gpu-grid,cpu-grid --units 1000,10000,100000
+    python tools/bench.py --physics gpu-collide,cpu-grid --units 1000,10000,100000
     python tools/bench.py --physics all --units 1e3,1e4,1e5,1e6 --repeats 3
     python tools/bench.py --no-build --duration 5 --frames
-    python tools/bench.py --physics gpu-collide --quality low,medium,high,ultra --units 10k,100k,1m
+    python tools/bench.py --physics gpu-collide --collision-iterations 2 --units 10k,100k,1m
     python tools/bench.py --physics gpu-collide --solver relaxed,average --collision-iterations 8
     python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,1.9
     python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average   # shared test setups
@@ -107,18 +107,16 @@ def git_info() -> dict:
             "dirty": bool(git("status", "--porcelain", "--untracked-files=no"))}
 
 
-def variant_label(preset: str | None, physics: str | None, quality: str | None, solver: str | None,
-                  omega: str | None) -> str:
-    """'gpu-collide', 'gpu-collide@low/average w1.5', 'crowd-100k-relaxed', 'crowd-100k-relaxed:gpu-grid'"""
+def variant_label(preset: str | None, physics: str | None, solver: str | None, omega: str | None) -> str:
+    """'gpu-collide', 'gpu-collide/average w1.5', 'crowd-100k-relaxed', 'crowd-100k-relaxed:cpu-grid'"""
     base = ":".join(part for part in (preset, physics) if part)
-    return (base + (f"@{quality}" if quality else "") + (f"/{solver}" if solver else "")
-            + (f" w{omega}" if omega else ""))
+    return base + (f"/{solver}" if solver else "") + (f" w{omega}" if omega else "")
 
 
-def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: str | None, quality: str | None,
-            solver: str | None, omega: str | None, units: int | None, repeat: int, out_dir: Path) -> dict:
-    label = variant_label(preset, physics, quality, solver, omega)
-    stem = (f"{label.replace('@', '_').replace('/', '_').replace(' ', '_').replace(':', '_')}"
+def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: str | None, solver: str | None,
+            omega: str | None, units: int | None, repeat: int, out_dir: Path) -> dict:
+    label = variant_label(preset, physics, solver, omega)
+    stem = (f"{label.replace('/', '_').replace(' ', '_').replace(':', '_')}"
             f"_{units if units is not None else 'preset'}_r{repeat}")
     json_path = out_dir / "runs" / f"{stem}.json"
     log_path = out_dir / "logs" / f"{stem}.log"
@@ -150,11 +148,6 @@ def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: st
         cmd += ["--spawn-rate", str(args.spawn_rate)]
     if args.no_respawn:
         cmd.append("--no-respawn")
-    # The preset first, so the individual flags below can override parts of it.
-    if quality:
-        cmd += ["--quality", quality]
-    if args.broadphase:
-        cmd += ["--broadphase", args.broadphase]
     if solver:
         cmd += ["--solver", solver]
     if omega:
@@ -203,7 +196,7 @@ def mean_of_quality(runs: list[dict], field: str) -> float | None:
 
 
 def aggregate(results: list[dict]) -> list[dict]:
-    """One row per (physics[@quality][/solver], units): repeats averaged."""
+    """One row per (physics[/solver], units): repeats averaged."""
     rows = []
     groups: dict[tuple[str, int], list[dict]] = {}
     for r in results:
@@ -226,7 +219,6 @@ def aggregate(results: list[dict]) -> list[dict]:
         in_walls = mean_of_quality(ok, "units_in_walls")
         row.update({
             "status": "ok",
-            "broadphase": ok[0].get("broadphase", "-"),
             "solver": ok[0].get("solver", "-"),
             "average_omega": ok[0].get("average_omega"),
             "in_walls_pct": in_walls * 100 / units if in_walls is not None and units else None,
@@ -261,7 +253,7 @@ def fmt(value, digits: int = 2) -> str:
 def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
     columns = ["physics", "units", "status", "fps_mean", "fps_1pct_low", "frame_ms_mean", "frame_ms_p99",
                "update_ms_mean", "sim_gpu_ms_mean", "sim_ms_mean", "overlap_pct", "penetration_mean", "penetration_max",
-               "in_walls_pct", "broadphase", "solver", "average_omega", "fps_spread", "runs", "ok"]
+               "in_walls_pct", "solver", "average_omega", "fps_spread", "runs", "ok"]
     with open(out_dir / "summary.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
@@ -299,7 +291,7 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
           "*cpu sim ms* is the scene update on the CPU, *gpu sim ms* the physics compute work on the GPU, "
           "timed in isolation; *sim ms* is their sum. *overlap %* is the share of units overlapping another at the "
           "end of the run, *penetration* the mean overlap depth as a fraction of a unit's diameter, *in walls %* the "
-          "share of units overlapping a wall. `name@preset` rows ran with `--quality preset`, `name/solver` rows with `--solver solver`, `wN` with `--omega N`.", ""]
+          "share of units overlapping a wall. `name/solver` rows with `--solver solver`, `wN` with `--omega N`.", ""]
     (out_dir / "summary.md").write_text("\n".join(md), encoding="utf-8")
     return table + ("\n\n" + notes[0] if notes else "")
 
@@ -339,11 +331,8 @@ def main() -> int:
     parser.add_argument("--collision-iterations", type=int, help="relaxation passes per frame (game default 4)")
     parser.add_argument("--relaxation", type=float, help="fraction of each pass's correction applied (default 0.5)")
     parser.add_argument("--speed", type=float, help="unit speed toward the exit (default 60)")
-    parser.add_argument("--quality", help="comma-separated presets to sweep (low, medium, high, ultra)")
     parser.add_argument("--solver", help="comma-separated collision solvers to sweep (relaxed, average)")
     parser.add_argument("--omega", help="comma-separated over-relaxation factors to sweep for the average solver")
-    parser.add_argument("--broadphase", choices=["counting", "buckets", "bitonic"],
-                        help="broadphase for gpu-collide (overrides the preset's)")
     parser.add_argument("--low-power-gpu", action="store_true", help="run on the integrated GPU, if there is one")
     parser.add_argument("--fixed-dt", type=float, help="simulation step per frame (game default 1/60; 0 = real)")
     parser.add_argument("--width", type=int, default=1600)
@@ -385,22 +374,21 @@ def main() -> int:
     for sub in ("runs", "logs", *(["frames"] if args.frames else [])):
         (out_dir / sub).mkdir(parents=True, exist_ok=True)
 
-    qualities: list[str | None] = [q.strip() for q in args.quality.split(",") if q.strip()] if args.quality else [None]
     solvers: list[str | None] = [v.strip() for v in args.solver.split(",") if v.strip()] if args.solver else [None]
     omegas: list[str | None] = [v.strip() for v in args.omega.split(",") if v.strip()] if args.omega else [None]
-    variants = [(preset, name, quality, solver, omega) for preset in presets for name in physics
-                for quality in qualities for solver in solvers for omega in omegas]
+    variants = [(preset, name, solver, omega) for preset in presets for name in physics
+                for solver in solvers for omega in omegas]
 
     total = len(variants) * len(counts) * args.repeats
-    print(f"== {total} run(s): presets {presets} x physics {physics} x quality {qualities} x solver {solvers} x omega {omegas} "
+    print(f"== {total} run(s): presets {presets} x physics {physics} x solver {solvers} x omega {omegas} "
           f"x units {counts} "
           f"x {args.repeats} "
           f"-> {out_dir}", flush=True)
 
     results: list[dict] = []
     n = 0
-    for preset, name, quality, solver, omega in variants:
-        label = variant_label(preset, name, quality, solver, omega)
+    for preset, name, solver, omega in variants:
+        label = variant_label(preset, name, solver, omega)
         too_slow = False
         for units in counts:
             for repeat in range(args.repeats):
@@ -411,7 +399,7 @@ def main() -> int:
                     continue
                 units_text = f"{units:>9,} units" if units is not None else "preset units"
                 print(f"[{n}/{total}] {label:<24} {units_text}  run {repeat + 1}... ", end="", flush=True)
-                r = run_one(exe, args, preset, name, quality, solver, omega, units, repeat, out_dir)
+                r = run_one(exe, args, preset, name, solver, omega, units, repeat, out_dir)
                 results.append(r)
                 if r.get("status") == "ok":
                     print(f"{r['fps_mean']:8.1f} fps  frame {stat(r, 'frame_ms'):7.2f} ms  "

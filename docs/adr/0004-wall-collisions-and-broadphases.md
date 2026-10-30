@@ -49,6 +49,11 @@ Buckets win on small grids. Counting sort wins on large ones, where the buckets
 method has to clear and scatter across millions of cells. The collision passes,
 not the broadphase, dominate at high counts.
 
+**Update (2026-10-30):** counting sort is now the only broadphase. Bitonic and
+buckets were removed, along with their shaders, `--broadphase`,
+`--bucket-capacity` and the `gpu-collide-*` registry entries. The table above
+is kept as the reason.
+
 ## Solver
 
 Each collision pass is Jacobi: every unit reads the same state (one unit
@@ -100,6 +105,12 @@ panel) sets passes, relaxation and broadphase together. Low runs 1 buckets pass
 at relaxation 0.8, and ultra runs 8 counting passes. On an Intel UHD 770
 (`--low-power-gpu`), 100k units on the walls level ran at 177 / 135 / 90 / 58 fps
 across low to ultra. Mean overlap depth fell from 0.23 to 0.07 of a diameter.
+
+**Update (2026-10-30):** the quality presets were removed, to be re-evaluated
+now that counting sort is the only broadphase. `--quality` and the level
+panel's preset menu are gone; set passes and relaxation directly. The figures
+above are from the old presets.
+
 Every method uses only compute features all three SDL_GPU backends have
 (structured buffers, 32-bit atomics, group-shared memory). There are no wave
 intrinsics or 64-bit atomics.

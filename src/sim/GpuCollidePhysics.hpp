@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <random>
 
 #include "gfx/UnitRenderer.hpp"
@@ -25,14 +24,11 @@ namespace horde::sim {
 //                         velocity = actual displacement / dt, respawn
 //                         units that reached an exit
 //
-// Each stage is its own piece so later systems can reuse or swap one: the
-// broadphase method is a setting, and steering could read the grid for local
-// avoidance.
+// Each stage is its own piece so later systems can reuse or swap one, and
+// steering could read the grid for local avoidance.
 class GpuCollidePhysics : public PhysicsSystem {
 public:
-    // `broadphase` overrides SimConfig::collision.broadphase, for registry
-    // entries that pin one method so benchmarks can compare them.
-    explicit GpuCollidePhysics(std::optional<Broadphase> broadphase = std::nullopt) : m_forcedBroadphase(broadphase) {}
+    GpuCollidePhysics() = default;
     ~GpuCollidePhysics() override;
 
     bool init(scene::Services& services, const SimConfig& config) override;
@@ -74,7 +70,6 @@ private:
     GpuSpatialGrid m_grid;
     GpuUnitCollisions m_collisions;
     GpuWalls m_walls;
-    std::optional<Broadphase> m_forcedBroadphase;
 
     SDL_GPUComputePipeline* m_integratePipeline = nullptr;
     SDL_GPUComputePipeline* m_finalizePipeline = nullptr;

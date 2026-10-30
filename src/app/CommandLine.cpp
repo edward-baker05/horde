@@ -40,10 +40,6 @@ void printUsage() {
         "  --relaxation F     relaxed solver: fraction of each pass's correction applied, default 0.5\n"
         "  --omega F          average solver: over-relaxation on the mean, 1 (plain) to 2, default 1\n"
         "  --speed F          unit speed toward the exit, default 60\n"
-        "  --broadphase NAME  counting | buckets | bitonic, default counting\n"
-        "  --bucket-capacity N  units per cell for the buckets broadphase, default 8\n"
-        "  --quality NAME     low | medium | high | ultra: sets passes, relaxation and\n"
-        "                     broadphase together; later flags still override it\n"
         "\n"
         "Benchmarking:\n"
         "  --bench            run headless-style: time the level, write results, quit\n"
@@ -214,14 +210,6 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--speed") {
             if (!value(v) || !parseNumber(v, level.maxSpeed) || level.maxSpeed < 0) return bad(v);
             wantsLevel = true;
-        } else if (arg == "--broadphase") {
-            if (!value(v) || !sim::parseBroadphase(std::string(v), level.collision.broadphase)) return bad(v);
-            wantsLevel = true;
-        } else if (arg == "--bucket-capacity") {
-            if (!value(v) || !parseNumber(v, level.collision.bucketCapacity) || level.collision.bucketCapacity == 0) {
-                return bad(v);
-            }
-            wantsLevel = true;
         } else if (arg == "--solver") {
             if (!value(v) || !sim::parseSolver(std::string(v), level.collision.solver)) return bad(v);
             wantsLevel = true;
@@ -230,9 +218,6 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
                 level.collision.averageOmega > 2.0f) {
                 return bad(v);
             }
-            wantsLevel = true;
-        } else if (arg == "--quality") {
-            if (!value(v) || !sim::collisionPreset(std::string(v), level.collision)) return bad(v);
             wantsLevel = true;
         } else if (arg == "--low-power-gpu") {
             config.lowPowerGpu = true;

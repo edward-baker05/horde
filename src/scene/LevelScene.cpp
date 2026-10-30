@@ -264,27 +264,6 @@ void LevelScene::debugUi() {
         m_pendingOptions.health.exitDamage = std::max(m_pendingOptions.health.exitDamage, 0.0f);
     }
 
-    if (ImGui::BeginCombo("Quality preset", "choose...")) {
-        for (const char* preset : {"low", "medium", "high", "ultra"}) {
-            if (ImGui::Selectable(preset)) {
-                sim::collisionPreset(preset, m_pendingOptions.collision);
-            }
-        }
-        ImGui::EndCombo();
-    }
-
-    constexpr sim::Broadphase broadphases[] = {sim::Broadphase::CountingSort, sim::Broadphase::Buckets,
-                                               sim::Broadphase::BitonicSort};
-    if (ImGui::BeginCombo("Broadphase", sim::broadphaseName(m_pendingOptions.collision.broadphase))) {
-        for (const sim::Broadphase broadphase : broadphases) {
-            if (ImGui::Selectable(sim::broadphaseName(broadphase),
-                                  broadphase == m_pendingOptions.collision.broadphase)) {
-                m_pendingOptions.collision.broadphase = broadphase;
-            }
-        }
-        ImGui::EndCombo();
-    }
-
     constexpr sim::CollisionSolver solvers[] = {sim::CollisionSolver::Relaxed, sim::CollisionSolver::Average};
     if (ImGui::BeginCombo("Solver", sim::solverName(m_pendingOptions.collision.solver))) {
         for (const sim::CollisionSolver solver : solvers) {

@@ -72,9 +72,6 @@ GpuCollidePhysics::~GpuCollidePhysics() {
 bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config) {
     m_device = services.gpu->device();
     m_config = config;
-    if (m_forcedBroadphase) {
-        m_config.collision.broadphase = *m_forcedBroadphase;
-    }
     m_unitCount = static_cast<std::uint32_t>(config.initialUnits.size());
     m_capacity = m_unitCount + config.flow.toSpawn;
     m_config.initialUnits.clear(); // only needed for the upload below
@@ -97,8 +94,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     // One cell per unit diameter, so the collision shader's 3x3 search is complete.
     const CollisionSettings& collision = m_config.collision;
     if (!m_renderer.init(services) ||
-        !m_grid.init(services, m_capacity, config.worldSize, config.unitSize, collision.broadphase,
-                     collision.bucketCapacity) ||
+        !m_grid.init(services, m_capacity, config.worldSize, config.unitSize) ||
         !m_collisions.init(services, collision, config.unitSize, config.worldSize) ||
         !m_walls.init(m_device, config.walls.get())) {
         return false;
@@ -339,8 +335,8 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
 
 void GpuCollidePhysics::debugUi() {
     const CollisionSettings& c = m_config.collision;
-    ImGui::Text("Broadphase: %s, %u x %u cells, %u passes", broadphaseName(c.broadphase), m_grid.gridDim().x,
-                m_grid.gridDim().y, m_grid.passCount());
+    ImGui::Text("Broadphase: counting sort, %u x %u cells, %u passes", m_grid.gridDim().x, m_grid.gridDim().y,
+                m_grid.passCount());
     if (c.solver == CollisionSolver::Average) {
         ImGui::Text("Collision: %u Jacobi passes, average solver (omega %.2f)", c.iterations, c.averageOmega);
     } else {

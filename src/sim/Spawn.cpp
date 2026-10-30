@@ -22,31 +22,6 @@ bool parseSpawnPattern(const std::string& text, SpawnPattern& out) {
     return true;
 }
 
-bool parseBroadphase(const std::string& text, Broadphase& out) {
-    if (text == "bitonic") {
-        out = Broadphase::BitonicSort;
-    } else if (text == "counting") {
-        out = Broadphase::CountingSort;
-    } else if (text == "buckets") {
-        out = Broadphase::Buckets;
-    } else {
-        return false;
-    }
-    return true;
-}
-
-const char* broadphaseName(Broadphase broadphase) {
-    switch (broadphase) {
-        case Broadphase::BitonicSort:
-            return "bitonic";
-        case Broadphase::CountingSort:
-            return "counting";
-        case Broadphase::Buckets:
-            return "buckets";
-    }
-    return "?";
-}
-
 bool parseSolver(const std::string& text, CollisionSolver& out) {
     if (text == "relaxed") {
         out = CollisionSolver::Relaxed;
@@ -66,34 +41,6 @@ const char* solverName(CollisionSolver solver) {
             return "average";
     }
     return "?";
-}
-
-bool collisionPreset(const std::string& name, CollisionSettings& out) {
-    // Passes are the main cost knob: each is a full read of every unit's
-    // neighbourhood. The broadphase is cheap with counting sort at any scale.
-    CollisionSettings preset;
-    if (name == "low") {
-        preset.iterations = 1;
-        preset.relaxation = 0.8f;
-        preset.broadphase = Broadphase::Buckets;
-        preset.bucketCapacity = 6;
-    } else if (name == "medium") {
-        preset.iterations = 2;
-        preset.relaxation = 0.7f;
-        preset.broadphase = Broadphase::Buckets;
-    } else if (name == "high") {
-        preset.iterations = 4;
-        preset.relaxation = 0.5f;
-        preset.broadphase = Broadphase::CountingSort;
-    } else if (name == "ultra") {
-        preset.iterations = 8;
-        preset.relaxation = 0.5f;
-        preset.broadphase = Broadphase::CountingSort;
-    } else {
-        return false;
-    }
-    out = preset;
-    return true;
 }
 
 const char* spawnPatternName(SpawnPattern pattern) {

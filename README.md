@@ -258,12 +258,11 @@ what stops the tech tree turning into a fight with a widget toolkit.
 what it interrupts. Transitions are queued and applied between frames, so a
 scene can safely request one from inside its own update.
 
-**Compute is ready but not used yet.** `shaders/src/gradient.comp.hlsl` is a
-working reference compute shader: it is compiled and shipped like any other, and
-`ShaderLoader::loadCompute()` plus the `Scene::compute()` hook are in place to
-run it. Nothing calls it — writing the first real compute pass is yours. The
-reference exists so the binding rules and the build path are already proven when
-you do.
+**Unit physics runs in compute.** `Scene::compute()` records compute passes
+before each frame's render pass, and `ShaderLoader::loadCompute()` builds the
+pipelines. The default system, `gpu-collide`, is a chain of compute shaders:
+integrate, a counting-sort grid, collision passes, finalize. See
+`docs/adr/0003-swappable-staged-unit-physics.md`.
 
 ---
 

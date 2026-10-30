@@ -27,13 +27,10 @@ namespace horde::scene {
 //   physicsRate          0 (once per frame), 60 or 120
 //   maxHp                int
 //   exitDamage           float
-//   quality              "low" | "medium" | "high" | "ultra", applied before the collision keys below
 //   solver               "relaxed" | "average"
 //   collisionIterations  int, passes per physics step
 //   relaxation           float, relaxed solver
 //   omega                float 1-2, average solver
-//   broadphase           "counting" | "buckets" | "bitonic"
-//   bucketCapacity       int
 //   seed                 int
 struct Preset {
     std::string name;

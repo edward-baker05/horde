@@ -8,54 +8,10 @@
 #include <glm/glm.hpp>
 #include <SDL3/SDL_stdinc.h>
 
-// Matches HLSL UnitData in update_positions.comp.hlsl and unit.vert.hlsl
+// Matches HLSL UnitData in unit.vert.hlsl and the compute shaders
 struct BaseUnitData {
     glm::vec2 pos{0.0f, 0.0f};
     glm::vec2 vel{0.0f, 0.0f};
-};
-
-// Matches HLSL SimParams cbuffer in update_positions.comp.hlsl
-struct alignas(16) GPUSimUniforms {
-    glm::vec2 worldOrigin{0.0f, 0.0f};
-    glm::vec2 worldBounds{0.0f, 0.0f};
-    float dt = 0.0f;
-    Uint32 unitCount = 0;
-    float restitution = 0.8f;
-    float gravity = 98.0f;
-    float unitSize = 5.0f;
-    float cellSize = 5.0f;
-    glm::uvec2 gridDim{0, 0};
-    glm::vec2 invCellSize{0.0f, 0.0f};
-    glm::vec2 padding{0.0f, 0.0f};
-};
-
-// Matches HLSL ClearParams in grid_clear.comp.hlsl
-struct alignas(16) GPUGridClearUniforms {
-    Uint32 totalCells = 0;
-    Uint32 padding[3] = {0, 0, 0};
-};
-
-// Matches HLSL GridBuildParams in grid_build.comp.hlsl
-struct alignas(16) GPUGridBuildUniforms {
-    glm::vec2 worldOrigin{0.0f, 0.0f};
-    glm::vec2 invCellSize{0.0f, 0.0f};
-    glm::uvec2 gridDim{0, 0};
-    Uint32 unitCount = 0;
-    Uint32 allocatedUnits = 0;
-};
-
-// Matches HLSL SortParams in bitonic_sort_step.comp.hlsl
-struct alignas(16) GPUSortUniforms {
-    Uint32 k = 0;
-    Uint32 j = 0;
-    Uint32 totalEntries = 0;
-    Uint32 padding = 0;
-};
-
-// Matches HLSL RangeParams in grid_find_ranges.comp.hlsl
-struct alignas(16) GPURangeUniforms {
-    Uint32 unitCount = 0;
-    Uint32 padding[3] = {0, 0, 0};
 };
 
 // SoA based approach

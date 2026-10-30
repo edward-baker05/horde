@@ -145,8 +145,6 @@ bool Recorder::finish(const RunInfo& info) const {
         {"present_ms", summarise(column(m_samples, &FrameSample::present))},
         {"gpu_sync", m_config.syncGpu},
         {"collision_iterations", collision.iterations},
-        {"broadphase", info.collision ? sim::broadphaseName(collision.broadphase) : "n/a"},
-        {"bucket_capacity", collision.bucketCapacity},
         {"walls", info.wallCount},
         {"wall_primitives", info.wallPrimitives},
         {"collision_relaxation", collision.relaxation},

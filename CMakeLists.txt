@@ -25,7 +25,6 @@ add_executable(horde
     src/gfx/UnitRenderer.cpp
     src/sim/CpuGridPhysics.cpp
     src/sim/GpuCollidePhysics.cpp
-    src/sim/GpuGridPhysics.cpp
     src/sim/GpuSpatialGrid.cpp
     src/sim/GpuUnitCollisions.cpp
     src/sim/GpuWalls.cpp

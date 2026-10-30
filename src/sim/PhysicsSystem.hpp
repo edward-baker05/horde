@@ -20,16 +20,6 @@ namespace horde::sim {
 
 class WallColliders;
 
-// How a GPU system finds each unit's neighbours. See GpuSpatialGrid.
-enum class Broadphase {
-    BitonicSort,  // sort (cell, unit) keys: O(n log^2 n), ~200 passes at 1M units
-    CountingSort, // count, prefix-sum, scatter: O(n + cells), a fixed handful of passes
-    Buckets,      // fixed-size bucket per cell, filled with atomics: one pass, can drop neighbours when full
-};
-
-bool parseBroadphase(const std::string& text, Broadphase& out);
-const char* broadphaseName(Broadphase broadphase);
-
 // How a collision pass combines a unit's pair corrections. Both are Jacobi:
 // within a pass every unit reads the same state and writes the next one, so
 // the result doesn't depend on thread order.
@@ -67,15 +57,7 @@ struct CollisionSettings {
     float averageOmega = 1.0f;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;
-    Broadphase broadphase = Broadphase::CountingSort;
-    // Buckets only: units a cell can hold before neighbours are missed. Four
-    // non-overlapping units fill a one-diameter cell; the rest is squeeze room.
-    std::uint32_t bucketCapacity = 8;
 };
-
-// Collision settings scaled to a performance budget, from integrated graphics
-// ("low") to a high-end card ("ultra"). Returns false for an unknown name.
-bool collisionPreset(const std::string& name, CollisionSettings& out);
 
 // Where units are trying to go, and how fast.
 struct MovementSettings {
@@ -186,9 +168,8 @@ public:
         return false;
     }
 
-    // The collision settings actually in use, which can differ from what the
-    // system was handed (a registry entry may pin the broadphase). Null for
-    // systems that don't use CollisionSettings.
+    // The collision settings actually in use. Null for systems that don't use
+    // CollisionSettings.
     virtual const CollisionSettings* collisionSettings() const {
         return nullptr;
     }
