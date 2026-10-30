@@ -1,0 +1,13 @@
+{
+  "description": "100k units on the walls level, relaxed solver at 120 Hz physics: 16 passes at relaxation 0.5, speed 200",
+  "level": "bench_walls",
+  "physics": "gpu-collide",
+  "units": 100000,
+  "spawn": "markers",
+  "spawnRate": 4000,
+  "physicsRate": 120,
+  "solver": "relaxed",
+  "collisionIterations": 16,
+  "relaxation": 0.5,
+  "speed": 200
+}

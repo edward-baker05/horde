@@ -187,6 +187,7 @@ committing the file; anyone with the build can then run it.
 | --- | --- |
 | `crowd-100k-relaxed` | walls level, 100k units, 4000/s spawn, relaxed solver, 16 passes, relaxation 1.0, speed 200 |
 | `crowd-100k-average` | the same, but the average solver at omega 2.0 |
+| `crowd-100k-relaxed-120hz` | the same as `crowd-100k-relaxed`, but 120 Hz physics and relaxation 0.5 |
 
 **To try one:** start the game and click it under *Presets* in the main menu, or
 
