@@ -44,6 +44,14 @@ bool deleteSelected(EditorState& state) {
         return true;
     }
 
+    if (state.selection.isFieldRegion() && state.selection.index < state.level.fieldRegions.size()) {
+        state.beginMutation();
+        state.level.fieldRegions.erase(state.level.fieldRegions.begin() +
+                                       static_cast<std::ptrdiff_t>(state.selection.index));
+        state.selection.clear();
+        return true;
+    }
+
     return false;
 }
 
@@ -55,7 +63,7 @@ void drawToolbar(EditorState& state) {
     ImGui::Begin("Tools");
 
     const Tool tools[] = {Tool::Select,   Tool::Rectangle, Tool::Triangle, Tool::Circle,
-                          Tool::Polyline, Tool::Spawn,     Tool::Exit};
+                          Tool::Polyline, Tool::Spawn,     Tool::Exit,     Tool::FieldRegion};
 
     for (int i = 0; i < static_cast<int>(std::size(tools)); ++i) {
         const Tool tool = tools[i];
@@ -80,6 +88,9 @@ void drawToolbar(EditorState& state) {
 
     ImGui::SeparatorText("New polyline");
     ImGui::DragFloat("Thickness", &state.newPolylineThickness, 0.25f, 1.0f, 200.0f);
+
+    ImGui::SeparatorText("New field region");
+    ImGui::DragFloat("Strength", &state.newFieldStrength, 0.05f, 0.1f, 60.0f, "%.2f /s");
 
     ImGui::End();
 }
@@ -245,6 +256,40 @@ void drawInspector(EditorState& state) {
             wall.color = {static_cast<std::uint8_t>(color[0] * 255.0f), static_cast<std::uint8_t>(color[1] * 255.0f),
                           static_cast<std::uint8_t>(color[2] * 255.0f)};
         }
+    } else if (state.selection.isFieldRegion()) {
+        logic::FieldRegion& region = state.level.fieldRegions[state.selection.index];
+
+        ImGui::Text("Field region %zu", state.selection.index);
+        ImGui::TextDisabled("Units inside follow its arrow. They pass through it.");
+        ImGui::SeparatorText("Transform");
+
+        float center[2] = {region.center.x, region.center.y};
+        if (ImGui::DragFloat2("Centre", center, 0.5f)) {
+            state.beginMutation();
+            region.center = {center[0], center[1]};
+        }
+
+        float degrees = glm::degrees(region.rotation);
+        if (ImGui::DragFloat("Rotation", &degrees, 1.0f, -360.0f, 360.0f, "%.1f deg")) {
+            state.beginMutation();
+            region.rotation = glm::radians(degrees);
+        }
+        ImGui::TextDisabled("0 flows east; positive turns clockwise.");
+
+        float extents[2] = {region.halfExtents.x * 2.0f, region.halfExtents.y * 2.0f};
+        if (ImGui::DragFloat2("Width/Height", extents, 0.5f, 1.0f, 100000.0f)) {
+            state.beginMutation();
+            region.halfExtents = {std::max(extents[0], 1.0f) * 0.5f, std::max(extents[1], 1.0f) * 0.5f};
+        }
+
+        ImGui::SeparatorText("Flow");
+
+        float strength = region.strength;
+        if (ImGui::DragFloat("Strength", &strength, 0.05f, 0.1f, 60.0f, "%.2f /s")) {
+            state.beginMutation();
+            region.strength = std::max(strength, 0.1f);
+        }
+        ImGui::TextDisabled("How quickly units turn to follow the arrow.");
     } else {
         logic::Marker& marker = state.level.markers[state.selection.index];
 
@@ -305,6 +350,22 @@ void drawWallList(EditorState& state) {
         if (ImGui::Selectable(label, selected)) {
             state.selection = Selection{SelectionKind::Marker, i};
         }
+    }
+
+    ImGui::SeparatorText("Field regions");
+
+    for (std::size_t i = 0; i < state.level.fieldRegions.size(); ++i) {
+        char label[64];
+        std::snprintf(label, sizeof(label), "%zu  Field region##field%zu", i, i);
+
+        const bool selected = state.selection.isFieldRegion() && state.selection.index == i;
+        if (ImGui::Selectable(label, selected)) {
+            state.selection = Selection{SelectionKind::FieldRegion, i};
+        }
+    }
+
+    if (state.level.fieldRegions.empty()) {
+        ImGui::TextDisabled("No field regions yet.");
     }
 
     ImGui::End();

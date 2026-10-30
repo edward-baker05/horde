@@ -16,7 +16,8 @@ namespace horde::sim {
 //
 // Per frame, as position-based dynamics:
 //   0. (CPU)              upload any units due to spawn this frame
-//   1. unit_integrate     steer toward the nearest exit, predict new positions
+//   1. unit_integrate     steer toward the nearest exit, or along a field
+//                         region's flow inside one; predict new positions
 //   2. GpuSpatialGrid     bucket the predicted positions (the broadphase)
 //   3. GpuUnitCollisions  N relaxation passes, each separating units then
 //                         pushing them out of walls

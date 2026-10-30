@@ -1,5 +1,6 @@
 #include "gfx/LevelRenderer.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "gfx/SpriteBatch.hpp"
@@ -63,9 +64,43 @@ void renderWall(const logic::Wall& wall, SpriteBatch& batch, SDL_GPUTexture* atl
     }
 }
 
-void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas) {
+glm::vec4 fieldRegionColor() {
+    return {0.35f, 0.6f, 1.0f, 0.18f};
+}
+
+void renderFieldRegion(const logic::FieldRegion& region, SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec4 color) {
+    const glm::vec2 size = region.halfExtents * 2.0f;
+    drawCentered(batch, atlas, region.center, size, region.rotation, cellSolid(), color);
+
+    // One arrow through the middle along local +x: a shaft and a triangle head.
+    // The atlas triangle's apex is local -y, so turning it a further quarter
+    // turn points it along +x.
+    const glm::vec2 dir = logic::fieldRegionDirection(region);
+    const float length = size.x * 0.6f;
+    const float head = std::min(length * 0.4f, size.y * 0.6f);
+    const float shaft = std::max(length - head, 0.0f);
+    const float width = std::max(head * 0.3f, 1.0f);
+    glm::vec4 arrow = color;
+    arrow.a = std::min(color.a * 3.0f, 1.0f);
+
+    const glm::vec2 tail = region.center - dir * (length * 0.5f);
+    if (shaft > 0.0f) {
+        drawCentered(batch, atlas, tail + dir * (shaft * 0.5f), {shaft, width}, region.rotation, cellSolid(), arrow);
+    }
+    drawCentered(batch, atlas, tail + dir * (shaft + head * 0.5f), {head, head}, region.rotation + 1.5707964f,
+                 cellTriangle(), arrow);
+}
+
+void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas, bool showFieldRegions) {
     // Background: exactly the bounds, drawn first so everything lands on top.
     drawCentered(batch, atlas, level.size * 0.5f, level.size, 0.0f, cellSolid(), toFloatColor(level.backgroundColor));
+
+    // Under the walls: a region is a hint drawn on the floor, not an object.
+    if (showFieldRegions) {
+        for (const logic::FieldRegion& region : level.fieldRegions) {
+            renderFieldRegion(region, batch, atlas, fieldRegionColor());
+        }
+    }
 
     for (const logic::Wall& wall : level.walls) {
         renderWall(wall, batch, atlas, toFloatColor(wall.color));

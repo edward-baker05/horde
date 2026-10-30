@@ -10,12 +10,12 @@
 namespace horde::editor {
 
 // Which tool the left mouse button is currently driving.
-enum class Tool { Select, Rectangle, Triangle, Circle, Polyline, Spawn, Exit };
+enum class Tool { Select, Rectangle, Triangle, Circle, Polyline, Spawn, Exit, FieldRegion };
 
-enum class SelectionKind { None, Wall, Marker };
+enum class SelectionKind { None, Wall, Marker, FieldRegion };
 
-// What is selected or hovered. `index` indexes Level::walls or Level::markers
-// depending on `kind`, and is meaningless when kind is None.
+// What is selected or hovered. `index` indexes Level::walls, Level::markers or
+// Level::fieldRegions depending on `kind`, and is meaningless when kind is None.
 struct Selection {
     SelectionKind kind = SelectionKind::None;
     std::size_t index = 0;
@@ -26,6 +26,10 @@ struct Selection {
 
     bool isMarker() const {
         return kind == SelectionKind::Marker;
+    }
+
+    bool isFieldRegion() const {
+        return kind == SelectionKind::FieldRegion;
     }
 
     void clear() {
@@ -67,6 +71,9 @@ struct EditorState {
 
     // Thickness applied to the next polyline drawn.
     float newPolylineThickness = 6.0f;
+
+    // Push strength applied to the next field region placed.
+    float newFieldStrength = logic::FieldRegion{}.strength;
 
     // Empty until the level has been saved or loaded from somewhere.
     std::filesystem::path path;

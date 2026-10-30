@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
+#include <variant>
 
 #include "editor/EditorUi.hpp"
 #include "editor/HitTest.hpp"
@@ -11,6 +13,7 @@
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "logic/LevelGeometry.hpp"
 #include "logic/LevelValidation.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
@@ -90,6 +93,9 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 return true;
             case SDLK_7:
                 m_state.tool = editor::Tool::Exit;
+                return true;
+            case SDLK_8:
+                m_state.tool = editor::Tool::FieldRegion;
                 return true;
 
             case SDLK_DELETE:
@@ -220,11 +226,19 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     break;
                 }
                 m_placement.active = false;
+                const glm::vec2 end = editor::snapPosition(m_cursorWorld, m_state.snap);
+
+                if (m_state.tool == editor::Tool::FieldRegion) {
+                    logic::FieldRegion region;
+                    if (editor::makeFieldRegionFromDrag(m_placement.start, end, m_state.newFieldStrength, region)) {
+                        m_state.beginMutation();
+                        m_state.level.fieldRegions.push_back(region);
+                    }
+                    return true;
+                }
 
                 logic::Wall wall;
-                if (editor::makeWallFromDrag(m_state.tool, m_placement.start,
-                                             editor::snapPosition(m_cursorWorld, m_state.snap), m_state.newWallColor,
-                                             wall)) {
+                if (editor::makeWallFromDrag(m_state.tool, m_placement.start, end, m_state.newWallColor, wall)) {
                     m_state.beginMutation();
                     m_state.level.walls.push_back(std::move(wall));
                 }
@@ -249,6 +263,21 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     if (m_activeHandle.kind == editor::HandleKind::Rotate) {
                         wall.rotation = editor::snapRotation(wall.rotation, m_state.snap);
                     }
+                    return true;
+                }
+                if (m_activeHandle.kind != editor::HandleKind::None && m_state.selection.isFieldRegion()) {
+                    // Drag a rectangle with the region's transform, then copy
+                    // the result back: the same grips and maths as a wall.
+                    logic::FieldRegion& region = m_state.level.fieldRegions[m_state.selection.index];
+                    logic::Wall frame = logic::fieldRegionFrame(region);
+                    const glm::vec2 target = m_activeHandle.kind == editor::HandleKind::ResizeCorner
+                                                 ? editor::snapPosition(m_cursorWorld, m_state.snap)
+                                                 : m_cursorWorld;
+                    editor::applyHandleDrag(frame, m_activeHandle, target, m_rotationGrabOffset);
+                    region.rotation = m_activeHandle.kind == editor::HandleKind::Rotate
+                                          ? editor::snapRotation(frame.rotation, m_state.snap)
+                                          : frame.rotation;
+                    region.halfExtents = std::get<logic::RectangleShape>(frame.shape).halfExtents;
                     return true;
                 }
                 if (m_markerDrag != 0 && m_state.selection.isMarker()) {
@@ -276,6 +305,11 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                         editor::snapPosition(m_cursorWorld - m_dragGrabOffset, m_state.snap);
                     return true;
                 }
+                if (m_draggingBody && m_state.selection.isFieldRegion()) {
+                    m_state.level.fieldRegions[m_state.selection.index].center =
+                        editor::snapPosition(m_cursorWorld - m_dragGrabOffset, m_state.snap);
+                    return true;
+                }
                 m_state.hovered = editor::pick(m_state.level, m_cursorWorld);
                 return false;
             }
@@ -296,6 +330,21 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                         if (handle.kind == editor::HandleKind::Rotate) {
                             const glm::vec2 d = m_cursorWorld - wall.center;
                             m_rotationGrabOffset = std::atan2(d.y, d.x) - wall.rotation;
+                        }
+                        return true;
+                    }
+                }
+
+                if (m_state.selection.isFieldRegion()) {
+                    const logic::Wall frame =
+                        logic::fieldRegionFrame(m_state.level.fieldRegions[m_state.selection.index]);
+                    const editor::Handle handle = editor::pickHandle(frame, m_cursorWorld, handlePickRadius());
+                    if (handle.kind != editor::HandleKind::None) {
+                        m_state.beginMutation();
+                        m_activeHandle = handle;
+                        if (handle.kind == editor::HandleKind::Rotate) {
+                            const glm::vec2 d = m_cursorWorld - frame.center;
+                            m_rotationGrabOffset = std::atan2(d.y, d.x) - frame.rotation;
                         }
                         return true;
                     }
@@ -329,6 +378,11 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     m_state.beginMutation();
                     m_draggingBody = true;
                     m_dragGrabOffset = m_cursorWorld - m_state.level.walls[m_state.selection.index].center;
+                }
+                if (m_state.selection.isFieldRegion()) {
+                    m_state.beginMutation();
+                    m_draggingBody = true;
+                    m_dragGrabOffset = m_cursorWorld - m_state.level.fieldRegions[m_state.selection.index].center;
                 }
                 if (m_state.selection.isMarker()) {
                     const logic::Marker& marker = m_state.level.markers[m_state.selection.index];
@@ -379,6 +433,9 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
         if (selection.isWall() && selection.index < m_state.level.walls.size()) {
             gfx::renderWall(m_state.level.walls[selection.index], batch, atlas, tint);
         }
+        if (selection.isFieldRegion() && selection.index < m_state.level.fieldRegions.size()) {
+            gfx::renderFieldRegion(m_state.level.fieldRegions[selection.index], batch, atlas, tint);
+        }
     };
 
     if (!(m_state.hovered == m_state.selection)) {
@@ -388,7 +445,15 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
 
     // A translucent preview of what the current drag would produce, so the
     // result is visible before the button is released.
-    if (m_placement.active) {
+    if (m_placement.active && m_state.tool == editor::Tool::FieldRegion) {
+        logic::FieldRegion preview;
+        if (editor::makeFieldRegionFromDrag(m_placement.start, m_placement.current, m_state.newFieldStrength,
+                                            preview)) {
+            glm::vec4 tint = gfx::fieldRegionColor();
+            tint.a = 0.35f;
+            gfx::renderFieldRegion(preview, batch, atlas, tint);
+        }
+    } else if (m_placement.active) {
         logic::Wall preview;
         if (editor::makeWallFromDrag(m_state.tool, m_placement.start, m_placement.current, m_state.newWallColor,
                                      preview)) {
@@ -420,10 +485,17 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
         }
     }
 
-    // The grips on the selected wall, drawn last so nothing covers them.
+    // The grips on the selected wall or field region, drawn last so nothing
+    // covers them.
+    std::optional<logic::Wall> gripped;
     if (m_state.selection.isWall() && m_state.selection.index < m_state.level.walls.size()) {
+        gripped = m_state.level.walls[m_state.selection.index];
+    } else if (m_state.selection.isFieldRegion() && m_state.selection.index < m_state.level.fieldRegions.size()) {
+        gripped = logic::fieldRegionFrame(m_state.level.fieldRegions[m_state.selection.index]);
+    }
+    if (gripped) {
         const float size = handleWorldSize();
-        for (const editor::Handle& handle : editor::wallHandles(m_state.level.walls[m_state.selection.index])) {
+        for (const editor::Handle& handle : editor::wallHandles(*gripped)) {
             const glm::vec4 uv = handle.kind == editor::HandleKind::Rotate ? gfx::cellDisc() : gfx::cellSolid();
             const glm::vec4 color = handle.kind == editor::HandleKind::Rotate ? glm::vec4{0.4f, 0.8f, 1.0f, 1.0f}
                                                                               : glm::vec4{1.0f, 0.9f, 0.3f, 1.0f};

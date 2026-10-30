@@ -25,8 +25,12 @@ struct alignas(16) GPUIntegrateUniforms {
     float radius;
     Uint32 exitCount;
     glm::vec4 exits[kMaxFlowMarkers]; // xy = centre, zw = half size
+    Uint32 fieldCount;
+    Uint32 fieldPadding[3];
+    // Two per region: (centre, half size), then (direction, strength, unused).
+    glm::vec4 fields[kMaxFieldRegions * 2];
 };
-static_assert(sizeof(GPUIntegrateUniforms) == 32 + 16 * kMaxFlowMarkers);
+static_assert(sizeof(GPUIntegrateUniforms) == 32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -59,6 +63,16 @@ Uint32 packAreas(const std::vector<MarkerArea>& areas, glm::vec4* out) {
     return count;
 }
 
+// Packs up to kMaxFieldRegions field regions, two vec4s each.
+Uint32 packFields(const std::vector<FieldArea>& fields, glm::vec4* out) {
+    const auto count = static_cast<Uint32>(std::min(fields.size(), kMaxFieldRegions));
+    for (Uint32 i = 0; i < count; ++i) {
+        out[i * 2] = glm::vec4(fields[i].center, fields[i].halfSize);
+        out[i * 2 + 1] = glm::vec4(fields[i].direction, fields[i].strength, 0.0f);
+    }
+    return count;
+}
+
 Uint32 groups(Uint32 threads) {
     return std::max<Uint32>(1, (threads + 255) / 256);
 }
@@ -80,6 +94,9 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     m_frame = 0;
     if (config.flow.spawns.size() > kMaxFlowMarkers || config.flow.exits.size() > kMaxFlowMarkers) {
         SDL_Log("GpuCollidePhysics: only the first %zu spawns and exits are used", kMaxFlowMarkers);
+    }
+    if (config.fieldRegions.size() > kMaxFieldRegions) {
+        SDL_Log("GpuCollidePhysics: only the first %zu field regions are used", kMaxFieldRegions);
     }
 
     // unit_integrate.comp: 2 rw buffers (units, previous positions), 1 uniform buffer
@@ -266,6 +283,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.fallbackGoal = m_config.movement.goal + glm::vec2(radius);
         uniforms.radius = radius;
         uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
+        uniforms.fieldCount = packFields(m_config.fieldRegions, uniforms.fields);
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding bindings[2]{};

@@ -12,9 +12,8 @@ unit of authoring, and what a level file contains exactly one of.
 _Avoid_: map, arena, stage
 
 **Background**:
-The coloured surface filling a level's bounds, beneath everything else. The
-only element of a level that units do not collide with, and the only one there
-is exactly one of.
+The coloured surface filling a level's bounds, beneath everything else. Units
+do not collide with it, and it is the only element there is exactly one of.
 _Avoid_: floor, backdrop, ground
 
 **Wall**:
@@ -40,6 +39,13 @@ _Avoid_: spawner, entrance, start point
 A marker on a level's edge which units leave the level through. Not a wall.
 Any exit is a valid destination for units from any spawn.
 _Avoid_: goal, end point, sink
+
+**Field region**:
+A box placed inside a level that units follow in one direction while inside
+it, in place of heading for an exit, so the horde is steered around walls
+rather than into them. Not a wall: units pass through it. Its rotation sets
+the direction of the flow.
+_Avoid_: flow field, vector field, zone, current
 
 **Marker**:
 A spawn or an exit. Markers lie flat against a level edge, may be stretched

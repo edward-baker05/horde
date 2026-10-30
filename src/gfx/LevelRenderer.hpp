@@ -19,11 +19,20 @@ glm::vec4 cellSolid();    // (1,1) solid fill
 // Converts a stored colour to the linear float vector the GPU wants, opaque.
 glm::vec4 toFloatColor(logic::Rgb color);
 
-// Queues a whole level: background, then walls in list order, then markers.
+// Queues a whole level: background, then field regions (if shown), then walls
+// in list order, then markers.
 //
 // Shared by the editor and by LevelScene so the two views of a level cannot
 // drift apart. Draw order is submission order — there is no depth test.
-void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas);
+void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas,
+                 bool showFieldRegions = true);
+
+// Queues one field region: a translucent box with an arrow along its push
+// direction. `color`'s alpha is the box's; the arrow is drawn more opaque.
+void renderFieldRegion(const logic::FieldRegion& region, SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec4 color);
+
+// The colour field regions are drawn in.
+glm::vec4 fieldRegionColor();
 
 // Queues one wall. Exposed separately so the editor can draw previews and
 // highlights with a modified colour without duplicating the per-kind logic.

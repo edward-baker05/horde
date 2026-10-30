@@ -75,16 +75,33 @@ struct Marker {
     float length = 100.0f;
 };
 
+// A box that redirects units passing through it, so a level can steer the
+// horde around walls instead of leaving it to collide with them. Not a wall:
+// units pass through it freely.
+//
+// The flow is along the region's local +x axis, so `rotation` sets its
+// direction (0 flows toward +x, east). While a unit's centre is inside, it
+// stops heading for the exit and turns to follow the flow at full speed;
+// `strength` is how quickly it turns, per second (like the movement steering
+// rate: higher snaps round sooner).
+struct FieldRegion {
+    glm::vec2 center{0.0f, 0.0f};
+    float rotation = 0.0f; // radians; positive is clockwise on screen
+    glm::vec2 halfExtents{50.0f, 50.0f};
+    float strength = 3.0f;
+};
+
 // A rectangular arena and everything placed in it.
 //
-// Bounds run from (0,0) to `size`. The background exactly fills those bounds
-// and is the only element units do not collide with.
+// Bounds run from (0,0) to `size`. The background exactly fills those bounds;
+// it and field regions are the elements units do not collide with.
 struct Level {
     glm::vec2 size{2000.0f, 2000.0f};
     // glm::vec2 size{20.0f, 40.0f};
     Rgb backgroundColor{38, 42, 50};
     std::vector<Wall> walls;     // a later index draws on top of an earlier one
     std::vector<Marker> markers; // always at least one spawn and one exit
+    std::vector<FieldRegion> fieldRegions;
 };
 
 // Length of one edge of a level, in world units.

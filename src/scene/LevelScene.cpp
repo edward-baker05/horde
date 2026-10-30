@@ -14,6 +14,7 @@
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "logic/LevelGeometry.hpp"
 #include "logic/LevelIO.hpp"
 #include "scene/Presets.hpp"
 #include "scene/SceneStack.hpp"
@@ -73,6 +74,10 @@ bool LevelScene::onEnter(Services& services) {
         logic::markerRect(m_level, marker, center, size);
         auto& areas = marker.kind == logic::MarkerKind::Spawn ? config.flow.spawns : config.flow.exits;
         areas.push_back({center, size * 0.5f});
+    }
+    for (const logic::FieldRegion& region : m_level.fieldRegions) {
+        config.fieldRegions.push_back(
+            {region.center, region.halfExtents, logic::fieldRegionDirection(region), region.strength});
     }
     config.flow.spawnRate = m_options.spawnRate;
     config.flow.respawnAtExit = m_options.respawnAtExit;
@@ -143,7 +148,7 @@ void LevelScene::compute(SDL_GPUCommandBuffer* commands) {
 
 void LevelScene::render(gfx::SpriteBatch& batch) {
     // Render world geometry through SpriteBatch
-    gfx::renderLevel(m_level, batch, m_services->atlas->handle());
+    gfx::renderLevel(m_level, batch, m_services->atlas->handle(), m_showFieldRegions);
 }
 
 void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) {
@@ -166,6 +171,13 @@ void LevelScene::debugUi() {
     ImGui::TextWrapped("%s", sim::physicsDescription(m_options.physics));
     m_physics->debugUi();
     healthUi();
+
+    // Drawing only: hidden regions still push units.
+    if (!m_level.fieldRegions.empty()) {
+        ImGui::Checkbox("Show field regions", &m_showFieldRegions);
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%zu)", m_level.fieldRegions.size());
+    }
 
     // Applies immediately: stepping is the scene's, not the physics system's.
     int rate = m_options.physicsRate >= 120.0f ? 1 : 0;

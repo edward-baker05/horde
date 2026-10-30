@@ -295,6 +295,34 @@ std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* e
         }
     }
 
+    // Optional: levels saved before field regions existed have none.
+    if (root.contains("fieldRegions")) {
+        if (!root["fieldRegions"].is_array()) {
+            if (error) {
+                *error = "'fieldRegions' is not an array";
+            }
+            return std::nullopt;
+        }
+        for (const json& node : root["fieldRegions"]) {
+            FieldRegion region;
+            float degrees = 0.0f;
+            glm::vec2 size{};
+            if (!readVec2(node, "center", region.center, error) || !readFloat(node, "rotation", degrees, error) ||
+                !readVec2(node, "size", size, error) || !readFloat(node, "strength", region.strength, error)) {
+                return std::nullopt;
+            }
+            if (size.x <= 0.0f || size.y <= 0.0f) {
+                if (error) {
+                    *error = "field region has zero or negative size";
+                }
+                return std::nullopt;
+            }
+            region.rotation = glm::radians(degrees);
+            region.halfExtents = size * 0.5f;
+            level.fieldRegions.push_back(region);
+        }
+    }
+
     // A level on disk with no markers predates nothing and means a hand-edited
     // file lost them. Restore the minimum rather than refusing to load.
     if (countMarkers(level, MarkerKind::Spawn) == 0) {
@@ -329,6 +357,17 @@ bool saveLevel(const Level& level, const std::filesystem::path& path, std::strin
         markers.push_back(std::move(node));
     }
     root["markers"] = std::move(markers);
+
+    json regions = json::array();
+    for (const FieldRegion& region : level.fieldRegions) {
+        json node;
+        node["center"] = writeVec2(region.center);
+        node["rotation"] = glm::degrees(region.rotation);
+        node["size"] = writeVec2(region.halfExtents * 2.0f);
+        node["strength"] = region.strength;
+        regions.push_back(std::move(node));
+    }
+    root["fieldRegions"] = std::move(regions);
 
     std::error_code code;
     std::filesystem::create_directories(path.parent_path(), code);

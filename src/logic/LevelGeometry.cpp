@@ -76,4 +76,16 @@ glm::vec2 localToWorld(const Wall& wall, glm::vec2 local) {
     return wall.center + glm::vec2{local.x * c - local.y * s, local.x * s + local.y * c};
 }
 
+Wall fieldRegionFrame(const FieldRegion& region) {
+    Wall frame;
+    frame.center = region.center;
+    frame.rotation = region.rotation;
+    frame.shape = RectangleShape{region.halfExtents};
+    return frame;
+}
+
+glm::vec2 fieldRegionDirection(const FieldRegion& region) {
+    return {std::cos(region.rotation), std::sin(region.rotation)};
+}
+
 } // namespace horde::logic

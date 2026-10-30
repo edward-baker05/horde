@@ -293,6 +293,18 @@ Streaming, exit steering and respawning are `gpu-collide`'s. Other systems get
 every unit placed at the spawns up front and head for the first exit's centre.
 Up to 8 spawns and 8 exits are used.
 
+### Field regions
+
+A field region is a translucent blue box with an arrow, placed in the editor
+with tool 8 (*Field region*). While a unit's centre is inside one, it stops
+heading for the exit and turns to follow the arrow at full speed, until it
+leaves; *strength* is how quickly it turns, per second (the normal steering
+rate is 4). So a few regions in front of a wall steer the horde around it
+instead of into it. Rotate the box to aim the arrow (0 points east). Units
+pass through regions; overlapping ones add up as direction x strength. Only
+`gpu-collide` applies them, up to 32 per level. The level's debug panel has
+*Show field regions* to hide them while playing; hidden regions still apply.
+
 ### Physics rate
 
 Physics steps at a fixed rate, independent of the frame rate: 60 Hz by

@@ -99,6 +99,20 @@ struct HealthSettings {
 // beyond are ignored, with a warning.
 inline constexpr std::size_t kMaxFlowMarkers = 8;
 
+// A level's field region, ready for simulation: a rotated box inside which a
+// unit follows `direction` instead of heading for the exit, turning toward it
+// at `strength` per second. Overlapping regions add as direction x strength.
+struct FieldArea {
+    glm::vec2 center{0.0f, 0.0f};
+    glm::vec2 halfSize{0.0f, 0.0f};
+    glm::vec2 direction{1.0f, 0.0f}; // unit length; also the box's local +x axis
+    float strength = 0.0f;
+};
+
+// GPU shaders hold at most this many field regions; any beyond are ignored,
+// with a warning.
+inline constexpr std::size_t kMaxFieldRegions = 32;
+
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
     glm::vec2 worldSize{2000.0f, 2000.0f};
@@ -107,6 +121,8 @@ struct SimConfig {
     MovementSettings movement;
     // The level's walls, flattened and binned. Null or empty: no walls.
     std::shared_ptr<const WallColliders> walls;
+    // Flows that steer units around walls. Only GPU systems apply them.
+    std::vector<FieldArea> fieldRegions;
     FlowSettings flow;
     HealthSettings health;
     // Starting position and velocity of every unit. Its length is the unit

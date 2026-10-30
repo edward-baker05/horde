@@ -109,6 +109,7 @@ private:
     logic::Level m_level;
 
     float enemy_size = 5.0f;
+    bool m_showFieldRegions = true;
 
     // Fixed-rate stepping: time not yet simulated, and the steps this frame owes compute().
     float m_stepAccumulator = 0.0f;

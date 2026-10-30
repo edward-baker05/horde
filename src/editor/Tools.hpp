@@ -23,7 +23,7 @@ struct Placement {
 };
 
 // True for the tools whose placement gesture sweeps a bounding box: rectangle,
-// triangle and circle. Polyline and the two marker tools do not.
+// triangle, circle and field region. Polyline and the two marker tools do not.
 bool isBoxTool(Tool tool);
 
 const char* toolName(Tool tool);
@@ -34,6 +34,10 @@ const char* toolName(Tool tool);
 // A circle takes its radius from half the SMALLER of the box's two extents, so
 // that it always fits inside the box the user swept.
 bool makeWallFromDrag(Tool tool, glm::vec2 start, glm::vec2 end, logic::Rgb color, logic::Wall& out);
+
+// Builds an unrotated field region filling a swept box, pushing toward +x.
+// Returns false if the drag was too small to be a deliberate placement.
+bool makeFieldRegionFromDrag(glm::vec2 start, glm::vec2 end, float strength, logic::FieldRegion& out);
 
 // A polyline being drawn. Points are in WORLD space while drafting; they are
 // converted to the wall's local space when the draft is committed.

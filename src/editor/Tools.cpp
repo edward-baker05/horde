@@ -7,7 +7,7 @@
 namespace horde::editor {
 
 bool isBoxTool(Tool tool) {
-    return tool == Tool::Rectangle || tool == Tool::Triangle || tool == Tool::Circle;
+    return tool == Tool::Rectangle || tool == Tool::Triangle || tool == Tool::Circle || tool == Tool::FieldRegion;
 }
 
 const char* toolName(Tool tool) {
@@ -26,6 +26,8 @@ const char* toolName(Tool tool) {
             return "Spawn";
         case Tool::Exit:
             return "Exit";
+        case Tool::FieldRegion:
+            return "Field region";
     }
     return "Select";
 }
@@ -59,6 +61,19 @@ bool makeWallFromDrag(Tool tool, glm::vec2 start, glm::vec2 end, logic::Rgb colo
             return false;
     }
 
+    return true;
+}
+
+bool makeFieldRegionFromDrag(glm::vec2 start, glm::vec2 end, float strength, logic::FieldRegion& out) {
+    const glm::vec2 extent{std::abs(end.x - start.x), std::abs(end.y - start.y)};
+    if (extent.x < kMinimumDragExtent || extent.y < kMinimumDragExtent) {
+        return false;
+    }
+
+    out = logic::FieldRegion{};
+    out.center = (start + end) * 0.5f;
+    out.halfExtents = extent * 0.5f;
+    out.strength = strength;
     return true;
 }
 

@@ -4,7 +4,10 @@
 // really moved.
 //
 // Each unit heads for the closest point of the closest exit band, so a crowd
-// spreads along an exit instead of converging on one point of it.
+// spreads along an exit instead of converging on one point of it. A unit whose
+// centre is inside a field region follows the region's direction instead,
+// turning into it at the region's strength, until it leaves: that is how a
+// level steers the horde around a wall.
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -20,6 +23,7 @@ RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float2> PrevPos : register(u1, space1);
 
 #define MAX_MARKERS 8
+#define MAX_FIELDS 32
 
 // Matches GPUIntegrateUniforms in sim/GpuCollidePhysics.cpp
 cbuffer IntegrateParams : register(b0, space2) {
@@ -31,7 +35,29 @@ cbuffer IntegrateParams : register(b0, space2) {
     float Radius;
     uint ExitCount;
     float4 Exits[MAX_MARKERS]; // xy = centre, zw = half size
+    uint FieldCount;
+    uint3 FieldPadding;
+    // Two per region: [2i] xy = centre, zw = half size; [2i+1] xy = flow
+    // direction (the box's local +x axis), z = turn rate per second.
+    float4 Fields[MAX_FIELDS * 2];
 };
+
+// Every field region containing `centre`, summed as direction x turn rate.
+// Zero outside all of them.
+float2 fieldFlow(float2 centre) {
+    float2 flow = float2(0.0f, 0.0f);
+    for (uint i = 0; i < FieldCount; ++i) {
+        float4 box = Fields[i * 2];
+        float4 field = Fields[i * 2 + 1];
+        float2 d = centre - box.xy;
+        // Into the box's frame: x along the push direction, y across it.
+        float2 local = float2(dot(d, field.xy), dot(d, float2(-field.y, field.x)));
+        if (all(abs(local) <= box.zw)) {
+            flow += field.xy * field.z;
+        }
+    }
+    return flow;
+}
 
 // The point units steer toward: the nearest point of the nearest exit.
 float2 goalFor(float2 centre) {
@@ -63,11 +89,24 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     PrevPos[index] = unit.pos;
 
     float2 centre = unit.pos + Radius;
-    float2 toGoal = goalFor(centre) - centre;
-    float distance = length(toGoal);
-    float2 desired = distance > 0.001f ? toGoal / distance * MaxSpeed : float2(0.0f, 0.0f);
+    float2 desired;
+    float turnRate;
 
-    unit.vel += (desired - unit.vel) * saturate(Steering * Dt);
+    // A field region outranks the exit: inside one, a unit turns to follow
+    // its arrow at full speed rather than cutting diagonally toward the exit.
+    float2 flow = fieldFlow(centre);
+    float flowRate = length(flow);
+    if (flowRate > 0.0001f) {
+        desired = flow / flowRate * MaxSpeed;
+        turnRate = flowRate;
+    } else {
+        float2 toGoal = goalFor(centre) - centre;
+        float distance = length(toGoal);
+        desired = distance > 0.001f ? toGoal / distance * MaxSpeed : float2(0.0f, 0.0f);
+        turnRate = Steering;
+    }
+
+    unit.vel += (desired - unit.vel) * saturate(turnRate * Dt);
     unit.pos += unit.vel * Dt;
 
     Units[index] = unit;
