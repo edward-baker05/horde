@@ -193,6 +193,13 @@ public:
         return nullptr;
     }
 
+    // Changes the collision passes per step while running, without a restart.
+    // Returns false for systems that can't.
+    virtual bool setCollisionPasses(std::uint32_t passes) {
+        (void)passes;
+        return false;
+    }
+
     // Whether the system honours SimConfig::flow: streaming units in at the
     // spawns, steering them to the exits and respawning them there. Systems
     // that don't get every unit up front instead.

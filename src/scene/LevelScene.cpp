@@ -171,12 +171,39 @@ void LevelScene::debugUi() {
     int rate = m_options.physicsRate >= 120.0f ? 1 : 0;
     ImGui::TextUnformatted("Physics rate");
     ImGui::SameLine();
-    if (ImGui::RadioButton("60 Hz", &rate, 0) || ImGui::RadioButton("120 Hz", &rate, 1)) {
+    const bool to60 = ImGui::RadioButton("60 Hz", &rate, 0);
+    ImGui::SameLine();
+    const bool to120 = ImGui::RadioButton("120 Hz", &rate, 1);
+    if (to60 || to120) {
         m_options.physicsRate = rate == 1 ? 120.0f : 60.0f;
         m_pendingOptions.physicsRate = m_options.physicsRate;
     }
     ImGui::SameLine();
     ImGui::TextDisabled("%.2f steps/frame", m_stepsPerFrame);
+
+    // Same collision passes per second two ways: more, smaller steps or fewer
+    // steps with more passes each. Both apply live, for side-by-side looks.
+    if (const sim::CollisionSettings* collision = m_physics->collisionSettings()) {
+        const float rateHz = m_options.physicsRate;
+        if (rateHz > 0.0f) {
+            ImGui::Text("%u passes x %.0f Hz = %.0f passes/s", collision->iterations, rateHz,
+                        static_cast<float>(collision->iterations) * rateHz);
+        } else {
+            ImGui::Text("%u passes, one step per frame", collision->iterations);
+        }
+
+        const bool fast = rateHz >= 120.0f && collision->iterations == 16;
+        if (ImGui::Button(fast ? "Swap to 60 Hz x 32 passes" : "Swap to 120 Hz x 16 passes")) {
+            const float newRate = fast ? 60.0f : 120.0f;
+            const std::uint32_t newPasses = fast ? 32 : 16;
+            if (m_physics->setCollisionPasses(newPasses)) {
+                m_options.physicsRate = newRate;
+                m_options.collision.iterations = newPasses;
+                m_pendingOptions.physicsRate = newRate;
+                m_pendingOptions.collision.iterations = newPasses;
+            }
+        }
+    }
 
     ImGui::SeparatorText("Restart with");
 
@@ -269,7 +296,7 @@ void LevelScene::debugUi() {
     }
 
     int iterations = static_cast<int>(m_pendingOptions.collision.iterations);
-    if (ImGui::SliderInt("Collision passes", &iterations, 0, 16)) {
+    if (ImGui::SliderInt("Collision passes", &iterations, 0, 32)) {
         m_pendingOptions.collision.iterations = static_cast<std::uint32_t>(iterations);
     }
     if (m_pendingOptions.collision.solver == sim::CollisionSolver::Relaxed) {

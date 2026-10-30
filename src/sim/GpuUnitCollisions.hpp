@@ -45,6 +45,11 @@ public:
         return m_settings;
     }
 
+    // Takes effect from the next resolve(): passes are just a loop count.
+    void setIterations(std::uint32_t iterations) {
+        m_settings.iterations = iterations;
+    }
+
 private:
     SDL_GPUDevice* m_device = nullptr;
     SDL_GPUComputePipeline* m_pipeline = nullptr;

@@ -53,6 +53,12 @@ public:
         return true;
     }
 
+    bool setCollisionPasses(std::uint32_t passes) override {
+        m_config.collision.iterations = passes;
+        m_collisions.setIterations(passes);
+        return true;
+    }
+
     // Units in the level so far: grows while spawns stream in, up to capacity.
     std::uint32_t unitCount() const override {
         return m_unitCount;
