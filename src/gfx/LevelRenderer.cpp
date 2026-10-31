@@ -62,6 +62,13 @@ void renderWall(const logic::Wall& wall, SpriteBatch& batch, SDL_GPUTexture* atl
         drawCentered(batch, atlas, (a + b) * 0.5f, {length, line.thickness}, std::atan2(delta.y, delta.x), cellSolid(),
                      color);
     }
+
+    // A disc at each bend fills the notch the two quads leave on its outside.
+    // The ends stay square. WallColliders collides with the same shape.
+    for (std::size_t i = 1; i + 1 < line.points.size(); ++i) {
+        drawCentered(batch, atlas, logic::localToWorld(wall, line.points[i]), {line.thickness, line.thickness}, 0.0f,
+                     cellDisc(), color);
+    }
 }
 
 glm::vec4 fieldRegionColor() {

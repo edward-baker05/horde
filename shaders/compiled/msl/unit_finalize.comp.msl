@@ -24,6 +24,11 @@ struct type_RWStructuredBuffer_float
     float _m0[1];
 };
 
+struct type_RWStructuredBuffer_v2float
+{
+    float2 _m0[1];
+};
+
 struct type_FinalizeParams
 {
     float2 WorldMin;
@@ -69,9 +74,10 @@ struct type_StructuredBuffer_uint
     uint _m0[1];
 };
 
-constant bool _97 = {};
+constant float2 _101 = {};
+constant bool _102 = {};
 
-kernel void main0(constant type_FinalizeParams& FinalizeParams [[buffer(0)]], device type_StructuredBuffer_v2float& PrevPos [[buffer(1)]], device type_StructuredBuffer_WallPrimitive& WallPrims [[buffer(2)]], device type_StructuredBuffer_v2uint& WallBins [[buffer(3)]], device type_StructuredBuffer_uint& WallBinIndices [[buffer(4)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(5)]], device type_RWStructuredBuffer_float& Health [[buffer(6)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+kernel void main0(constant type_FinalizeParams& FinalizeParams [[buffer(0)]], device type_StructuredBuffer_v2float& PrevPos [[buffer(1)]], device type_StructuredBuffer_WallPrimitive& WallPrims [[buffer(2)]], device type_StructuredBuffer_v2uint& WallBins [[buffer(3)]], device type_StructuredBuffer_uint& WallBinIndices [[buffer(4)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(5)]], device type_RWStructuredBuffer_float& Health [[buffer(6)]], device type_RWStructuredBuffer_v2float& Fling [[buffer(7)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
 {
     do
     {
@@ -79,318 +85,609 @@ kernel void main0(constant type_FinalizeParams& FinalizeParams [[buffer(0)]], de
         {
             break;
         }
-        float2 _116 = float2(FinalizeParams.Radius);
-        float2 _117 = Units._m0[gl_GlobalInvocationID.x].pos + _116;
-        float2 _397;
+        uint _132;
+        float2 _124 = float2(FinalizeParams.Radius);
+        float2 _125 = PrevPos._m0[gl_GlobalInvocationID.x] + _124;
+        float2 _126 = Units._m0[gl_GlobalInvocationID.x].pos + _124;
+        float2 _535;
         do
         {
-            if (FinalizeParams.WallCount == 0u)
+            float2 _129 = _126 - _125;
+            float _130 = length(_129);
+            _132 = FinalizeParams.WallCount;
+            bool _137;
+            if (_132 != 0u)
             {
-                _397 = _117;
+                _137 = _130 <= FinalizeParams.Radius;
+            }
+            else
+            {
+                _137 = true;
+            }
+            if (_137)
+            {
+                _535 = _126;
                 break;
             }
-            int2 _135 = clamp(int2(floor(_117 / float2(FinalizeParams.WallBinSize))), int2(0), int2(FinalizeParams.WallBinDim) - int2(1));
-            uint _143 = uint(_135.x) + (uint(_135.y) * FinalizeParams.WallBinDim.x);
-            float2 _147;
-            _147 = _117;
-            float2 _148;
-            for (uint _150 = 0u; _150 < WallBins._m0[_143].y; _147 = _148, _150++)
+            bool _149;
+            uint _143 = min(uint(ceil(_130 / FinalizeParams.Radius)), 64u);
+            float2 _146 = _129 / float2(float(_143));
+            float _328;
+            do
             {
-                uint _157 = WallBins._m0[_143].x + _150;
-                float2 _389;
-                float _390;
-                do
+                _149 = _132 == 0u;
+                if (_149)
                 {
-                    if (WallPrims._m0[WallBinIndices._m0[_157]].kind == 0u)
+                    _328 = 3.3999999521443642490773241379936e+38;
+                    break;
+                }
+                int2 _162 = clamp(int2(floor(_125 / float2(FinalizeParams.WallBinSize))), int2(0), int2(FinalizeParams.WallBinDim) - int2(1));
+                uint _170 = uint(_162.x) + (uint(_162.y) * FinalizeParams.WallBinDim.x);
+                float _174;
+                _174 = 3.3999999521443642490773241379936e+38;
+                float _175;
+                for (uint _177 = 0u; _177 < WallBins._m0[_170].y; _174 = _175, _177++)
+                {
+                    uint _184 = WallBins._m0[_170].x + _177;
+                    float _327;
+                    do
                     {
-                        float2 _178 = float2(-WallPrims._m0[WallBinIndices._m0[_157]].p1.y, WallPrims._m0[WallBinIndices._m0[_157]].p1.x);
-                        float2 _179 = _147 - WallPrims._m0[WallBinIndices._m0[_157]].p0;
-                        float _180 = dot(_179, WallPrims._m0[WallBinIndices._m0[_157]].p1);
-                        float _181 = dot(_179, _178);
-                        float2 _184 = abs(float2(_180, _181)) - WallPrims._m0[WallBinIndices._m0[_157]].p2;
-                        float _185 = _184.x;
-                        bool _191;
-                        if ((isunordered(_185, 0.0) || _185 <= 0.0))
+                        if (WallPrims._m0[WallBinIndices._m0[_184]].kind == 0u)
                         {
-                            _191 = _184.y > 0.0;
-                        }
-                        else
-                        {
-                            _191 = true;
-                        }
-                        float2 _219;
-                        float _220;
-                        if (_191)
-                        {
-                            float2 _195 = precise::max(_184, float2(0.0));
-                            float _196 = length(_195);
-                            _219 = (_195 * float2((_180 < 0.0) ? (-1.0) : 1.0, (_181 < 0.0) ? (-1.0) : 1.0)) / float2(precise::max(_196, 9.9999999747524270787835121154785e-07));
-                            _220 = _196;
-                        }
-                        else
-                        {
-                            float _206 = _184.y;
-                            float2 _218;
-                            if (_185 > _206)
+                            float2 _206 = _125 - WallPrims._m0[WallBinIndices._m0[_184]].p0;
+                            float2 _211 = abs(float2(dot(_206, WallPrims._m0[WallBinIndices._m0[_184]].p1), dot(_206, float2(-WallPrims._m0[WallBinIndices._m0[_184]].p1.y, WallPrims._m0[WallBinIndices._m0[_184]].p1.x)))) - WallPrims._m0[WallBinIndices._m0[_184]].p2;
+                            float _212 = _211.x;
+                            bool _218;
+                            if ((isunordered(_212, 0.0) || _212 <= 0.0))
                             {
-                                _218 = float2((_180 < 0.0) ? (-1.0) : 1.0, 0.0);
+                                _218 = _211.y > 0.0;
                             }
                             else
                             {
-                                _218 = float2(0.0, (_181 < 0.0) ? (-1.0) : 1.0);
+                                _218 = true;
                             }
-                            _219 = _218;
-                            _220 = precise::max(_185, _206);
+                            float _226;
+                            if (_218)
+                            {
+                                _226 = length(precise::max(_211, float2(0.0)));
+                            }
+                            else
+                            {
+                                _226 = precise::max(_212, _211.y);
+                            }
+                            _327 = _226;
+                            break;
                         }
-                        _389 = (WallPrims._m0[WallBinIndices._m0[_157]].p1 * _219.x) + (_178 * _219.y);
-                        _390 = _220;
+                        if (WallPrims._m0[WallBinIndices._m0[_184]].kind == 1u)
+                        {
+                            _327 = length(_125 - WallPrims._m0[WallBinIndices._m0[_184]].p0) - WallPrims._m0[WallBinIndices._m0[_184]].radius;
+                            break;
+                        }
+                        float2 _233 = WallPrims._m0[WallBinIndices._m0[_184]].p1 - WallPrims._m0[WallBinIndices._m0[_184]].p0;
+                        float _234 = dot(_233, _233);
+                        float _243;
+                        if (_234 > 9.9999999747524270787835121154785e-07)
+                        {
+                            _243 = fast::clamp(dot(_125 - WallPrims._m0[WallBinIndices._m0[_184]].p0, _233) / _234, 0.0, 1.0);
+                        }
+                        else
+                        {
+                            _243 = 0.0;
+                        }
+                        float2 _246 = _125 - (WallPrims._m0[WallBinIndices._m0[_184]].p0 + (_233 * _243));
+                        float _247 = dot(_246, _246);
+                        float _249 = (_247 < 3.3999999521443642490773241379936e+38) ? _247 : 3.3999999521443642490773241379936e+38;
+                        float2 _250 = _125 - WallPrims._m0[WallBinIndices._m0[_184]].p0;
+                        float2 _260 = WallPrims._m0[WallBinIndices._m0[_184]].p2 - WallPrims._m0[WallBinIndices._m0[_184]].p1;
+                        float _261 = dot(_260, _260);
+                        float _270;
+                        if (_261 > 9.9999999747524270787835121154785e-07)
+                        {
+                            _270 = fast::clamp(dot(_125 - WallPrims._m0[WallBinIndices._m0[_184]].p1, _260) / _261, 0.0, 1.0);
+                        }
+                        else
+                        {
+                            _270 = 0.0;
+                        }
+                        float2 _273 = _125 - (WallPrims._m0[WallBinIndices._m0[_184]].p1 + (_260 * _270));
+                        float _274 = dot(_273, _273);
+                        float _276 = (_274 < _249) ? _274 : _249;
+                        float2 _277 = _125 - WallPrims._m0[WallBinIndices._m0[_184]].p1;
+                        float2 _288 = WallPrims._m0[WallBinIndices._m0[_184]].p0 - WallPrims._m0[WallBinIndices._m0[_184]].p2;
+                        float _289 = dot(_288, _288);
+                        float _298;
+                        if (_289 > 9.9999999747524270787835121154785e-07)
+                        {
+                            _298 = fast::clamp(dot(_125 - WallPrims._m0[WallBinIndices._m0[_184]].p2, _288) / _289, 0.0, 1.0);
+                        }
+                        else
+                        {
+                            _298 = 0.0;
+                        }
+                        float2 _301 = _125 - (WallPrims._m0[WallBinIndices._m0[_184]].p2 + (_288 * _298));
+                        float _302 = dot(_301, _301);
+                        float2 _305 = _125 - WallPrims._m0[WallBinIndices._m0[_184]].p2;
+                        int _315 = (((((_233.x * _250.y) - (_233.y * _250.x)) >= 0.0) ? 1 : (-1)) + ((((_260.x * _277.y) - (_260.y * _277.x)) >= 0.0) ? 1 : (-1))) + ((((_288.x * _305.y) - (_288.y * _305.x)) >= 0.0) ? 1 : (-1));
+                        bool _320;
+                        if (_315 != 3)
+                        {
+                            _320 = _315 == (-3);
+                        }
+                        else
+                        {
+                            _320 = true;
+                        }
+                        float _321 = sqrt((_302 < _276) ? _302 : _276);
+                        float _326;
+                        if (_320)
+                        {
+                            _326 = -_321;
+                        }
+                        else
+                        {
+                            _326 = _321;
+                        }
+                        _327 = _326;
                         break;
-                    }
-                    if (WallPrims._m0[WallBinIndices._m0[_157]].kind == 1u)
-                    {
-                        float2 _229 = _147 - WallPrims._m0[WallBinIndices._m0[_157]].p0;
-                        float _230 = length(_229);
-                        float2 _237;
-                        if (_230 > 9.9999999747524270787835121154785e-07)
-                        {
-                            _237 = _229 / float2(_230);
-                        }
-                        else
-                        {
-                            _237 = float2(0.0, -1.0);
-                        }
-                        _389 = _237;
-                        _390 = _230 - WallPrims._m0[WallBinIndices._m0[_157]].radius;
-                        break;
-                    }
-                    if (WallPrims._m0[WallBinIndices._m0[_157]].kind == 2u)
-                    {
-                        float2 _242 = WallPrims._m0[WallBinIndices._m0[_157]].p1 - WallPrims._m0[WallBinIndices._m0[_157]].p0;
-                        float _243 = dot(_242, _242);
-                        float _252;
-                        if (_243 > 9.9999999747524270787835121154785e-07)
-                        {
-                            _252 = fast::clamp(dot(_147 - WallPrims._m0[WallBinIndices._m0[_157]].p0, _242) / _243, 0.0, 1.0);
-                        }
-                        else
-                        {
-                            _252 = 0.0;
-                        }
-                        float2 _255 = _147 - (WallPrims._m0[WallBinIndices._m0[_157]].p0 + (_242 * _252));
-                        float _256 = length(_255);
-                        float2 _267;
-                        if (length(_242) > 9.9999999747524270787835121154785e-07)
-                        {
-                            _267 = fast::normalize(float2(-_242.y, _242.x));
-                        }
-                        else
-                        {
-                            _267 = float2(0.0, -1.0);
-                        }
-                        float2 _274;
-                        if (_256 > 9.9999999747524270787835121154785e-07)
-                        {
-                            _274 = _255 / float2(_256);
-                        }
-                        else
-                        {
-                            _274 = _267;
-                        }
-                        _389 = _274;
-                        _390 = _256 - WallPrims._m0[WallBinIndices._m0[_157]].radius;
-                        break;
-                    }
-                    float2 _276 = WallPrims._m0[WallBinIndices._m0[_157]].p1 - WallPrims._m0[WallBinIndices._m0[_157]].p0;
-                    float _277 = dot(_276, _276);
-                    float _286;
-                    if (_277 > 9.9999999747524270787835121154785e-07)
-                    {
-                        _286 = fast::clamp(dot(_147 - WallPrims._m0[WallBinIndices._m0[_157]].p0, _276) / _277, 0.0, 1.0);
-                    }
-                    else
-                    {
-                        _286 = 0.0;
-                    }
-                    float2 _288 = WallPrims._m0[WallBinIndices._m0[_157]].p0 + (_276 * _286);
-                    float2 _289 = _147 - _288;
-                    float _290 = dot(_289, _289);
-                    bool _291 = _290 < 3.3999999521443642490773241379936e+38;
-                    float _294 = _291 ? _290 : 3.3999999521443642490773241379936e+38;
-                    float2 _295 = _147 - WallPrims._m0[WallBinIndices._m0[_157]].p0;
-                    float2 _305 = WallPrims._m0[WallBinIndices._m0[_157]].p2 - WallPrims._m0[WallBinIndices._m0[_157]].p1;
-                    float _306 = dot(_305, _305);
-                    float _315;
-                    if (_306 > 9.9999999747524270787835121154785e-07)
-                    {
-                        _315 = fast::clamp(dot(_147 - WallPrims._m0[WallBinIndices._m0[_157]].p1, _305) / _306, 0.0, 1.0);
-                    }
-                    else
-                    {
-                        _315 = 0.0;
-                    }
-                    float2 _317 = WallPrims._m0[WallBinIndices._m0[_157]].p1 + (_305 * _315);
-                    float2 _318 = _147 - _317;
-                    float _319 = dot(_318, _318);
-                    bool _320 = _319 < _294;
-                    float _323 = _320 ? _319 : _294;
-                    float2 _324 = _147 - WallPrims._m0[WallBinIndices._m0[_157]].p1;
-                    float2 _335 = WallPrims._m0[WallBinIndices._m0[_157]].p0 - WallPrims._m0[WallBinIndices._m0[_157]].p2;
-                    float _336 = dot(_335, _335);
-                    float _345;
-                    if (_336 > 9.9999999747524270787835121154785e-07)
-                    {
-                        _345 = fast::clamp(dot(_147 - WallPrims._m0[WallBinIndices._m0[_157]].p2, _335) / _336, 0.0, 1.0);
-                    }
-                    else
-                    {
-                        _345 = 0.0;
-                    }
-                    float2 _347 = WallPrims._m0[WallBinIndices._m0[_157]].p2 + (_335 * _345);
-                    float2 _348 = _147 - _347;
-                    float _349 = dot(_348, _348);
-                    bool _350 = _349 < _323;
-                    float2 _352 = select(select(select(WallPrims._m0[WallBinIndices._m0[_157]].p0, _288, bool2(_291)), _317, bool2(_320)), _347, bool2(_350));
-                    float2 _354 = _147 - WallPrims._m0[WallBinIndices._m0[_157]].p2;
-                    int _364 = (((((_276.x * _295.y) - (_276.y * _295.x)) >= 0.0) ? 1 : (-1)) + ((((_305.x * _324.y) - (_305.y * _324.x)) >= 0.0) ? 1 : (-1))) + ((((_335.x * _354.y) - (_335.y * _354.x)) >= 0.0) ? 1 : (-1));
-                    bool _369;
-                    if (_364 != 3)
-                    {
-                        _369 = _364 == (-3);
-                    }
-                    else
-                    {
-                        _369 = true;
-                    }
-                    float _370 = sqrt(_350 ? _349 : _323);
-                    float2 _383;
-                    if (_370 > 9.9999999747524270787835121154785e-07)
-                    {
-                        float2 _380;
-                        if (_369)
-                        {
-                            _380 = _352 - _147;
-                        }
-                        else
-                        {
-                            _380 = _147 - _352;
-                        }
-                        _383 = _380 / float2(_370);
-                    }
-                    else
-                    {
-                        _383 = float2(0.0, -1.0);
-                    }
-                    float _388;
-                    if (_369)
-                    {
-                        _388 = -_370;
-                    }
-                    else
-                    {
-                        _388 = _370;
-                    }
-                    _389 = _383;
-                    _390 = _388;
-                    break;
-                } while(false);
-                if (_390 < FinalizeParams.Radius)
+                    } while(false);
+                    _175 = precise::min(_174, _327);
+                }
+                _328 = _174;
+                break;
+            } while(false);
+            float2 _532;
+            bool _533;
+            uint _330 = 1u;
+            for (;;)
+            {
+                if (_330 <= _143)
                 {
-                    _148 = _147 + (_389 * (FinalizeParams.Radius - _390));
+                    float2 _338 = _125 + (_146 * float(_330));
+                    float _519;
+                    do
+                    {
+                        if (_149)
+                        {
+                            _519 = 3.3999999521443642490773241379936e+38;
+                            break;
+                        }
+                        int2 _353 = clamp(int2(floor(_338 / float2(FinalizeParams.WallBinSize))), int2(0), int2(FinalizeParams.WallBinDim) - int2(1));
+                        uint _361 = uint(_353.x) + (uint(_353.y) * FinalizeParams.WallBinDim.x);
+                        float _365;
+                        _365 = 3.3999999521443642490773241379936e+38;
+                        float _366;
+                        for (uint _368 = 0u; _368 < WallBins._m0[_361].y; _365 = _366, _368++)
+                        {
+                            uint _375 = WallBins._m0[_361].x + _368;
+                            float _518;
+                            do
+                            {
+                                if (WallPrims._m0[WallBinIndices._m0[_375]].kind == 0u)
+                                {
+                                    float2 _397 = _338 - WallPrims._m0[WallBinIndices._m0[_375]].p0;
+                                    float2 _402 = abs(float2(dot(_397, WallPrims._m0[WallBinIndices._m0[_375]].p1), dot(_397, float2(-WallPrims._m0[WallBinIndices._m0[_375]].p1.y, WallPrims._m0[WallBinIndices._m0[_375]].p1.x)))) - WallPrims._m0[WallBinIndices._m0[_375]].p2;
+                                    float _403 = _402.x;
+                                    bool _409;
+                                    if ((isunordered(_403, 0.0) || _403 <= 0.0))
+                                    {
+                                        _409 = _402.y > 0.0;
+                                    }
+                                    else
+                                    {
+                                        _409 = true;
+                                    }
+                                    float _417;
+                                    if (_409)
+                                    {
+                                        _417 = length(precise::max(_402, float2(0.0)));
+                                    }
+                                    else
+                                    {
+                                        _417 = precise::max(_403, _402.y);
+                                    }
+                                    _518 = _417;
+                                    break;
+                                }
+                                if (WallPrims._m0[WallBinIndices._m0[_375]].kind == 1u)
+                                {
+                                    _518 = length(_338 - WallPrims._m0[WallBinIndices._m0[_375]].p0) - WallPrims._m0[WallBinIndices._m0[_375]].radius;
+                                    break;
+                                }
+                                float2 _424 = WallPrims._m0[WallBinIndices._m0[_375]].p1 - WallPrims._m0[WallBinIndices._m0[_375]].p0;
+                                float _425 = dot(_424, _424);
+                                float _434;
+                                if (_425 > 9.9999999747524270787835121154785e-07)
+                                {
+                                    _434 = fast::clamp(dot(_338 - WallPrims._m0[WallBinIndices._m0[_375]].p0, _424) / _425, 0.0, 1.0);
+                                }
+                                else
+                                {
+                                    _434 = 0.0;
+                                }
+                                float2 _437 = _338 - (WallPrims._m0[WallBinIndices._m0[_375]].p0 + (_424 * _434));
+                                float _438 = dot(_437, _437);
+                                float _440 = (_438 < 3.3999999521443642490773241379936e+38) ? _438 : 3.3999999521443642490773241379936e+38;
+                                float2 _441 = _338 - WallPrims._m0[WallBinIndices._m0[_375]].p0;
+                                float2 _451 = WallPrims._m0[WallBinIndices._m0[_375]].p2 - WallPrims._m0[WallBinIndices._m0[_375]].p1;
+                                float _452 = dot(_451, _451);
+                                float _461;
+                                if (_452 > 9.9999999747524270787835121154785e-07)
+                                {
+                                    _461 = fast::clamp(dot(_338 - WallPrims._m0[WallBinIndices._m0[_375]].p1, _451) / _452, 0.0, 1.0);
+                                }
+                                else
+                                {
+                                    _461 = 0.0;
+                                }
+                                float2 _464 = _338 - (WallPrims._m0[WallBinIndices._m0[_375]].p1 + (_451 * _461));
+                                float _465 = dot(_464, _464);
+                                float _467 = (_465 < _440) ? _465 : _440;
+                                float2 _468 = _338 - WallPrims._m0[WallBinIndices._m0[_375]].p1;
+                                float2 _479 = WallPrims._m0[WallBinIndices._m0[_375]].p0 - WallPrims._m0[WallBinIndices._m0[_375]].p2;
+                                float _480 = dot(_479, _479);
+                                float _489;
+                                if (_480 > 9.9999999747524270787835121154785e-07)
+                                {
+                                    _489 = fast::clamp(dot(_338 - WallPrims._m0[WallBinIndices._m0[_375]].p2, _479) / _480, 0.0, 1.0);
+                                }
+                                else
+                                {
+                                    _489 = 0.0;
+                                }
+                                float2 _492 = _338 - (WallPrims._m0[WallBinIndices._m0[_375]].p2 + (_479 * _489));
+                                float _493 = dot(_492, _492);
+                                float2 _496 = _338 - WallPrims._m0[WallBinIndices._m0[_375]].p2;
+                                int _506 = (((((_424.x * _441.y) - (_424.y * _441.x)) >= 0.0) ? 1 : (-1)) + ((((_451.x * _468.y) - (_451.y * _468.x)) >= 0.0) ? 1 : (-1))) + ((((_479.x * _496.y) - (_479.y * _496.x)) >= 0.0) ? 1 : (-1));
+                                bool _511;
+                                if (_506 != 3)
+                                {
+                                    _511 = _506 == (-3);
+                                }
+                                else
+                                {
+                                    _511 = true;
+                                }
+                                float _512 = sqrt((_493 < _467) ? _493 : _467);
+                                float _517;
+                                if (_511)
+                                {
+                                    _517 = -_512;
+                                }
+                                else
+                                {
+                                    _517 = _512;
+                                }
+                                _518 = _517;
+                                break;
+                            } while(false);
+                            _366 = precise::min(_365, _518);
+                        }
+                        _519 = _365;
+                        break;
+                    } while(false);
+                    bool _525;
+                    if (_519 < FinalizeParams.Radius)
+                    {
+                        _525 = _519 < (_328 - 0.00999999977648258209228515625);
+                    }
+                    else
+                    {
+                        _525 = false;
+                    }
+                    if (_525)
+                    {
+                        _532 = _125 + (_146 * float(_330 - 1u));
+                        _533 = true;
+                        break;
+                    }
+                    _330++;
+                    continue;
                 }
                 else
                 {
-                    _148 = _147;
+                    _532 = _101;
+                    _533 = false;
+                    break;
                 }
             }
-            _397 = _147;
+            if (_533)
+            {
+                _535 = _532;
+                break;
+            }
+            _535 = _126;
             break;
         } while(false);
-        float2 _403 = fast::clamp(_397 - _116, FinalizeParams.WorldMin, FinalizeParams.WorldMax);
-        float2 _409 = (_403 - PrevPos._m0[gl_GlobalInvocationID.x]) * FinalizeParams.InvDt;
-        float _410 = length(_409);
-        float2 _418;
-        if (_410 > FinalizeParams.MaxSpeed)
+        float2 _776;
+        do
         {
-            _418 = _409 * (FinalizeParams.MaxSpeed / _410);
+            if (_132 == 0u)
+            {
+                _776 = _535;
+                break;
+            }
+            int2 _551 = clamp(int2(floor(_535 / float2(FinalizeParams.WallBinSize))), int2(0), int2(FinalizeParams.WallBinDim) - int2(1));
+            uint _559 = uint(_551.x) + (uint(_551.y) * FinalizeParams.WallBinDim.x);
+            float2 _563;
+            _563 = _535;
+            float2 _564;
+            for (uint _566 = 0u; _566 < WallBins._m0[_559].y; _563 = _564, _566++)
+            {
+                uint _573 = WallBins._m0[_559].x + _566;
+                float2 _768;
+                float _769;
+                do
+                {
+                    if (WallPrims._m0[WallBinIndices._m0[_573]].kind == 0u)
+                    {
+                        float2 _594 = float2(-WallPrims._m0[WallBinIndices._m0[_573]].p1.y, WallPrims._m0[WallBinIndices._m0[_573]].p1.x);
+                        float2 _595 = _563 - WallPrims._m0[WallBinIndices._m0[_573]].p0;
+                        float _596 = dot(_595, WallPrims._m0[WallBinIndices._m0[_573]].p1);
+                        float _597 = dot(_595, _594);
+                        float2 _600 = abs(float2(_596, _597)) - WallPrims._m0[WallBinIndices._m0[_573]].p2;
+                        float _601 = _600.x;
+                        bool _607;
+                        if ((isunordered(_601, 0.0) || _601 <= 0.0))
+                        {
+                            _607 = _600.y > 0.0;
+                        }
+                        else
+                        {
+                            _607 = true;
+                        }
+                        float2 _635;
+                        float _636;
+                        if (_607)
+                        {
+                            float2 _611 = precise::max(_600, float2(0.0));
+                            float _612 = length(_611);
+                            _635 = (_611 * float2((_596 < 0.0) ? (-1.0) : 1.0, (_597 < 0.0) ? (-1.0) : 1.0)) / float2(precise::max(_612, 9.9999999747524270787835121154785e-07));
+                            _636 = _612;
+                        }
+                        else
+                        {
+                            float _622 = _600.y;
+                            float2 _634;
+                            if (_601 > _622)
+                            {
+                                _634 = float2((_596 < 0.0) ? (-1.0) : 1.0, 0.0);
+                            }
+                            else
+                            {
+                                _634 = float2(0.0, (_597 < 0.0) ? (-1.0) : 1.0);
+                            }
+                            _635 = _634;
+                            _636 = precise::max(_601, _622);
+                        }
+                        _768 = (WallPrims._m0[WallBinIndices._m0[_573]].p1 * _635.x) + (_594 * _635.y);
+                        _769 = _636;
+                        break;
+                    }
+                    if (WallPrims._m0[WallBinIndices._m0[_573]].kind == 1u)
+                    {
+                        float2 _645 = _563 - WallPrims._m0[WallBinIndices._m0[_573]].p0;
+                        float _646 = length(_645);
+                        float2 _653;
+                        if (_646 > 9.9999999747524270787835121154785e-07)
+                        {
+                            _653 = _645 / float2(_646);
+                        }
+                        else
+                        {
+                            _653 = float2(0.0, -1.0);
+                        }
+                        _768 = _653;
+                        _769 = _646 - WallPrims._m0[WallBinIndices._m0[_573]].radius;
+                        break;
+                    }
+                    float2 _655 = WallPrims._m0[WallBinIndices._m0[_573]].p1 - WallPrims._m0[WallBinIndices._m0[_573]].p0;
+                    float _656 = dot(_655, _655);
+                    float _665;
+                    if (_656 > 9.9999999747524270787835121154785e-07)
+                    {
+                        _665 = fast::clamp(dot(_563 - WallPrims._m0[WallBinIndices._m0[_573]].p0, _655) / _656, 0.0, 1.0);
+                    }
+                    else
+                    {
+                        _665 = 0.0;
+                    }
+                    float2 _667 = WallPrims._m0[WallBinIndices._m0[_573]].p0 + (_655 * _665);
+                    float2 _668 = _563 - _667;
+                    float _669 = dot(_668, _668);
+                    bool _670 = _669 < 3.3999999521443642490773241379936e+38;
+                    float _673 = _670 ? _669 : 3.3999999521443642490773241379936e+38;
+                    float2 _674 = _563 - WallPrims._m0[WallBinIndices._m0[_573]].p0;
+                    float2 _684 = WallPrims._m0[WallBinIndices._m0[_573]].p2 - WallPrims._m0[WallBinIndices._m0[_573]].p1;
+                    float _685 = dot(_684, _684);
+                    float _694;
+                    if (_685 > 9.9999999747524270787835121154785e-07)
+                    {
+                        _694 = fast::clamp(dot(_563 - WallPrims._m0[WallBinIndices._m0[_573]].p1, _684) / _685, 0.0, 1.0);
+                    }
+                    else
+                    {
+                        _694 = 0.0;
+                    }
+                    float2 _696 = WallPrims._m0[WallBinIndices._m0[_573]].p1 + (_684 * _694);
+                    float2 _697 = _563 - _696;
+                    float _698 = dot(_697, _697);
+                    bool _699 = _698 < _673;
+                    float _702 = _699 ? _698 : _673;
+                    float2 _703 = _563 - WallPrims._m0[WallBinIndices._m0[_573]].p1;
+                    float2 _714 = WallPrims._m0[WallBinIndices._m0[_573]].p0 - WallPrims._m0[WallBinIndices._m0[_573]].p2;
+                    float _715 = dot(_714, _714);
+                    float _724;
+                    if (_715 > 9.9999999747524270787835121154785e-07)
+                    {
+                        _724 = fast::clamp(dot(_563 - WallPrims._m0[WallBinIndices._m0[_573]].p2, _714) / _715, 0.0, 1.0);
+                    }
+                    else
+                    {
+                        _724 = 0.0;
+                    }
+                    float2 _726 = WallPrims._m0[WallBinIndices._m0[_573]].p2 + (_714 * _724);
+                    float2 _727 = _563 - _726;
+                    float _728 = dot(_727, _727);
+                    bool _729 = _728 < _702;
+                    float2 _731 = select(select(select(WallPrims._m0[WallBinIndices._m0[_573]].p0, _667, bool2(_670)), _696, bool2(_699)), _726, bool2(_729));
+                    float2 _733 = _563 - WallPrims._m0[WallBinIndices._m0[_573]].p2;
+                    int _743 = (((((_655.x * _674.y) - (_655.y * _674.x)) >= 0.0) ? 1 : (-1)) + ((((_684.x * _703.y) - (_684.y * _703.x)) >= 0.0) ? 1 : (-1))) + ((((_714.x * _733.y) - (_714.y * _733.x)) >= 0.0) ? 1 : (-1));
+                    bool _748;
+                    if (_743 != 3)
+                    {
+                        _748 = _743 == (-3);
+                    }
+                    else
+                    {
+                        _748 = true;
+                    }
+                    float _749 = sqrt(_729 ? _728 : _702);
+                    float2 _762;
+                    if (_749 > 9.9999999747524270787835121154785e-07)
+                    {
+                        float2 _759;
+                        if (_748)
+                        {
+                            _759 = _731 - _563;
+                        }
+                        else
+                        {
+                            _759 = _563 - _731;
+                        }
+                        _762 = _759 / float2(_749);
+                    }
+                    else
+                    {
+                        _762 = float2(0.0, -1.0);
+                    }
+                    float _767;
+                    if (_748)
+                    {
+                        _767 = -_749;
+                    }
+                    else
+                    {
+                        _767 = _749;
+                    }
+                    _768 = _762;
+                    _769 = _767;
+                    break;
+                } while(false);
+                if (_769 < FinalizeParams.Radius)
+                {
+                    _564 = _563 + (_768 * (FinalizeParams.Radius - _769));
+                }
+                else
+                {
+                    _564 = _563;
+                }
+            }
+            _776 = _563;
+            break;
+        } while(false);
+        float2 _782 = fast::clamp(_776 - _124, FinalizeParams.WorldMin, FinalizeParams.WorldMax);
+        float2 _787 = (_782 - PrevPos._m0[gl_GlobalInvocationID.x]) * FinalizeParams.InvDt;
+        float _790 = length(Fling._m0[gl_GlobalInvocationID.x]);
+        float2 _800;
+        float2 _801;
+        if (_790 > 0.0)
+        {
+            float2 _795 = Fling._m0[gl_GlobalInvocationID.x] / float2(_790);
+            float2 _798 = _795 * fast::clamp(dot(_787, _795), 0.0, _790);
+            _800 = _798;
+            _801 = _787 - _798;
         }
         else
         {
-            _418 = _409;
+            _800 = Fling._m0[gl_GlobalInvocationID.x];
+            _801 = _787;
         }
-        bool _427;
+        float _802 = length(_801);
+        float2 _810;
+        if (_802 > FinalizeParams.MaxSpeed)
+        {
+            _810 = _801 * (FinalizeParams.MaxSpeed / _802);
+        }
+        else
+        {
+            _810 = _801;
+        }
+        bool _819;
         if (FinalizeParams.RespawnOnExit != 0u)
         {
-            _427 = FinalizeParams.SpawnCount > 0u;
+            _819 = FinalizeParams.SpawnCount > 0u;
         }
         else
         {
-            _427 = false;
+            _819 = false;
         }
-        bool _457;
-        if (_427)
+        bool _849;
+        if (_819)
         {
-            float2 _430 = _403 + _116;
-            bool _456;
+            float2 _822 = _782 + _124;
+            bool _848;
             do
             {
-                bool _453;
-                bool _454;
-                uint _434 = 0u;
+                bool _845;
+                bool _846;
+                uint _826 = 0u;
                 for (;;)
                 {
-                    if (_434 < FinalizeParams.ExitCount)
+                    if (_826 < FinalizeParams.ExitCount)
                     {
-                        if (all(abs(_430 - FinalizeParams.Exits[_434].xy) <= (FinalizeParams.Exits[_434].zw + _116)))
+                        if (all(abs(_822 - FinalizeParams.Exits[_826].xy) <= (FinalizeParams.Exits[_826].zw + _124)))
                         {
-                            _453 = true;
-                            _454 = true;
+                            _845 = true;
+                            _846 = true;
                             break;
                         }
-                        _434++;
+                        _826++;
                         continue;
                     }
                     else
                     {
-                        _453 = _97;
-                        _454 = false;
+                        _845 = _102;
+                        _846 = false;
                         break;
                     }
                 }
-                if (_454)
+                if (_846)
                 {
-                    _456 = _453;
+                    _848 = _845;
                     break;
                 }
-                _456 = false;
+                _848 = false;
                 break;
             } while(false);
-            _457 = _456;
+            _849 = _848;
         }
         else
         {
-            _457 = false;
+            _849 = false;
         }
-        float2 _530;
-        if (_457)
+        float2 _922;
+        if (_849)
         {
             Health._m0[gl_GlobalInvocationID.x] = precise::max(Health._m0[gl_GlobalInvocationID.x] - FinalizeParams.ExitDamage, 0.0);
-            uint _469 = (FinalizeParams.Frame * 747796405u) + 2891336453u;
-            uint _475 = ((_469 >> (((_469 >> 28u) + 4u) & 31u)) ^ _469) * 277803737u;
-            uint _480 = ((gl_GlobalInvocationID.x ^ ((_475 >> 22u) ^ _475)) * 747796405u) + 2891336453u;
-            uint _486 = ((_480 >> (((_480 >> 28u) + 4u) & 31u)) ^ _480) * 277803737u;
-            uint _488 = (_486 >> 22u) ^ _486;
-            uint _491 = _488 % FinalizeParams.SpawnCount;
-            uint _495 = (_488 * 747796405u) + 2891336453u;
-            uint _501 = ((_495 >> (((_495 >> 28u) + 4u) & 31u)) ^ _495) * 277803737u;
-            uint _509 = ((_488 ^ 2654435769u) * 747796405u) + 2891336453u;
-            uint _515 = ((_509 >> (((_509 >> 28u) + 4u) & 31u)) ^ _509) * 277803737u;
-            _530 = fast::clamp((FinalizeParams.Spawns[_491].xy + (((float2(float(((_501 >> 22u) ^ _501) & 16777215u) * 5.9604644775390625e-08, float(((_515 >> 22u) ^ _515) & 16777215u) * 5.9604644775390625e-08) * 2.0) - float2(1.0)) * FinalizeParams.Spawns[_491].zw)) - _116, FinalizeParams.WorldMin, FinalizeParams.WorldMax);
+            uint _861 = (FinalizeParams.Frame * 747796405u) + 2891336453u;
+            uint _867 = ((_861 >> (((_861 >> 28u) + 4u) & 31u)) ^ _861) * 277803737u;
+            uint _872 = ((gl_GlobalInvocationID.x ^ ((_867 >> 22u) ^ _867)) * 747796405u) + 2891336453u;
+            uint _878 = ((_872 >> (((_872 >> 28u) + 4u) & 31u)) ^ _872) * 277803737u;
+            uint _880 = (_878 >> 22u) ^ _878;
+            uint _883 = _880 % FinalizeParams.SpawnCount;
+            uint _887 = (_880 * 747796405u) + 2891336453u;
+            uint _893 = ((_887 >> (((_887 >> 28u) + 4u) & 31u)) ^ _887) * 277803737u;
+            uint _901 = ((_880 ^ 2654435769u) * 747796405u) + 2891336453u;
+            uint _907 = ((_901 >> (((_901 >> 28u) + 4u) & 31u)) ^ _901) * 277803737u;
+            _922 = fast::clamp((FinalizeParams.Spawns[_883].xy + (((float2(float(((_893 >> 22u) ^ _893) & 16777215u) * 5.9604644775390625e-08, float(((_907 >> 22u) ^ _907) & 16777215u) * 5.9604644775390625e-08) * 2.0) - float2(1.0)) * FinalizeParams.Spawns[_883].zw)) - _124, FinalizeParams.WorldMin, FinalizeParams.WorldMax);
         }
         else
         {
-            _530 = _403;
+            _922 = _782;
         }
-        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _530, select(_418, float2(0.0), bool2(_457)) };
+        bool2 _923 = bool2(_849);
+        Fling._m0[gl_GlobalInvocationID.x] = select(_800, float2(0.0), _923);
+        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _922, select(_810, float2(0.0), _923) };
         break;
     } while(false);
 }

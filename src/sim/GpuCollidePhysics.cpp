@@ -31,9 +31,11 @@ struct alignas(16) GPUIntegrateUniforms {
     // Two per region: (centre, half size), then (direction, strength, unused).
     glm::vec4 fields[kMaxFieldRegions * 2];
     Uint32 explosionCount;
-    Uint32 explosionPadding[3];
+    float flingDrag;
+    float flingMaxSpeed;
+    Uint32 explosionPadding;
     // Two per explosion: (centre, radius, this step's push at the centre),
-    // then (falloff, unused x3).
+    // then (falloff, fling 0 or 1, unused x2).
     glm::vec4 explosions[kMaxExplosions * 2];
 };
 static_assert(sizeof(GPUIntegrateUniforms) ==
@@ -81,17 +83,33 @@ Uint32 packFields(const std::vector<FieldArea>& fields, glm::vec4* out) {
 }
 
 // The share of an explosion's total push to apply in a step of `dt`, with
-// `left` of it (1 to 0) still to come. Spread evenly over its duration, but
-// never more than `maxStep` world units at the centre, where the push is
-// largest: further than about a diameter per step and a unit can skip through
-// a thin wall. A push held back that way just carries on for longer.
+// `left` of it (1 to 0) still to come.
+//
+// Its strength over time s (0 to 1 of the duration) follows the decay curve
+// (1 - s)^(k - 1), k = 1 constant, 2 linear, 3 quadratic; so the share given
+// out by time s is 1 - (1 - s)^k, and `left` = (1 - s)^k says how far through
+// it is. A shove also never moves a unit more than `maxStep` world units at
+// the centre, where the push is largest, so a step's move stays within what
+// unit_finalize's wall sweep checks. A push held back that way just carries
+// on for longer.
 float explosionShare(const Explosion& explosion, float left, float dt, float maxStep) {
-    float share = explosion.duration > 0.0f ? std::min(left, dt / explosion.duration) : left;
-    if (std::abs(explosion.strength) * share > maxStep) {
+    if (explosion.duration <= 0.0f) {
+        return left;
+    }
+    const float k = static_cast<float>(explosion.decay) + 1.0f;
+    const float now = 1.0f - std::pow(left, 1.0f / k);
+    const float next = std::min(1.0f, now + dt / explosion.duration);
+    float share = std::min(left, left - std::pow(1.0f - next, k));
+    if (!explosion.fling && std::abs(explosion.strength) * share > maxStep) {
         share = maxStep / std::abs(explosion.strength);
     }
     return share;
 }
+
+// Furthest an explosion moves a unit in one step, in diameters: what
+// unit_finalize's wall sweep covers (MAX_SWEEP_HOPS radii). Any further and
+// a unit could skip through a thin wall.
+constexpr float kMaxBlastStepDiameters = 32.0f;
 
 Uint32 groups(Uint32 threads) {
     return std::max<Uint32>(1, (threads + 255) / 256);
@@ -119,10 +137,11 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         SDL_Log("GpuCollidePhysics: only the first %zu field regions are used", kMaxFieldRegions);
     }
 
-    // unit_integrate.comp: 2 rw buffers (units, previous positions), 1 uniform buffer
-    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 2, 1, 256, 1, 1);
-    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 2 rw buffers (units, health), 1 uniform buffer
-    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 2, 1, 256, 1, 1);
+    // unit_integrate.comp: 3 rw buffers (units, previous positions, fling), 1 uniform buffer
+    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 3, 1, 256, 1, 1);
+    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 3 rw buffers (units, health, fling),
+    // 1 uniform buffer
+    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 3, 1, 256, 1, 1);
     if (!m_integratePipeline || !m_finalizePipeline) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to load pipelines");
         return false;
@@ -154,7 +173,11 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     healthInfo.size = static_cast<Uint32>(sizeof(float) * std::max<std::uint32_t>(m_capacity, 1));
     m_health = SDL_CreateGPUBuffer(m_device, &healthInfo);
 
-    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health) {
+    SDL_GPUBufferCreateInfo flingInfo = prevInfo;
+    flingInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    m_fling = SDL_CreateGPUBuffer(m_device, &flingInfo);
+
+    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s",
                      SDL_GetError());
         return false;
@@ -176,8 +199,11 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
 
     m_current = 0;
     const std::vector<float> health = startingHealth(m_unitCount);
+    // Every unit, including those still to spawn, starts unflung.
+    const std::vector<glm::vec2> fling(std::max<std::uint32_t>(m_capacity, 1), glm::vec2(0.0f));
     return uploadUnitsNow(m_device, config.initialUnits.data(), m_unitCount, m_units, 1) &&
-           uploadBytesNow(m_device, health.data(), static_cast<std::uint32_t>(sizeof(float) * health.size()), m_health);
+           uploadBytesNow(m_device, health.data(), static_cast<std::uint32_t>(sizeof(float) * health.size()), m_health) &&
+           uploadBytesNow(m_device, fling.data(), static_cast<std::uint32_t>(sizeof(glm::vec2) * fling.size()), m_fling);
 }
 
 void GpuCollidePhysics::shutdown() {
@@ -205,7 +231,7 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
-    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions, &m_health};
+    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions, &m_health, &m_fling};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
             SDL_ReleaseGPUBuffer(m_device, *buffer);
@@ -328,19 +354,24 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         for (std::size_t i = 0; i < m_explosions.size(); ++i) {
             ActiveExplosion& active = m_explosions[i];
             const Explosion& e = active.explosion;
-            const float share = explosionShare(e, active.left, m_dt, 2.0f * m_config.unitSize);
+            const float share = explosionShare(e, active.left, m_dt, kMaxBlastStepDiameters * m_config.unitSize);
             active.left -= share;
             uniforms.explosions[i * 2] = glm::vec4(e.center, e.radius, e.strength * share);
-            uniforms.explosions[i * 2 + 1] = glm::vec4(static_cast<float>(e.falloff), 0.0f, 0.0f, 0.0f);
+            uniforms.explosions[i * 2 + 1] =
+                glm::vec4(static_cast<float>(e.falloff), e.fling ? 1.0f : 0.0f, 0.0f, 0.0f);
         }
+        uniforms.flingDrag = m_flingDrag;
+        // The same limit as a shove's, per step.
+        uniforms.flingMaxSpeed = kMaxBlastStepDiameters * m_config.unitSize / m_dt;
         std::erase_if(m_explosions, [](const ActiveExplosion& active) { return active.left <= 1e-5f; });
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding bindings[2]{};
+        SDL_GPUStorageBufferReadWriteBinding bindings[3]{};
         bindings[0].buffer = m_units[m_current];
         bindings[1].buffer = m_prevPositions;
+        bindings[2].buffer = m_fling;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 2)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 3)) {
             SDL_BindGPUComputePipeline(pass, m_integratePipeline);
             SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
             SDL_EndGPUComputePass(pass);
@@ -372,11 +403,12 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.exitDamage = m_config.health.exitDamage;
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding bindings[2]{};
+        SDL_GPUStorageBufferReadWriteBinding bindings[3]{};
         bindings[0].buffer = m_units[m_current];
         bindings[1].buffer = m_health;
+        bindings[2].buffer = m_fling;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 2)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 3)) {
             SDL_BindGPUComputePipeline(pass, m_finalizePipeline);
             SDL_GPUBuffer* readOnly[4] = {m_prevPositions, m_walls.buffers()[0], m_walls.buffers()[1],
                                           m_walls.buffers()[2]};

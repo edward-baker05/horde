@@ -8,8 +8,9 @@
 // centre is inside a field region follows the region's direction instead,
 // turning into it at the region's strength, until it leaves: that is how a
 // level steers the horde around a wall. Debug explosions then shove the
-// predicted positions directly, so collisions and walls still have the last
-// word on where units end up.
+// predicted positions directly, or fling units by adding to a separate fling
+// velocity that is free of the speed cap and dies away under drag; either
+// way collisions and walls still have the last word on where units end up.
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -23,6 +24,8 @@ struct UnitData {
 
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float2> PrevPos : register(u1, space1);
+// Velocity from flinging explosions, on top of the walking velocity in Units.
+RWStructuredBuffer<float2> Fling : register(u2, space1);
 
 #define MAX_MARKERS 8
 #define MAX_FIELDS 32
@@ -44,19 +47,24 @@ cbuffer IntegrateParams : register(b0, space2) {
     // direction (the box's local +x axis), z = turn rate per second.
     float4 Fields[MAX_FIELDS * 2];
     uint ExplosionCount;
-    uint3 ExplosionPadding;
+    float FlingDrag;     // per second: how quickly fling velocity dies away
+    float FlingMaxSpeed; // fling speed cap, so no step can skip through a wall
+    uint ExplosionPadding;
     // Two per debug explosion: [2i] xy = centre, z = radius, w = this step's
     // push at the centre (negative pulls inward); [2i+1] x = falloff
-    // (0 constant, 1 linear, 2 quadratic).
+    // (0 constant, 1 linear, 2 quadratic), y = 1 to fling rather than shove.
     float4 Explosions[MAX_EXPLOSIONS * 2];
 };
 
-// How far every active explosion moves a unit at `centre` this step.
-float2 explosionPush(float2 centre, uint index) {
-    float2 push = float2(0.0f, 0.0f);
+// What every active explosion does to a unit at `centre` this step: how far
+// shoves move it (`push`) and how much flings add to its velocity (`launch`).
+void explosionPush(float2 centre, uint index, out float2 push, out float2 launch) {
+    push = float2(0.0f, 0.0f);
+    launch = float2(0.0f, 0.0f);
     for (uint i = 0; i < ExplosionCount; ++i) {
         float4 blast = Explosions[i * 2];
         float falloff = Explosions[i * 2 + 1].x;
+        bool fling = Explosions[i * 2 + 1].y > 0.5f;
         float2 d = centre - blast.xy;
         float distance = length(d);
         if (distance >= blast.z) {
@@ -68,11 +76,14 @@ float2 explosionPush(float2 centre, uint index) {
         float t = distance / blast.z;
         float scale = falloff < 0.5f ? 1.0f : (falloff < 1.5f ? 1.0f - t : (1.0f - t) * (1.0f - t));
         float amount = blast.w * scale;
-        // A pull stops at the centre rather than overshooting past it.
-        amount = max(amount, -distance);
-        push += dir * amount;
+        if (fling) {
+            // Not so fast a pull would carry it past the centre in one step.
+            launch += dir * max(amount, -distance / Dt);
+        } else {
+            // A pull stops at the centre rather than overshooting past it.
+            push += dir * max(amount, -distance);
+        }
     }
-    return push;
 }
 
 // Every field region containing `centre`, summed as direction x turn rate.
@@ -140,8 +151,17 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     }
 
     unit.vel += (desired - unit.vel) * saturate(turnRate * Dt);
-    unit.pos += unit.vel * Dt;
-    unit.pos += explosionPush(centre, index);
+    float2 push;
+    float2 launch;
+    explosionPush(centre, index, push, launch);
+    float2 fling = Fling[index] * saturate(1.0f - FlingDrag * Dt) + launch;
+    float flingSpeed = length(fling);
+    if (flingSpeed > FlingMaxSpeed) {
+        fling *= FlingMaxSpeed / flingSpeed;
+    }
+    Fling[index] = fling;
+
+    unit.pos += (unit.vel + fling) * Dt + push;
 
     Units[index] = unit;
 }

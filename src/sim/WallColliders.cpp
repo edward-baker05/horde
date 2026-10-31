@@ -41,10 +41,6 @@ void primitiveBounds(const WallPrimitive& p, glm::vec2& lo, glm::vec2& hi) {
             lo = p.p0 - glm::vec2(p.radius);
             hi = p.p0 + glm::vec2(p.radius);
             return;
-        case WallPrimitive::Capsule:
-            lo = glm::min(p.p0, p.p1) - glm::vec2(p.radius);
-            hi = glm::max(p.p0, p.p1) + glm::vec2(p.radius);
-            return;
         default:
             lo = glm::min(glm::min(p.p0, p.p1), p.p2);
             hi = glm::max(glm::max(p.p0, p.p1), p.p2);
@@ -71,12 +67,23 @@ void appendWall(const logic::Wall& wall, std::vector<WallPrimitive>& out) {
         return;
     }
 
-    // Each polyline segment is a capsule. Rounded ends also close the gaps the
-    // renderer leaves at bends, which is what a unit sliding along it wants.
+    // Each polyline segment is a box, square-ended as it is drawn, and each
+    // bend a disc as wide as the line, which closes the notch two boxes leave
+    // on the outside of a bend (the renderer draws the same disc there).
     const auto& line = std::get<logic::PolylineShape>(wall.shape);
+    const float halfThickness = line.thickness * 0.5f;
     for (std::size_t i = 0; i + 1 < line.points.size(); ++i) {
-        out.push_back({logic::localToWorld(wall, line.points[i]), logic::localToWorld(wall, line.points[i + 1]),
-                       {0.0f, 0.0f}, WallPrimitive::Capsule, line.thickness * 0.5f});
+        const glm::vec2 a = logic::localToWorld(wall, line.points[i]);
+        const glm::vec2 b = logic::localToWorld(wall, line.points[i + 1]);
+        const float length = glm::length(b - a);
+        if (length <= kEpsilon) {
+            continue;
+        }
+        out.push_back({(a + b) * 0.5f, (b - a) / length, {length * 0.5f, halfThickness}, WallPrimitive::Box, 0.0f});
+    }
+    for (std::size_t i = 1; i + 1 < line.points.size(); ++i) {
+        out.push_back({logic::localToWorld(wall, line.points[i]), {0.0f, 0.0f}, {0.0f, 0.0f}, WallPrimitive::Circle,
+                       halfThickness});
     }
 }
 
@@ -107,18 +114,6 @@ float primitiveDistance(const WallPrimitive& p, glm::vec2 point, glm::vec2& norm
             const glm::vec2 d = point - p.p0;
             const float length = glm::length(d);
             normal = length > kEpsilon ? d / length : glm::vec2(0.0f, -1.0f);
-            return length - p.radius;
-        }
-        case WallPrimitive::Capsule: {
-            const glm::vec2 d = point - closestOnSegment(point, p.p0, p.p1);
-            const float length = glm::length(d);
-            if (length > kEpsilon) {
-                normal = d / length;
-            } else {
-                const glm::vec2 along = p.p1 - p.p0;
-                normal = glm::length(along) > kEpsilon ? glm::normalize(glm::vec2(-along.y, along.x))
-                                                       : glm::vec2(0.0f, -1.0f);
-            }
             return length - p.radius;
         }
         default: {

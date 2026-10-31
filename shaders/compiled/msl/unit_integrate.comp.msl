@@ -33,11 +33,13 @@ struct type_IntegrateParams
     packed_uint3 FieldPadding;
     float4 Fields[64];
     uint ExplosionCount;
-    packed_uint3 ExplosionPadding;
+    float FlingDrag;
+    float FlingMaxSpeed;
+    uint ExplosionPadding;
     float4 Explosions[16];
 };
 
-kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(1)]], device type_RWStructuredBuffer_v2float& PrevPos [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(1)]], device type_RWStructuredBuffer_v2float& PrevPos [[buffer(2)]], device type_RWStructuredBuffer_v2float& Fling [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
 {
     do
     {
@@ -45,125 +47,155 @@ kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], 
         {
             break;
         }
-        float2 _75 = Units._m0[gl_GlobalInvocationID.x].pos;
-        float2 _77 = Units._m0[gl_GlobalInvocationID.x].vel;
-        PrevPos._m0[gl_GlobalInvocationID.x] = _75;
-        float2 _82 = _75 + float2(IntegrateParams.Radius);
-        float2 _84;
-        _84 = float2(0.0);
-        float2 _85;
-        for (uint _87 = 0u; _87 < IntegrateParams.FieldCount; _84 = _85, _87++)
+        float2 _78 = Units._m0[gl_GlobalInvocationID.x].pos;
+        float2 _80 = Units._m0[gl_GlobalInvocationID.x].vel;
+        PrevPos._m0[gl_GlobalInvocationID.x] = _78;
+        float2 _85 = _78 + float2(IntegrateParams.Radius);
+        float2 _87;
+        _87 = float2(0.0);
+        float2 _88;
+        for (uint _90 = 0u; _90 < IntegrateParams.FieldCount; _87 = _88, _90++)
         {
-            uint _94 = _87 * 2u;
-            uint _97 = _94 + 1u;
-            float2 _101 = _82 - IntegrateParams.Fields[_94].xy;
-            if (all(abs(float2(dot(_101, IntegrateParams.Fields[_97].xy), dot(_101, float2(-IntegrateParams.Fields[_97].y, IntegrateParams.Fields[_97].x)))) <= IntegrateParams.Fields[_94].zw))
+            uint _97 = _90 * 2u;
+            uint _100 = _97 + 1u;
+            float2 _104 = _85 - IntegrateParams.Fields[_97].xy;
+            if (all(abs(float2(dot(_104, IntegrateParams.Fields[_100].xy), dot(_104, float2(-IntegrateParams.Fields[_100].y, IntegrateParams.Fields[_100].x)))) <= IntegrateParams.Fields[_97].zw))
             {
-                _85 = _84 + (IntegrateParams.Fields[_97].xy * IntegrateParams.Fields[_97].z);
+                _88 = _87 + (IntegrateParams.Fields[_100].xy * IntegrateParams.Fields[_100].z);
             }
             else
             {
-                _85 = _84;
+                _88 = _87;
             }
         }
-        float _119 = length(_84);
-        float _177;
-        float2 _178;
-        if (_119 > 9.9999997473787516355514526367188e-05)
+        float _122 = length(_87);
+        float _180;
+        float2 _181;
+        if (_122 > 9.9999997473787516355514526367188e-05)
         {
-            _177 = _119;
-            _178 = (_84 / float2(_119)) * IntegrateParams.MaxSpeed;
+            _180 = _122;
+            _181 = (_87 / float2(_122)) * IntegrateParams.MaxSpeed;
         }
         else
         {
-            float2 _162;
+            float2 _165;
             do
             {
                 if (IntegrateParams.ExitCount == 0u)
                 {
-                    _162 = IntegrateParams.FallbackGoal;
+                    _165 = IntegrateParams.FallbackGoal;
                     break;
                 }
-                float2 _145;
-                _145 = IntegrateParams.Exits[0].xy;
-                float _142 = 3.3999999521443642490773241379936e+38;
-                uint _147 = 0u;
-                for (; _147 < IntegrateParams.ExitCount; )
+                float2 _148;
+                _148 = IntegrateParams.Exits[0].xy;
+                float _145 = 3.3999999521443642490773241379936e+38;
+                uint _150 = 0u;
+                for (; _150 < IntegrateParams.ExitCount; )
                 {
-                    float2 _157 = fast::clamp(_82, IntegrateParams.Exits[_147].xy - IntegrateParams.Exits[_147].zw, IntegrateParams.Exits[_147].xy + IntegrateParams.Exits[_147].zw);
-                    float2 _158 = _157 - _82;
-                    float _159 = dot(_158, _158);
-                    bool _160 = _159 < _142;
-                    _142 = _160 ? _159 : _142;
-                    _145 = select(_145, _157, bool2(_160));
-                    _147++;
+                    float2 _160 = fast::clamp(_85, IntegrateParams.Exits[_150].xy - IntegrateParams.Exits[_150].zw, IntegrateParams.Exits[_150].xy + IntegrateParams.Exits[_150].zw);
+                    float2 _161 = _160 - _85;
+                    float _162 = dot(_161, _161);
+                    bool _163 = _162 < _145;
+                    _145 = _163 ? _162 : _145;
+                    _148 = select(_148, _160, bool2(_163));
+                    _150++;
                     continue;
                 }
-                _162 = _145;
+                _165 = _148;
                 break;
             } while(false);
-            float2 _163 = _162 - _82;
-            float _164 = length(_163);
-            float2 _174;
-            if (_164 > 0.001000000047497451305389404296875)
+            float2 _166 = _165 - _85;
+            float _167 = length(_166);
+            float2 _177;
+            if (_167 > 0.001000000047497451305389404296875)
             {
-                _174 = (_163 / float2(_164)) * IntegrateParams.MaxSpeed;
+                _177 = (_166 / float2(_167)) * IntegrateParams.MaxSpeed;
             }
             else
             {
-                _174 = float2(0.0);
+                _177 = float2(0.0);
             }
-            _177 = IntegrateParams.Steering;
-            _178 = _174;
+            _180 = IntegrateParams.Steering;
+            _181 = _177;
         }
-        float2 _185 = _77 + ((_178 - _77) * fast::clamp(_177 * IntegrateParams.Dt, 0.0, 1.0));
-        float2 _189;
-        _189 = float2(0.0);
+        float2 _188 = _80 + ((_181 - _80) * fast::clamp(_180 * IntegrateParams.Dt, 0.0, 1.0));
         float2 _190;
-        for (uint _192 = 0u; _192 < IntegrateParams.ExplosionCount; _189 = _190, _192++)
+        float2 _193;
+        _190 = float2(0.0);
+        _193 = float2(0.0);
+        float2 _191;
+        float2 _194;
+        for (uint _195 = 0u; _195 < IntegrateParams.ExplosionCount; _190 = _191, _193 = _194, _195++)
         {
-            uint _199 = _192 * 2u;
-            uint _202 = _199 + 1u;
-            float2 _206 = _82 - IntegrateParams.Explosions[_199].xy;
-            float _207 = length(_206);
-            if (_207 >= IntegrateParams.Explosions[_199].z)
+            uint _202 = _195 * 2u;
+            uint _205 = _202 + 1u;
+            float2 _212 = _85 - IntegrateParams.Explosions[_202].xy;
+            float _213 = length(_212);
+            if (_213 >= IntegrateParams.Explosions[_202].z)
             {
-                _190 = _189;
+                _191 = _190;
+                _194 = _193;
                 continue;
             }
-            float _213 = float(gl_GlobalInvocationID.x) * 2.3999631404876708984375;
-            float2 _223;
-            if (_207 > 0.001000000047497451305389404296875)
+            float _219 = float(gl_GlobalInvocationID.x) * 2.3999631404876708984375;
+            float2 _229;
+            if (_213 > 0.001000000047497451305389404296875)
             {
-                _223 = _206 / float2(_207);
+                _229 = _212 / float2(_213);
             }
             else
             {
-                _223 = float2(cos(_213), sin(_213));
+                _229 = float2(cos(_219), sin(_219));
             }
-            float _224 = _207 / IntegrateParams.Explosions[_199].z;
-            float _237;
-            if (IntegrateParams.Explosions[_202].x < 0.5)
+            float _230 = _213 / IntegrateParams.Explosions[_202].z;
+            float _243;
+            if (IntegrateParams.Explosions[_205].x < 0.5)
             {
-                _237 = 1.0;
+                _243 = 1.0;
             }
             else
             {
-                float _236;
-                if (IntegrateParams.Explosions[_202].x < 1.5)
+                float _242;
+                if (IntegrateParams.Explosions[_205].x < 1.5)
                 {
-                    _236 = 1.0 - _224;
+                    _242 = 1.0 - _230;
                 }
                 else
                 {
-                    float _234 = 1.0 - _224;
-                    _236 = _234 * _234;
+                    float _240 = 1.0 - _230;
+                    _242 = _240 * _240;
                 }
-                _237 = _236;
+                _243 = _242;
             }
-            _190 = _189 + (_223 * precise::max(IntegrateParams.Explosions[_199].w * _237, -_207));
+            float _245 = IntegrateParams.Explosions[_202].w * _243;
+            float2 _258;
+            float2 _259;
+            if (IntegrateParams.Explosions[_205].y > 0.5)
+            {
+                _258 = _190;
+                _259 = _193 + (_229 * precise::max(_245, (-_213) / IntegrateParams.Dt));
+            }
+            else
+            {
+                _258 = _190 + (_229 * precise::max(_245, -_213));
+                _259 = _193;
+            }
+            _191 = _258;
+            _194 = _259;
         }
-        Units._m0[gl_GlobalInvocationID.x] = UnitData{ (_75 + (_185 * IntegrateParams.Dt)) + _189, _185 };
+        float2 _268 = (Fling._m0[gl_GlobalInvocationID.x] * fast::clamp(1.0 - (IntegrateParams.FlingDrag * IntegrateParams.Dt), 0.0, 1.0)) + _193;
+        float _269 = length(_268);
+        float2 _277;
+        if (_269 > IntegrateParams.FlingMaxSpeed)
+        {
+            _277 = _268 * (IntegrateParams.FlingMaxSpeed / _269);
+        }
+        else
+        {
+            _277 = _268;
+        }
+        Fling._m0[gl_GlobalInvocationID.x] = _277;
+        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _78 + (((_188 + _277) * IntegrateParams.Dt) + _190), _188 };
         break;
     } while(false);
 }

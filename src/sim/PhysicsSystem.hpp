@@ -113,25 +113,33 @@ struct FieldArea {
 // with a warning.
 inline constexpr std::size_t kMaxFieldRegions = 32;
 
-// How an explosion's push fades from its centre (t = 0) to its edge (t = 1).
+// How an explosion fades from 1 at t = 0 toward 0 at t = 1: over its radius
+// (t = distance / radius) and over its duration (t = time / duration).
 enum class ExplosionFalloff {
-    Constant,  // 1: the same push everywhere inside the radius
+    Constant,  // 1: the same everywhere, or all the way through
     Linear,    // 1 - t
-    Quadratic, // (1 - t)^2: concentrated near the centre
+    Quadratic, // (1 - t)^2: concentrated near the centre, or the start
 };
 
 const char* falloffName(ExplosionFalloff falloff);
 
 // A debug blast: units within `radius` of `center` are pushed away from it,
-// or pulled toward it when `strength` is negative. A unit at the centre moves
-// `strength` world units in all, spread evenly over `duration` seconds (0:
-// all in one step); further out it moves less, as `falloff` says.
+// or pulled toward it when `strength` is negative. Further out they get less,
+// as `falloff` says. The blast plays out over `duration` seconds (0: all in
+// one step), front-loaded as `decay` says.
+//
+// Shoved (the default), a unit at the centre is moved `strength` world units
+// in all and keeps walking at no more than the unit speed. Flung, it is
+// launched at up to `strength` world units per second, past the unit speed,
+// and slows down under the system's fling drag or on hitting something.
 struct Explosion {
     glm::vec2 center{0.0f, 0.0f};
     float radius = 100.0f;
     float strength = 50.0f;
     float duration = 0.15f;
     ExplosionFalloff falloff = ExplosionFalloff::Linear;
+    ExplosionFalloff decay = ExplosionFalloff::Constant;
+    bool fling = false;
 };
 
 // GPU shaders hold at most this many explosions at once; a new one replaces
@@ -244,6 +252,12 @@ public:
     // Explosions still pushing units, for drawing.
     virtual std::vector<Explosion> activeExplosions() const {
         return {};
+    }
+
+    // How quickly flung units slow down, per second: 3 loses about 95% of
+    // the fling speed in one second.
+    virtual void setFlingDrag(float perSecond) {
+        (void)perSecond;
     }
 };
 

@@ -28,7 +28,6 @@ StructuredBuffer<uint> WallBinIndices : register(WALL_BIN_INDICES_SLOT, space0);
 
 static const uint WALL_BOX = 0;
 static const uint WALL_CIRCLE = 1;
-static const uint WALL_CAPSULE = 2;
 static const uint WALL_TRIANGLE = 3;
 
 float signOrOne(float v) {
@@ -71,15 +70,6 @@ float wallDistance(WallPrimitive w, float2 p, out float2 normal) {
         return len - w.radius;
     }
 
-    if (w.kind == WALL_CAPSULE) {
-        float2 d = p - closestOnSegment(p, w.p0, w.p1);
-        float len = length(d);
-        float2 along = w.p1 - w.p0;
-        float2 fallback = length(along) > 1e-6f ? normalize(float2(-along.y, along.x)) : float2(0.0f, -1.0f);
-        normal = len > 1e-6f ? d / len : fallback;
-        return len - w.radius;
-    }
-
     // Triangle
     float2 corners[3] = {w.p0, w.p1, w.p2};
     float bestSq = 3.4e38f;
@@ -103,6 +93,24 @@ float wallDistance(WallPrimitive w, float2 p, out float2 normal) {
     float len = sqrt(bestSq);
     normal = len > 1e-6f ? (inside ? best - p : p - best) / len : float2(0.0f, -1.0f);
     return inside ? -len : len;
+}
+
+// Distance from `centre` to the surface of the nearest wall near it (negative
+// inside one); very large when there is none.
+float wallClearance(float2 centre) {
+    float best = 3.4e38f;
+    if (WallCount == 0) {
+        return best;
+    }
+
+    int2 cell = clamp((int2)floor(centre / WallBinSize), int2(0, 0), (int2)WallBinDim - 1);
+    uint2 bin = WallBins[(uint)cell.x + (uint)cell.y * WallBinDim.x];
+
+    for (uint i = 0; i < bin.y; ++i) {
+        float2 n;
+        best = min(best, wallDistance(WallPrims[WallBinIndices[bin.x + i]], centre, n));
+    }
+    return best;
 }
 
 // Pushes a disc of `radius` centred at `centre` out of every wall near it.

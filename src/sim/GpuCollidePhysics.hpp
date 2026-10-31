@@ -58,6 +58,10 @@ public:
     bool addExplosion(const Explosion& explosion) override;
     std::vector<Explosion> activeExplosions() const override;
 
+    void setFlingDrag(float perSecond) override {
+        m_flingDrag = perSecond;
+    }
+
     bool setCollisionPasses(std::uint32_t passes) override {
         m_config.collision.iterations = passes;
         m_collisions.setIterations(passes);
@@ -105,6 +109,10 @@ private:
         float left = 1.0f;
     };
     std::vector<ActiveExplosion> m_explosions;
+    // Each unit's velocity from flinging explosions, on top of its (capped)
+    // walking velocity. Zero for units that haven't been flung.
+    SDL_GPUBuffer* m_fling = nullptr;
+    float m_flingDrag = 3.0f;
 
     SimConfig m_config;
     std::uint32_t m_unitCount = 0;

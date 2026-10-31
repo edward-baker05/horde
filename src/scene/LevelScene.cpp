@@ -342,24 +342,52 @@ void LevelScene::explosionUi() {
     }
 
     ImGui::Checkbox("Armed (right-click to fire)", &m_explosionArmed);
+    ImGui::Checkbox("Fling (past max speed)", &m_explosion.fling);
     ImGui::SliderFloat("Blast radius", &m_explosion.radius, 5.0f, 1000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
-    ImGui::SliderFloat("Blast strength", &m_explosion.strength, -500.0f, 500.0f, "%.0f");
+    // A fling's strength is a speed, so it wants a wider range than a shove's distance.
+    const float range = m_explosion.fling ? 2000.0f : 500.0f;
+    ImGui::SliderFloat("Blast strength", &m_explosion.strength, -range, range,
+                       m_explosion.fling ? "%.0f /s" : "%.0f");
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("World units a unit at the centre is moved in all.\nNegative pulls units in.");
+        ImGui::SetTooltip(m_explosion.fling
+                              ? "Speed, in world units per second, a unit at the centre is launched at in all.\n"
+                                "Negative pulls units in."
+                              : "World units a unit at the centre is moved in all.\nNegative pulls units in.");
     }
     ImGui::SliderFloat("Blast duration", &m_explosion.duration, 0.0f, 5.0f, "%.2f s");
 
-    constexpr sim::ExplosionFalloff falloffs[] = {sim::ExplosionFalloff::Constant, sim::ExplosionFalloff::Linear,
-                                                  sim::ExplosionFalloff::Quadratic};
-    if (ImGui::BeginCombo("Falloff", sim::falloffName(m_explosion.falloff))) {
-        for (const sim::ExplosionFalloff falloff : falloffs) {
-            if (ImGui::Selectable(sim::falloffName(falloff), falloff == m_explosion.falloff)) {
-                m_explosion.falloff = falloff;
+    constexpr sim::ExplosionFalloff curves[] = {sim::ExplosionFalloff::Constant, sim::ExplosionFalloff::Linear,
+                                                sim::ExplosionFalloff::Quadratic};
+    const auto curveCombo = [&](const char* label, sim::ExplosionFalloff& value) {
+        if (ImGui::BeginCombo(label, sim::falloffName(value))) {
+            for (const sim::ExplosionFalloff curve : curves) {
+                if (ImGui::Selectable(sim::falloffName(curve), curve == value)) {
+                    value = curve;
+                }
             }
+            ImGui::EndCombo();
         }
-        ImGui::EndCombo();
+    };
+    curveCombo("Falloff", m_explosion.falloff);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How the blast fades from its centre to its edge.");
+    }
+    curveCombo("Decay", m_explosion.decay);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How the blast fades over its duration: constant is even all the way,\n"
+                          "linear and quadratic put more of it at the start.");
+    }
+
+    if (m_explosion.fling) {
+        if (ImGui::SliderFloat("Fling drag", &m_flingDrag, 0.1f, 20.0f, "%.1f /s", ImGuiSliderFlags_Logarithmic)) {
+            m_physics->setFlingDrag(m_flingDrag);
+        }
     }
 }
 

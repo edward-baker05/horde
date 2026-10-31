@@ -314,11 +314,21 @@ negative pulls units in (suction, or a gravity bomb with a long *duration*),
 stopping at the centre rather than overshooting it. The push is spread over
 *duration* seconds (0: one step) and fades toward the edge as *falloff* says:
 constant (1), linear (1 - t) or quadratic ((1 - t)^2), where t is the distance
-over the radius. Units are shoved, not flung: velocity is still capped at the
-unit speed, so they walk on as soon as it ends. No step moves a unit more than
-two diameters, so walls aren't tunnelled through; a stronger blast lasts a few
-steps longer instead. Only `gpu-collide` supports them, up to 8 at once. Red
-circles push, blue pull.
+over the radius. *Decay* uses the same three curves over time instead (t is
+the time over the duration): constant spreads the blast evenly, linear and
+quadratic put more of it at the start and let it die down.
+
+By default units are shoved: velocity is still capped at the unit speed, so
+they walk on as soon as it ends. Tick *Fling* and *strength* becomes a launch
+speed (world units per second) instead: units fly off past the unit speed and
+slow down under *fling drag* (per second; 3 loses about 95% in a second), or
+sooner when they hit a wall or a crowd, which soaks the fling up. Either way,
+pushed or pulled, a unit moving faster than a radius a step is swept along its
+path in radius-sized hops and stops at the first wall in the way, so even thin
+walls aren't tunnelled through. The sweep reaches 32 diameters, so no step
+moves a unit further than that: a stronger shove lasts a few steps longer
+instead, and fling speed is capped there. Only
+`gpu-collide` supports them, up to 8 at once. Red circles push, blue pull.
 
 ### Physics rate
 

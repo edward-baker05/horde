@@ -117,6 +117,7 @@ private:
     // cursor with these settings (its centre is filled in on the click).
     bool m_explosionArmed = false;
     sim::Explosion m_explosion;
+    float m_flingDrag = 3.0f;
 
     // Fixed-rate stepping: time not yet simulated, and the steps this frame owes compute().
     float m_stepAccumulator = 0.0f;

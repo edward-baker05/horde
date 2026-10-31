@@ -5,7 +5,8 @@
 Units collide with level walls through `sim::WallColliders`, built once when a
 level starts (walls never move). Every wall is flattened into convex
 primitives, each with a signed distance function: a rotated box, a circle, a
-triangle, or one capsule per polyline segment. The primitives are then binned
+triangle, or for a polyline one box per segment and one circle per bend. The
+primitives are then binned
 into a coarse uniform grid of cells eight unit-radii across, so a unit only
 tests the few primitives near it however many walls the level has. `GpuWalls`
 uploads the same data, and `shaders/src/walls.hlsli` repeats the CPU maths, so
@@ -16,9 +17,14 @@ Wall pushes happen inside every collision pass, right after the unit-vs-unit
 correction, and once more in `unit_finalize`. Because velocity is derived from
 the corrected position, units slide along walls instead of sticking to them.
 
-Polyline capsules have rounded ends where the renderer draws square ones. The
-collision is at most half a thickness larger at each end, and it closes the gaps
-the renderer leaves at bends, which is what a unit sliding along it wants.
+A polyline's bend circles close the notch two segment boxes leave on the
+outside of a bend, so a unit sliding along it doesn't catch there; the renderer
+draws the same circle, and the ends stay square, as drawn.
+
+_Update 2026-10-31:_ polyline segments were capsules, whose rounded ends
+reached half a thickness past the square ends the renderer draws, so units
+visibly bumped into nothing at a polyline's ends. They are now boxes plus bend
+circles, and the capsule primitive is gone.
 
 We also considered baking a signed distance field texture of the whole level:
 one texture fetch per unit, whatever the walls. We rejected it for now. Its

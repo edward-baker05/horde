@@ -14,10 +14,9 @@ namespace horde::sim {
 //
 //   Box       p0 = centre, p1 = unit x axis (cos, sin of rotation), p2 = half extents
 //   Circle    p0 = centre, radius
-//   Capsule   p0, p1 = segment ends, radius = half thickness (one polyline segment)
 //   Triangle  p0, p1, p2 = corners
 struct WallPrimitive {
-    enum Kind : std::uint32_t { Box = 0, Circle = 1, Capsule = 2, Triangle = 3 };
+    enum Kind : std::uint32_t { Box = 0, Circle = 1, Triangle = 3 };
 
     glm::vec2 p0{0.0f};
     glm::vec2 p1{0.0f};
