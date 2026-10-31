@@ -305,6 +305,21 @@ pass through regions; overlapping ones add up as direction x strength. Only
 `gpu-collide` applies them, up to 32 per level. The level's debug panel has
 *Show field regions* to hide them while playing; hidden regions still apply.
 
+### Explosions
+
+A debug tool in the level's panel, under *Explosion*. Tick *Armed*, then
+right-click to set one off at the cursor; a faint circle shows its radius.
+*Strength* is how far, in world units, a unit at the centre is moved in all;
+negative pulls units in (suction, or a gravity bomb with a long *duration*),
+stopping at the centre rather than overshooting it. The push is spread over
+*duration* seconds (0: one step) and fades toward the edge as *falloff* says:
+constant (1), linear (1 - t) or quadratic ((1 - t)^2), where t is the distance
+over the radius. Units are shoved, not flung: velocity is still capped at the
+unit speed, so they walk on as soon as it ends. No step moves a unit more than
+two diameters, so walls aren't tunnelled through; a stronger blast lasts a few
+steps longer instead. Only `gpu-collide` supports them, up to 8 at once. Red
+circles push, blue pull.
+
 ### Physics rate
 
 Physics steps at a fixed rate, independent of the frame rate: 60 Hz by

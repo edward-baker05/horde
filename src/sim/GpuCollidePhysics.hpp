@@ -17,7 +17,8 @@ namespace horde::sim {
 // Per frame, as position-based dynamics:
 //   0. (CPU)              upload any units due to spawn this frame
 //   1. unit_integrate     steer toward the nearest exit, or along a field
-//                         region's flow inside one; predict new positions
+//                         region's flow inside one; predict new positions,
+//                         then push them by any active debug explosions
 //   2. GpuSpatialGrid     bucket the predicted positions (the broadphase)
 //   3. GpuUnitCollisions  N relaxation passes, each separating units then
 //                         pushing them out of walls
@@ -49,6 +50,13 @@ public:
     bool supportsFlow() const override {
         return true;
     }
+
+    bool supportsExplosions() const override {
+        return true;
+    }
+
+    bool addExplosion(const Explosion& explosion) override;
+    std::vector<Explosion> activeExplosions() const override;
 
     bool setCollisionPasses(std::uint32_t passes) override {
         m_config.collision.iterations = passes;
@@ -89,6 +97,14 @@ private:
     std::mt19937 m_spawnRng;
     double m_spawnDue = 0.0;
     std::uint32_t m_frame = 0;
+
+    // Explosions still pushing, oldest first, with the share of each push
+    // (1 to 0) still to come.
+    struct ActiveExplosion {
+        Explosion explosion;
+        float left = 1.0f;
+    };
+    std::vector<ActiveExplosion> m_explosions;
 
     SimConfig m_config;
     std::uint32_t m_unitCount = 0;

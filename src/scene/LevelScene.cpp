@@ -117,6 +117,12 @@ void LevelScene::onExit() {
 }
 
 bool LevelScene::handleEvent(const SDL_Event& event) {
+    // Right-click: the camera pans with the left and middle buttons.
+    if (m_explosionArmed && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
+        sim::Explosion explosion = m_explosion;
+        explosion.center = m_camera.screenToWorld({event.button.x, event.button.y});
+        return m_physics->addExplosion(explosion);
+    }
     return m_cameraController.handleEvent(event, m_camera);
 }
 
@@ -149,6 +155,25 @@ void LevelScene::compute(SDL_GPUCommandBuffer* commands) {
 void LevelScene::render(gfx::SpriteBatch& batch) {
     // Render world geometry through SpriteBatch
     gfx::renderLevel(m_level, batch, m_services->atlas->handle(), m_showFieldRegions);
+
+    // Explosions: red pushes, blue pulls. Units are drawn over these.
+    const auto explosionColor = [](float strength, float alpha) {
+        return strength >= 0.0f ? glm::vec4(1.0f, 0.35f, 0.2f, alpha) : glm::vec4(0.3f, 0.5f, 1.0f, alpha);
+    };
+    for (const sim::Explosion& explosion : m_physics->activeExplosions()) {
+        const float diameter = explosion.radius * 2.0f;
+        gfx::drawCentered(batch, m_services->atlas->handle(), explosion.center, {diameter, diameter}, 0.0f,
+                          gfx::cellDisc(), explosionColor(explosion.strength, 0.3f));
+    }
+    // Where a right-click would land, while armed and not over a panel.
+    if (m_explosionArmed && !ImGui::GetIO().WantCaptureMouse) {
+        float mouseX = 0.0f;
+        float mouseY = 0.0f;
+        SDL_GetMouseState(&mouseX, &mouseY);
+        const float diameter = m_explosion.radius * 2.0f;
+        gfx::drawCentered(batch, m_services->atlas->handle(), m_camera.screenToWorld({mouseX, mouseY}),
+                          {diameter, diameter}, 0.0f, gfx::cellDisc(), explosionColor(m_explosion.strength, 0.12f));
+    }
 }
 
 void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) {
@@ -178,6 +203,7 @@ void LevelScene::debugUi() {
         ImGui::SameLine();
         ImGui::TextDisabled("(%zu)", m_level.fieldRegions.size());
     }
+    explosionUi();
 
     // Applies immediately: stepping is the scene's, not the physics system's.
     int rate = m_options.physicsRate >= 120.0f ? 1 : 0;
@@ -306,6 +332,35 @@ void LevelScene::debugUi() {
     }
 
     ImGui::End();
+}
+
+void LevelScene::explosionUi() {
+    ImGui::SeparatorText("Explosion");
+    if (!m_physics->supportsExplosions()) {
+        ImGui::TextDisabled("Not supported by this physics system");
+        return;
+    }
+
+    ImGui::Checkbox("Armed (right-click to fire)", &m_explosionArmed);
+    ImGui::SliderFloat("Blast radius", &m_explosion.radius, 5.0f, 1000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Blast strength", &m_explosion.strength, -500.0f, 500.0f, "%.0f");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("World units a unit at the centre is moved in all.\nNegative pulls units in.");
+    }
+    ImGui::SliderFloat("Blast duration", &m_explosion.duration, 0.0f, 5.0f, "%.2f s");
+
+    constexpr sim::ExplosionFalloff falloffs[] = {sim::ExplosionFalloff::Constant, sim::ExplosionFalloff::Linear,
+                                                  sim::ExplosionFalloff::Quadratic};
+    if (ImGui::BeginCombo("Falloff", sim::falloffName(m_explosion.falloff))) {
+        for (const sim::ExplosionFalloff falloff : falloffs) {
+            if (ImGui::Selectable(sim::falloffName(falloff), falloff == m_explosion.falloff)) {
+                m_explosion.falloff = falloff;
+            }
+        }
+        ImGui::EndCombo();
+    }
 }
 
 void LevelScene::healthUi() {

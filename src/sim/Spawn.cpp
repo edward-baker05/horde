@@ -43,6 +43,18 @@ const char* solverName(CollisionSolver solver) {
     return "?";
 }
 
+const char* falloffName(ExplosionFalloff falloff) {
+    switch (falloff) {
+        case ExplosionFalloff::Constant:
+            return "constant";
+        case ExplosionFalloff::Linear:
+            return "linear";
+        case ExplosionFalloff::Quadratic:
+            return "quadratic";
+    }
+    return "?";
+}
+
 const char* spawnPatternName(SpawnPattern pattern) {
     switch (pattern) {
         case SpawnPattern::Column:

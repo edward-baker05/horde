@@ -113,6 +113,31 @@ struct FieldArea {
 // with a warning.
 inline constexpr std::size_t kMaxFieldRegions = 32;
 
+// How an explosion's push fades from its centre (t = 0) to its edge (t = 1).
+enum class ExplosionFalloff {
+    Constant,  // 1: the same push everywhere inside the radius
+    Linear,    // 1 - t
+    Quadratic, // (1 - t)^2: concentrated near the centre
+};
+
+const char* falloffName(ExplosionFalloff falloff);
+
+// A debug blast: units within `radius` of `center` are pushed away from it,
+// or pulled toward it when `strength` is negative. A unit at the centre moves
+// `strength` world units in all, spread evenly over `duration` seconds (0:
+// all in one step); further out it moves less, as `falloff` says.
+struct Explosion {
+    glm::vec2 center{0.0f, 0.0f};
+    float radius = 100.0f;
+    float strength = 50.0f;
+    float duration = 0.15f;
+    ExplosionFalloff falloff = ExplosionFalloff::Linear;
+};
+
+// GPU shaders hold at most this many explosions at once; a new one replaces
+// the oldest.
+inline constexpr std::size_t kMaxExplosions = 8;
+
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
     glm::vec2 worldSize{2000.0f, 2000.0f};
@@ -202,6 +227,23 @@ public:
     // that don't get every unit up front instead.
     virtual bool supportsFlow() const {
         return false;
+    }
+
+    // Whether addExplosion() does anything.
+    virtual bool supportsExplosions() const {
+        return false;
+    }
+
+    // Sets off an explosion from the next step. Returns false for systems
+    // that can't.
+    virtual bool addExplosion(const Explosion& explosion) {
+        (void)explosion;
+        return false;
+    }
+
+    // Explosions still pushing units, for drawing.
+    virtual std::vector<Explosion> activeExplosions() const {
+        return {};
     }
 };
 

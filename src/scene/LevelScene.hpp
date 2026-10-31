@@ -98,6 +98,8 @@ private:
     void frameCostUi();
     // Live health summary, sampled from the GPU about once a second.
     void healthUi();
+    // The debug explosion tool's settings.
+    void explosionUi();
 
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
@@ -110,6 +112,11 @@ private:
 
     float enemy_size = 5.0f;
     bool m_showFieldRegions = true;
+
+    // Debug explosion tool: while armed, a right-click sets one off at the
+    // cursor with these settings (its centre is filled in on the click).
+    bool m_explosionArmed = false;
+    sim::Explosion m_explosion;
 
     // Fixed-rate stepping: time not yet simulated, and the steps this frame owes compute().
     float m_stepAccumulator = 0.0f;

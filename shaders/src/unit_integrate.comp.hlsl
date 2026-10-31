@@ -7,7 +7,9 @@
 // spreads along an exit instead of converging on one point of it. A unit whose
 // centre is inside a field region follows the region's direction instead,
 // turning into it at the region's strength, until it leaves: that is how a
-// level steers the horde around a wall.
+// level steers the horde around a wall. Debug explosions then shove the
+// predicted positions directly, so collisions and walls still have the last
+// word on where units end up.
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -24,6 +26,7 @@ RWStructuredBuffer<float2> PrevPos : register(u1, space1);
 
 #define MAX_MARKERS 8
 #define MAX_FIELDS 32
+#define MAX_EXPLOSIONS 8
 
 // Matches GPUIntegrateUniforms in sim/GpuCollidePhysics.cpp
 cbuffer IntegrateParams : register(b0, space2) {
@@ -40,7 +43,37 @@ cbuffer IntegrateParams : register(b0, space2) {
     // Two per region: [2i] xy = centre, zw = half size; [2i+1] xy = flow
     // direction (the box's local +x axis), z = turn rate per second.
     float4 Fields[MAX_FIELDS * 2];
+    uint ExplosionCount;
+    uint3 ExplosionPadding;
+    // Two per debug explosion: [2i] xy = centre, z = radius, w = this step's
+    // push at the centre (negative pulls inward); [2i+1] x = falloff
+    // (0 constant, 1 linear, 2 quadratic).
+    float4 Explosions[MAX_EXPLOSIONS * 2];
 };
+
+// How far every active explosion moves a unit at `centre` this step.
+float2 explosionPush(float2 centre, uint index) {
+    float2 push = float2(0.0f, 0.0f);
+    for (uint i = 0; i < ExplosionCount; ++i) {
+        float4 blast = Explosions[i * 2];
+        float falloff = Explosions[i * 2 + 1].x;
+        float2 d = centre - blast.xy;
+        float distance = length(d);
+        if (distance >= blast.z) {
+            continue;
+        }
+        // A unit right on the centre still gets a direction: spread by index.
+        float angle = float(index) * 2.39996323f;
+        float2 dir = distance > 0.001f ? d / distance : float2(cos(angle), sin(angle));
+        float t = distance / blast.z;
+        float scale = falloff < 0.5f ? 1.0f : (falloff < 1.5f ? 1.0f - t : (1.0f - t) * (1.0f - t));
+        float amount = blast.w * scale;
+        // A pull stops at the centre rather than overshooting past it.
+        amount = max(amount, -distance);
+        push += dir * amount;
+    }
+    return push;
+}
 
 // Every field region containing `centre`, summed as direction x turn rate.
 // Zero outside all of them.
@@ -108,6 +141,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
 
     unit.vel += (desired - unit.vel) * saturate(turnRate * Dt);
     unit.pos += unit.vel * Dt;
+    unit.pos += explosionPush(centre, index);
 
     Units[index] = unit;
 }

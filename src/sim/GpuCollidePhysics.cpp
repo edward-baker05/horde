@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
@@ -29,8 +30,14 @@ struct alignas(16) GPUIntegrateUniforms {
     Uint32 fieldPadding[3];
     // Two per region: (centre, half size), then (direction, strength, unused).
     glm::vec4 fields[kMaxFieldRegions * 2];
+    Uint32 explosionCount;
+    Uint32 explosionPadding[3];
+    // Two per explosion: (centre, radius, this step's push at the centre),
+    // then (falloff, unused x3).
+    glm::vec4 explosions[kMaxExplosions * 2];
 };
-static_assert(sizeof(GPUIntegrateUniforms) == 32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions);
+static_assert(sizeof(GPUIntegrateUniforms) ==
+              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -71,6 +78,19 @@ Uint32 packFields(const std::vector<FieldArea>& fields, glm::vec4* out) {
         out[i * 2 + 1] = glm::vec4(fields[i].direction, fields[i].strength, 0.0f);
     }
     return count;
+}
+
+// The share of an explosion's total push to apply in a step of `dt`, with
+// `left` of it (1 to 0) still to come. Spread evenly over its duration, but
+// never more than `maxStep` world units at the centre, where the push is
+// largest: further than about a diameter per step and a unit can skip through
+// a thin wall. A push held back that way just carries on for longer.
+float explosionShare(const Explosion& explosion, float left, float dt, float maxStep) {
+    float share = explosion.duration > 0.0f ? std::min(left, dt / explosion.duration) : left;
+    if (std::abs(explosion.strength) * share > maxStep) {
+        share = maxStep / std::abs(explosion.strength);
+    }
+    return share;
 }
 
 Uint32 groups(Uint32 threads) {
@@ -200,6 +220,26 @@ void GpuCollidePhysics::update(float dt) {
     m_dt = dt;
 }
 
+bool GpuCollidePhysics::addExplosion(const Explosion& explosion) {
+    if (explosion.radius <= 0.0f || explosion.strength == 0.0f) {
+        return false;
+    }
+    if (m_explosions.size() >= kMaxExplosions) {
+        m_explosions.erase(m_explosions.begin());
+    }
+    m_explosions.push_back({explosion, 1.0f});
+    return true;
+}
+
+std::vector<Explosion> GpuCollidePhysics::activeExplosions() const {
+    std::vector<Explosion> out;
+    out.reserve(m_explosions.size());
+    for (const ActiveExplosion& active : m_explosions) {
+        out.push_back(active.explosion);
+    }
+    return out;
+}
+
 std::vector<float> GpuCollidePhysics::startingHealth(std::uint32_t count) const {
     return std::vector<float>(count, static_cast<float>(m_config.health.maxHp));
 }
@@ -284,6 +324,16 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.radius = radius;
         uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
         uniforms.fieldCount = packFields(m_config.fieldRegions, uniforms.fields);
+        uniforms.explosionCount = static_cast<Uint32>(m_explosions.size());
+        for (std::size_t i = 0; i < m_explosions.size(); ++i) {
+            ActiveExplosion& active = m_explosions[i];
+            const Explosion& e = active.explosion;
+            const float share = explosionShare(e, active.left, m_dt, 2.0f * m_config.unitSize);
+            active.left -= share;
+            uniforms.explosions[i * 2] = glm::vec4(e.center, e.radius, e.strength * share);
+            uniforms.explosions[i * 2 + 1] = glm::vec4(static_cast<float>(e.falloff), 0.0f, 0.0f, 0.0f);
+        }
+        std::erase_if(m_explosions, [](const ActiveExplosion& active) { return active.left <= 1e-5f; });
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding bindings[2]{};
