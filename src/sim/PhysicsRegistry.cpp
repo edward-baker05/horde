@@ -2,9 +2,7 @@
 
 #include <functional>
 
-#include "sim/CpuGridPhysics.hpp"
 #include "sim/GpuCollidePhysics.hpp"
-#include "sim/StaticPhysics.hpp"
 
 namespace horde::sim {
 
@@ -23,10 +21,6 @@ const std::vector<Entry>& entries() {
     static const std::vector<Entry> table = {
         {"gpu-collide", "GPU: steer to the exit, collide with units and walls; counting-sort broadphase",
          [] { return std::make_unique<GpuCollidePhysics>(); }},
-        {"cpu-grid", "CPU single-threaded: linked-list uniform grid, 4 substeps, 6 solver iterations",
-         [] { return std::make_unique<CpuGridPhysics>(); }},
-        {"static", "No simulation; draws units where they spawned. Baseline for rendering cost",
-         [] { return std::make_unique<StaticPhysics>(); }},
     };
     return table;
 }

@@ -8,7 +8,7 @@ those into one results directory with a CSV and a Markdown table.
 
 Examples:
     python tools/bench.py
-    python tools/bench.py --physics gpu-collide,cpu-grid --units 1000,10000,100000
+    python tools/bench.py --physics gpu-collide --units 1000,10000,100000
     python tools/bench.py --physics all --units 1e3,1e4,1e5,1e6 --repeats 3
     python tools/bench.py --no-build --duration 5 --frames
     python tools/bench.py --physics gpu-collide --collision-iterations 2 --units 10k,100k,1m
@@ -108,7 +108,7 @@ def git_info() -> dict:
 
 
 def variant_label(preset: str | None, physics: str | None, solver: str | None, omega: str | None) -> str:
-    """'gpu-collide', 'gpu-collide/average w1.5', 'crowd-100k-relaxed', 'crowd-100k-relaxed:cpu-grid'"""
+    """'gpu-collide', 'gpu-collide/average w1.5', 'crowd-100k-relaxed', 'crowd-100k-relaxed:gpu-collide'"""
     base = ":".join(part for part in (preset, physics) if part)
     return base + (f"/{solver}" if solver else "") + (f" w{omega}" if omega else "")
 

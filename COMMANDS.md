@@ -227,7 +227,7 @@ one JSON per run in `runs/`, and the game's output in `logs/`.
 
 ```sh
 python tools/bench.py                                  # every system x 1k, 10k, 100k
-python tools/bench.py --physics gpu-collide,cpu-grid --units 1k,10k,100k,1m --repeats 3
+python tools/bench.py --physics gpu-collide --units 1k,10k,100k,1m --repeats 3
 python tools/bench.py --no-build --duration 5 --frames # reuse the build, keep per-frame CSVs
 python tools/bench.py --physics gpu-collide --collision-iterations 8 --relaxation 0.8
 python tools/bench.py --physics gpu-collide --level assets/levels/bench_walls.level.json
@@ -269,7 +269,7 @@ setup:
 ```sh
 horde --list-physics
 horde --bench --physics gpu-collide --units 100000 --duration 10 --out result.json
-horde --physics cpu-grid --units 5000     # boots straight into that level, playable
+horde --physics gpu-collide --units 5000  # boots straight into that level, playable
 horde --level assets/levels/bench_walls.level.json --collision-iterations 1 --units 50000
 ```
 
@@ -398,8 +398,7 @@ and binned. See `docs/adr/0003-swappable-staged-unit-physics.md` and
 
 1. Implement `sim::PhysicsSystem` (`src/sim/PhysicsSystem.hpp`) in
    `src/sim/<Name>.cpp`. Draw through `gfx::UnitRenderer` so every system pays
-   the same rendering cost. CPU systems can stream positions with
-   `sim::UnitStreamer`, as `CpuGridPhysics` does.
+   the same rendering cost.
 2. Add the `.cpp` to `CMakeLists.txt`.
 3. Add one line to the table in `src/sim/PhysicsRegistry.cpp`.
 

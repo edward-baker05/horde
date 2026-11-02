@@ -24,14 +24,12 @@ add_executable(horde
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
     src/gfx/UnitRenderer.cpp
-    src/sim/CpuGridPhysics.cpp
     src/sim/GpuCollidePhysics.cpp
     src/sim/GpuSpatialGrid.cpp
     src/sim/GpuUnitCollisions.cpp
     src/sim/GpuWalls.cpp
     src/sim/PhysicsRegistry.cpp
     src/sim/Spawn.cpp
-    src/sim/StaticPhysics.cpp
     src/sim/UnitBuffers.cpp
     src/sim/WallColliders.cpp
     src/editor/EditorUi.cpp
@@ -47,7 +45,6 @@ add_executable(horde
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
     src/ui/ImGuiLayer.cpp
-    src/logic/UnitData.cpp
     src/logic/UnitData.hpp
     src/logic/Level.cpp
     src/logic/LevelGeometry.cpp
