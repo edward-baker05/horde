@@ -358,6 +358,13 @@ void LevelScene::explosionUi() {
                               : "World units a unit at the centre is moved in all.\nNegative pulls units in.");
     }
     ImGui::SliderFloat("Blast duration", &m_explosion.duration, 0.0f, 5.0f, "%.2f s");
+    ImGui::SliderFloat("Blast damage", &m_explosion.damage, 0.0f, 100.0f, "%.1f hp");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Hit points a unit at the centre loses over the blast, fading toward the edge\n"
+                          "by the falloff. Units left with none are despawned.");
+    }
 
     constexpr sim::ExplosionFalloff curves[] = {sim::ExplosionFalloff::Constant, sim::ExplosionFalloff::Linear,
                                                 sim::ExplosionFalloff::Quadratic};
@@ -400,21 +407,28 @@ void LevelScene::healthUi() {
         std::vector<float> health;
         m_healthSampled = m_physics->readHealth(health) && !health.empty();
         if (m_healthSampled) {
+            // A unit at 0 has been despawned, so the mean and lowest are of
+            // the units still in play.
             double sum = 0.0;
-            m_healthLowest = health.front();
+            std::uint32_t alive = 0;
+            m_healthLowest = 0.0f;
             m_healthAtZero = 0;
             for (const float hp : health) {
+                if (hp <= 0.0f) {
+                    ++m_healthAtZero;
+                    continue;
+                }
+                m_healthLowest = alive == 0 ? hp : std::min(m_healthLowest, hp);
                 sum += hp;
-                m_healthLowest = std::min(m_healthLowest, hp);
-                m_healthAtZero += hp <= 0.0f ? 1u : 0u;
+                ++alive;
             }
-            m_healthMean = static_cast<float>(sum / static_cast<double>(health.size()));
+            m_healthMean = alive > 0 ? static_cast<float>(sum / alive) : 0.0f;
         }
     }
 
     if (m_healthSampled) {
         // Max HP is whole; hit points after damage need not be.
-        ImGui::Text("Health: mean %.1f / %u, lowest %.1f, %u at 0", m_healthMean, m_options.health.maxHp,
+        ImGui::Text("Health: mean %.1f / %u, lowest %.1f, %u despawned", m_healthMean, m_options.health.maxHp,
                     m_healthLowest, m_healthAtZero);
     }
 }

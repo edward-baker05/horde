@@ -64,6 +64,12 @@ struct MovementSettings {
     glm::vec2 goal{0.0f, 0.0f};
     float maxSpeed = 60.0f; // world units per second
     float steering = 4.0f;  // per second: how quickly velocity turns toward the goal
+    // Each unit's heading sways either side of where it is going by up to
+    // wobbleAngle radians, about wobbleRate times a second, each unit out of
+    // step with its neighbours. Steering smooths it into a gentle wobble.
+    // An angle of 0 turns it off.
+    float wobbleAngle = 0.3f;
+    float wobbleRate = 1.0f; // Hz
 };
 
 // An axis-aligned area of the level: a spawn or exit marker's band.
@@ -140,7 +146,20 @@ struct Explosion {
     ExplosionFalloff falloff = ExplosionFalloff::Linear;
     ExplosionFalloff decay = ExplosionFalloff::Constant;
     bool fling = false;
+    // Hit points a unit at the centre loses over the whole blast, fading
+    // toward the edge by `falloff` like the push. A unit left with none is
+    // despawned.
+    float damage = 0.0f;
 };
+
+// Where a despawned unit is kept: far outside any level, so every GPU pass
+// can tell it apart without another buffer. Matches DEAD_POSITION in
+// shaders/src/unit_state.hlsli.
+inline constexpr float kDeadPosition = -1.0e30f;
+
+inline bool isDeadUnit(glm::vec2 pos) {
+    return pos.x < -1.0e29f;
+}
 
 // GPU shaders hold at most this many explosions at once; a new one replaces
 // the oldest.

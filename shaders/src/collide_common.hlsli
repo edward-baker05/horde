@@ -57,6 +57,7 @@ static const uint SOLVER_AVERAGE = 1; // mean of corrections times AverageOmega
 #define WALL_BINS_SLOT t4
 #define WALL_BIN_INDICES_SLOT t5
 #include "walls.hlsli"
+#include "unit_state.hlsli"
 
 // A stable direction for two units sitting exactly on top of each other, so
 // they still separate. Opposite for the two members of the pair.

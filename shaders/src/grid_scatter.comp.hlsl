@@ -4,7 +4,9 @@
 // broadphase produces.
 //
 // Dispatched over max(units, cells) threads: thread i places unit i and fills
-// range i.
+// range i. Dead units have no cell and are left out.
+
+#include "unit_state.hlsli"
 
 StructuredBuffer<uint2> UnitCell : register(t0, space0); // per unit: (cell, slot)
 StructuredBuffer<uint> Starts : register(t1, space0);    // per cell: exclusive prefix sum of counts
@@ -24,7 +26,9 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
 
     if (i < UnitCount) {
         uint2 cellSlot = UnitCell[i];
-        SortedKeys[Starts[cellSlot.x] + cellSlot.y] = uint2(cellSlot.x, i);
+        if (cellSlot.x != NO_CELL) {
+            SortedKeys[Starts[cellSlot.x] + cellSlot.y] = uint2(cellSlot.x, i);
+        }
     }
 
     if (i < CellCount) {

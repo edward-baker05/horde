@@ -1,8 +1,9 @@
 // Last step of the gpu-collide pipeline: keep units out of walls and inside
 // the level, set each unit's velocity from where it actually ended up (so
 // collisions slow and deflect units rather than only moving them, and soak up
-// fling velocity: position-based dynamics), and damage units that reached an
-// exit and send them back to a spawn.
+// fling velocity: position-based dynamics), damage units that reached an
+// exit and send them back to a spawn, and despawn units with no hit points
+// left (see unit_state.hlsli).
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -48,6 +49,7 @@ cbuffer FinalizeParams : register(b0, space2) {
 #define WALL_BINS_SLOT t2
 #define WALL_BIN_INDICES_SLOT t3
 #include "walls.hlsli"
+#include "unit_state.hlsli"
 
 // PCG hash: a well-mixed uint from a uint.
 uint hash(uint v) {
@@ -111,6 +113,9 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     }
 
     UnitData unit = Units[index];
+    if (isDead(unit.pos)) {
+        return;
+    }
     float2 centre = sweepTowards(PrevPos[index] + Radius, unit.pos + Radius);
     centre = resolveWalls(centre, Radius);
     unit.pos = clamp(centre - Radius, WorldMin, WorldMax);
@@ -143,6 +148,14 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         float4 spawn = Spawns[h % SpawnCount];
         float2 r = float2(unitFloat(hash(h)), unitFloat(hash(h ^ 0x9E3779B9u))) * 2.0f - 1.0f;
         unit.pos = clamp(spawn.xy + r * spawn.zw - Radius, WorldMin, WorldMax);
+        unit.vel = float2(0.0f, 0.0f);
+        fling = float2(0.0f, 0.0f);
+    }
+
+    // Out of hit points, from an exit or an explosion: despawn. Every pass
+    // skips it from here on.
+    if (Health[index] <= 0.0f) {
+        unit.pos = float2(DEAD_POSITION, DEAD_POSITION);
         unit.vel = float2(0.0f, 0.0f);
         fling = float2(0.0f, 0.0f);
     }

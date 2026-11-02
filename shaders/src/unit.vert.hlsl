@@ -19,6 +19,8 @@ StructuredBuffer<float2> PrevPos : register(t1, space0);
 // Each unit's hit points, when InvMaxHealth > 0.
 StructuredBuffer<float> Health : register(t2, space0);
 
+#include "unit_state.hlsli"
+
 cbuffer UnitUniforms : register(b0, space1) {
     float4x4 ViewProjection;
     float4 UvRect;   // xy = top-left, zw = bottom-right
@@ -58,7 +60,9 @@ Output main(uint id : SV_VertexID) {
         float2(UvRect.z, UvRect.w),
     };
 
-    float2 local = QuadCorners[corner] * UnitSize;
+    // A dead unit's quad collapses to one point outside clip space, so it
+    // draws nothing.
+    float2 local = isDead(unit.pos) ? float2(0.0f, 0.0f) : QuadCorners[corner] * UnitSize;
     float2 pos = unit.pos;
     if (MaxJump > 0.0f) {
         float2 prev = PrevPos[unitIndex];

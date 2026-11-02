@@ -1,6 +1,9 @@
 // Counting-sort broadphase, step 1: count units per cell. Each unit claims a
 // slot in its cell with an atomic add and remembers (cell, slot), so the
-// scatter step can place it without another atomic.
+// scatter step can place it without another atomic. A dead unit claims no
+// cell, so no other unit ever finds it as a neighbour.
+
+#include "unit_state.hlsli"
 
 struct UnitData {
     float2 pos;
@@ -25,7 +28,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         return;
     }
 
-    int2 cell = clamp((int2)(Units[index].pos * InvCellSize), int2(0, 0), (int2)GridDim - 1);
+    float2 pos = Units[index].pos;
+    if (isDead(pos)) {
+        UnitCell[index] = uint2(NO_CELL, 0);
+        return;
+    }
+
+    int2 cell = clamp((int2)(pos * InvCellSize), int2(0, 0), (int2)GridDim - 1);
     uint cellId = (uint)cell.x + (uint)cell.y * GridDim.x;
 
     uint slot;

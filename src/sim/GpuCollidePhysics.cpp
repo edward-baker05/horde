@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL_log.h>
 
+#include <glm/trigonometric.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -37,9 +38,13 @@ struct alignas(16) GPUIntegrateUniforms {
     // Two per explosion: (centre, radius, this step's push at the centre),
     // then (falloff, fling 0 or 1, unused x2).
     glm::vec4 explosions[kMaxExplosions * 2];
+    float time; // seconds of simulation
+    float wobbleAngle;
+    float wobbleRate;
+    Uint32 wobblePadding;
 };
 static_assert(sizeof(GPUIntegrateUniforms) ==
-              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions);
+              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions + 16);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -137,8 +142,8 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         SDL_Log("GpuCollidePhysics: only the first %zu field regions are used", kMaxFieldRegions);
     }
 
-    // unit_integrate.comp: 3 rw buffers (units, previous positions, fling), 1 uniform buffer
-    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 3, 1, 256, 1, 1);
+    // unit_integrate.comp: 4 rw buffers (units, previous positions, fling, health), 1 uniform buffer
+    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 4, 1, 256, 1, 1);
     // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 3 rw buffers (units, health, fling),
     // 1 uniform buffer
     m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 3, 1, 256, 1, 1);
@@ -247,7 +252,8 @@ void GpuCollidePhysics::update(float dt) {
 }
 
 bool GpuCollidePhysics::addExplosion(const Explosion& explosion) {
-    if (explosion.radius <= 0.0f || explosion.strength == 0.0f) {
+    // A blast with no push still counts if it does damage.
+    if (explosion.radius <= 0.0f || (explosion.strength == 0.0f && explosion.damage <= 0.0f)) {
         return false;
     }
     if (m_explosions.size() >= kMaxExplosions) {
@@ -357,21 +363,27 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
             const float share = explosionShare(e, active.left, m_dt, kMaxBlastStepDiameters * m_config.unitSize);
             active.left -= share;
             uniforms.explosions[i * 2] = glm::vec4(e.center, e.radius, e.strength * share);
+            // Damage is given out in the same shares as the push, so it all
+            // lands over the blast's duration.
             uniforms.explosions[i * 2 + 1] =
-                glm::vec4(static_cast<float>(e.falloff), e.fling ? 1.0f : 0.0f, 0.0f, 0.0f);
+                glm::vec4(static_cast<float>(e.falloff), e.fling ? 1.0f : 0.0f, e.damage * share, 0.0f);
         }
         uniforms.flingDrag = m_flingDrag;
         // The same limit as a shove's, per step.
         uniforms.flingMaxSpeed = kMaxBlastStepDiameters * m_config.unitSize / m_dt;
+        uniforms.time = static_cast<float>(m_frame) * m_dt;
+        uniforms.wobbleAngle = m_config.movement.wobbleAngle;
+        uniforms.wobbleRate = m_config.movement.wobbleRate;
         std::erase_if(m_explosions, [](const ActiveExplosion& active) { return active.left <= 1e-5f; });
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding bindings[3]{};
+        SDL_GPUStorageBufferReadWriteBinding bindings[4]{};
         bindings[0].buffer = m_units[m_current];
         bindings[1].buffer = m_prevPositions;
         bindings[2].buffer = m_fling;
+        bindings[3].buffer = m_health;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 3)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 4)) {
             SDL_BindGPUComputePipeline(pass, m_integratePipeline);
             SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
             SDL_EndGPUComputePass(pass);
@@ -449,6 +461,13 @@ void GpuCollidePhysics::debugUi() {
     ImGui::Text("Heading for %zu exit(s) at %.0f u/s%s", m_config.flow.exits.size(), m_config.movement.maxSpeed,
                 m_config.flow.respawnAtExit ? ", respawning" : "");
     ImGui::Text("Max HP %u, %.1f damage per exit", m_config.health.maxHp, m_config.health.exitDamage);
+
+    // Live: the shader reads these every step.
+    float wobbleDegrees = glm::degrees(m_config.movement.wobbleAngle);
+    if (ImGui::SliderFloat("Wobble", &wobbleDegrees, 0.0f, 60.0f, "%.0f deg")) {
+        m_config.movement.wobbleAngle = glm::radians(wobbleDegrees);
+    }
+    ImGui::SliderFloat("Wobble rate", &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
 }
 
 bool GpuCollidePhysics::readHealth(std::vector<float>& out) {
@@ -492,8 +511,14 @@ bool GpuCollidePhysics::readHealth(std::vector<float>& out) {
     return ok;
 }
 
+// Live units only: despawned ones sit at kDeadPosition and would otherwise
+// count as one huge overlapping pile.
 bool GpuCollidePhysics::readUnits(std::vector<BaseUnitData>& out) {
-    return m_device && downloadUnits(m_device, m_units[m_current], m_unitCount, out);
+    if (!m_device || !downloadUnits(m_device, m_units[m_current], m_unitCount, out)) {
+        return false;
+    }
+    std::erase_if(out, [](const BaseUnitData& unit) { return isDeadUnit(unit.pos); });
+    return true;
 }
 
 } // namespace horde::sim
