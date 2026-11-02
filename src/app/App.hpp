@@ -5,9 +5,11 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "bench/Benchmark.hpp"
 #include "gfx/GpuContext.hpp"
+#include "gfx/GpuTimer.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
@@ -77,9 +79,14 @@ private:
     scene::FrameStats m_stats;
     bool m_measureSimGpu = true;
     bool m_haveStats = false;
+    // GPU physics timing while playing: fences polled off the main thread, so
+    // measuring costs the GPU nothing. Benchmarks wait for the work instead
+    // (see render()), which isolates it exactly.
+    gfx::GpuTimer m_gpuTimer;
+    std::vector<Uint64> m_gpuSamples;
     struct {
         Uint64 frames = 0, total = 0, frame = 0, frameMax = 0, update = 0, record = 0, gpu = 0, gpuMax = 0,
-               wait = 0;
+               gpuSamples = 0, wait = 0;
     } m_statsWindow;
 };
 

@@ -18,6 +18,7 @@ add_executable(horde
     src/core/Paths.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
+    src/gfx/GpuTimer.cpp
     src/gfx/LevelRenderer.cpp
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp

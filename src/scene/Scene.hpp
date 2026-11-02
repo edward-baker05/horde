@@ -41,9 +41,10 @@ struct Services {
     SDL_Window* window = nullptr;
     SceneStack* scenes = nullptr;
     const FrameStats* frameStats = nullptr;
-    // When set, App submits the scene's compute work on its own and waits for
-    // it each frame, which is what makes FrameStats::simGpuMs exact. Costs a
-    // little CPU/GPU overlap.
+    // When set, App submits the scene's compute work on a command buffer of
+    // its own and times it into FrameStats::simGpuMs. While playing that is
+    // done off the main thread with fences, costing the GPU nothing; a
+    // benchmark waits for the work instead, to isolate it exactly.
     bool* measureSimGpu = nullptr;
 };
 

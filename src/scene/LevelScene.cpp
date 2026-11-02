@@ -489,8 +489,9 @@ void LevelScene::frameCostUi() {
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Waits for the physics compute work each frame to time it exactly.\n"
-                              "Drawing's GPU time is not included in any line.");
+            ImGui::SetTooltip("Times the physics compute work on the GPU from a background thread,\n"
+                              "without waiting for it, so the frame rate is unaffected. Figures trail\n"
+                              "by a frame or two. Drawing's GPU time is not included in any line.");
         }
     }
     ImGui::Separator();

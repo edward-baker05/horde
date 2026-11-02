@@ -91,6 +91,8 @@ bool App::init(const AppConfig& config) {
     // Benchmarks decide for themselves whether to sync the GPU.
     if (m_config.bench) {
         m_measureSimGpu = m_config.bench->syncGpu;
+    } else {
+        m_gpuTimer.start(m_gpu.device());
     }
 
     m_scenes.emplace(services);
@@ -209,9 +211,10 @@ int App::finishBenchmark() {
 }
 
 void App::accumulateStats(Uint64 frameNs) {
-    // Render time includes the swapchain wait and the timed compute wait;
-    // what remains is the CPU building and submitting the frame.
-    const Uint64 waits = m_lastAcquireNs + m_lastPresentNs + (m_measureSimGpu ? m_lastGpuNs : 0);
+    // Render time includes the swapchain wait and, in a benchmark, the timed
+    // compute wait (m_lastGpuNs is 0 otherwise); what remains is the CPU
+    // building and submitting the frame.
+    const Uint64 waits = m_lastAcquireNs + m_lastPresentNs + m_lastGpuNs;
     const Uint64 record = m_lastRenderNs > waits ? m_lastRenderNs - waits : 0;
 
     m_statsWindow.frames++;
@@ -221,9 +224,23 @@ void App::accumulateStats(Uint64 frameNs) {
     m_statsWindow.update += m_lastSceneUpdateNs;
     m_statsWindow.record += record;
     m_statsWindow.wait += m_lastAcquireNs + m_lastPresentNs;
+    // GPU physics times: the frame's own when a benchmark waited for it,
+    // otherwise whatever GpuTimer has finished since the last frame. Those
+    // trail by a frame or two, so they are averaged by sample, not by frame.
+    m_gpuSamples.clear();
+    if (m_config.bench) {
+        if (m_measureSimGpu) {
+            m_gpuSamples.push_back(m_lastGpuNs);
+        }
+    } else {
+        m_gpuTimer.collect(m_gpuSamples);
+    }
     if (m_measureSimGpu) {
-        m_statsWindow.gpu += m_lastGpuNs;
-        m_statsWindow.gpuMax = std::max(m_statsWindow.gpuMax, m_lastGpuNs);
+        for (const Uint64 sample : m_gpuSamples) {
+            m_statsWindow.gpu += sample;
+            m_statsWindow.gpuMax = std::max(m_statsWindow.gpuMax, sample);
+            m_statsWindow.gpuSamples++;
+        }
     }
 
     // Publish twice a second: steady enough to read.
@@ -240,10 +257,15 @@ void App::accumulateStats(Uint64 frameNs) {
     m_stats.recordMs = ms(m_statsWindow.record);
     m_stats.waitMs = ms(m_statsWindow.wait);
     m_stats.simGpuMeasured = m_measureSimGpu;
-    m_stats.simGpuMs = m_measureSimGpu ? ms(m_statsWindow.gpu) : 0.0f;
+    m_stats.simGpuMs = m_measureSimGpu && m_statsWindow.gpuSamples > 0
+                           ? static_cast<float>(static_cast<double>(m_statsWindow.gpu) /
+                                                static_cast<double>(m_statsWindow.gpuSamples) / 1.0e6)
+                           : 0.0f;
     m_stats.simGpuMaxMs = m_measureSimGpu ? static_cast<float>(m_statsWindow.gpuMax / 1.0e6) : 0.0f;
-    m_stats.otherMs = std::max(0.0f, m_stats.frameMs - m_stats.updateMs - m_stats.recordMs - m_stats.waitMs -
-                                         m_stats.simGpuMs);
+    // A benchmark's GPU wait was part of the frame; GpuTimer's ran alongside it.
+    const float gpuWaitMs = m_config.bench ? m_stats.simGpuMs : 0.0f;
+    m_stats.otherMs =
+        std::max(0.0f, m_stats.frameMs - m_stats.updateMs - m_stats.recordMs - m_stats.waitMs - gpuWaitMs);
     m_statsWindow = {};
 }
 
@@ -334,7 +356,32 @@ void App::render() {
     // Compute runs first and outside the render pass — SDL_GPU passes cannot
     // nest, and the graphics pass samples what compute writes.
     if (active != nullptr) {
-        if (m_measureSimGpu) {
+        if (m_measureSimGpu && !m_config.bench) {
+            // While playing: the compute work goes on a command buffer of its
+            // own, after an empty one whose fence marks the GPU reaching it,
+            // and GpuTimer times the gap between the two fences on its own
+            // thread. Nothing here waits, so the CPU and GPU still overlap as
+            // they do unmeasured.
+            m_lastGpuNs = 0;
+            SDL_GPUCommandBuffer* marker = SDL_AcquireGPUCommandBuffer(m_gpu.device());
+            SDL_GPUFence* begin = marker != nullptr ? SDL_SubmitGPUCommandBufferAndAcquireFence(marker) : nullptr;
+            SDL_GPUCommandBuffer* computeCommands = SDL_AcquireGPUCommandBuffer(m_gpu.device());
+            if (computeCommands != nullptr) {
+                active->compute(computeCommands);
+                SDL_GPUFence* end = SDL_SubmitGPUCommandBufferAndAcquireFence(computeCommands);
+                if (begin != nullptr && end != nullptr) {
+                    m_gpuTimer.track(begin, end);
+                    begin = nullptr;
+                } else if (end != nullptr) {
+                    SDL_ReleaseGPUFence(m_gpu.device(), end);
+                }
+            } else {
+                active->compute(commands);
+            }
+            if (begin != nullptr) {
+                SDL_ReleaseGPUFence(m_gpu.device(), begin);
+            }
+        } else if (m_measureSimGpu) {
             // Benchmarks put the scene's compute work on a command buffer of
             // its own and wait for it, which times the simulation's GPU cost
             // alone: no rendering, no present, no frame-rate cap. The same
@@ -401,6 +448,7 @@ void App::shutdown() {
         SDL_WaitForGPUIdle(m_gpu.device());
     }
 
+    m_gpuTimer.stop();
     m_scenes.reset();
     m_imgui.shutdown();
     m_atlas.release();
