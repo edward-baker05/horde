@@ -28,6 +28,9 @@ LevelScene::~LevelScene() {
 bool LevelScene::onEnter(Services& services) {
     m_services = &services;
     m_pendingOptions = m_options;
+    m_explosionArmed = m_options.explosionArmed;
+    m_explosion = m_options.explosion;
+    m_flingDrag = m_options.flingDrag;
 
     // A missing or malformed level must never stop the game booting: fall back
     // to a bare default rather than failing to enter the scene.
@@ -107,7 +110,11 @@ bool LevelScene::onEnter(Services& services) {
             m_options.unitCount, m_options.physics.c_str(), sim::spawnPatternName(m_options.spawn),
             config.flow.spawns.size(), config.flow.exits.size(), m_level.walls.size(), m_walls->primitives().size());
 
-    return m_physics->init(services, config);
+    if (!m_physics->init(services, config)) {
+        return false;
+    }
+    m_physics->setFlingDrag(m_flingDrag);
+    return true;
 }
 
 void LevelScene::onExit() {
@@ -325,6 +332,11 @@ void LevelScene::debugUi() {
     ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
 
     if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {
+        // The explosion tool is set live, not as a pending option: take it as
+        // it is now, whatever preset was loaded since.
+        m_pendingOptions.explosionArmed = m_explosionArmed;
+        m_pendingOptions.explosion = m_explosion;
+        m_pendingOptions.flingDrag = m_flingDrag;
         m_services->scenes->replace(std::make_unique<LevelScene>(m_pendingOptions));
     }
 

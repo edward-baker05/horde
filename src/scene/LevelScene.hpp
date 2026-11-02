@@ -44,6 +44,11 @@ struct LevelOptions {
     float maxSpeed = sim::MovementSettings{}.maxSpeed;
     // The preset these options came from, if any, for display.
     std::string presetName;
+    // The debug explosion tool's settings. Restarting the level carries over
+    // whatever they were last set to, rather than resetting them.
+    bool explosionArmed = false;
+    sim::Explosion explosion;
+    float flingDrag = 3.0f;
 };
 
 // The game world. Currently a level full of simulated units and a button back
