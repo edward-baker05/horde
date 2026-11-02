@@ -446,22 +446,6 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
 }
 
 void GpuCollidePhysics::debugUi() {
-    const CollisionSettings& c = m_config.collision;
-    ImGui::Text("Broadphase: counting sort, %u x %u cells, %u passes", m_grid.gridDim().x, m_grid.gridDim().y,
-                m_grid.passCount());
-    if (c.solver == CollisionSolver::Average) {
-        ImGui::Text("Collision: %u Jacobi passes, average solver (omega %.2f)", c.iterations, c.averageOmega);
-    } else {
-        ImGui::Text("Collision: %u Jacobi passes, relaxed solver (%.2f)", c.iterations, c.relaxation);
-    }
-    ImGui::Text("Walls: %u primitives", m_walls.primitiveCount());
-    if (m_unitCount < m_capacity) {
-        ImGui::Text("Spawning: %u / %u at %.0f/s", m_unitCount, m_capacity, m_config.flow.spawnRate);
-    }
-    ImGui::Text("Heading for %zu exit(s) at %.0f u/s%s", m_config.flow.exits.size(), m_config.movement.maxSpeed,
-                m_config.flow.respawnAtExit ? ", respawning" : "");
-    ImGui::Text("Max HP %u, %.1f damage per exit", m_config.health.maxHp, m_config.health.exitDamage);
-
     // Live: the shader reads these every step.
     float wobbleDegrees = glm::degrees(m_config.movement.wobbleAngle);
     if (ImGui::SliderFloat("Wobble", &wobbleDegrees, 0.0f, 60.0f, "%.0f deg")) {

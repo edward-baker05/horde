@@ -200,8 +200,6 @@ void LevelScene::debugUi() {
     if (!m_options.presetName.empty()) {
         ImGui::Text("Preset: %s", m_options.presetName.c_str());
     }
-    ImGui::Text("Physics: %s", m_options.physics.c_str());
-    ImGui::TextWrapped("%s", sim::physicsDescription(m_options.physics));
     m_physics->debugUi();
     healthUi();
 
