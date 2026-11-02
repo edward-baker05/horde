@@ -25,6 +25,26 @@ _Avoid_: obstacle, collider, barrier, polygon
 Which geometry a wall has: rectangle, isoceles triangle, circle, or polyline.
 _Avoid_: shape type, primitive
 
+**Wall grid**:
+The level overlaid with square cells one unit across, any of which may be
+painted solid. Painted cells are walls: units collide with them. Every level
+has exactly one wall grid, though it may be empty.
+_Avoid_: tilemap, tiles, voxels
+
+**Cell**:
+One square of the wall grid: empty, full, or a slope, and when not empty, one
+of its palette's colours.
+_Avoid_: tile, pixel, block
+
+**Slope**:
+A cell solid on one side of its diagonal, giving a 45° surface.
+_Avoid_: ramp, diagonal, half-tile
+
+**Palette**:
+The eight colours a level's wall grid can use. Cells refer to an entry rather
+than holding a colour, so editing an entry recolours every cell that uses it.
+_Avoid_: swatches, colour table
+
 **Polyline**:
 A wall kind consisting of an ordered run of points joined by straight segments
 of uniform thickness. It need not be closed — a single straight segment is a

@@ -10,6 +10,7 @@
 
 #include "gfx/Camera2D.hpp"
 #include "logic/Level.hpp"
+#include "logic/WallGridShapes.hpp"
 #include "scene/Scene.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
@@ -109,6 +110,8 @@ private:
     // What the debug panel's restart button will apply.
     LevelOptions m_pendingOptions;
     logic::Level m_level;
+    // The wall grid merged for drawing, once, since the level doesn't change.
+    logic::GridPieces m_gridPieces;
 
     float enemy_size = 5.0f;
     bool m_showFieldRegions = true;

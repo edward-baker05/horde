@@ -8,8 +8,10 @@
 
 namespace horde::logic {
 
-// The schema version this build writes, and the only one it reads.
-inline constexpr int kLevelFormatVersion = 1;
+// The schema version this build writes. Version 2 added the wall grid; version
+// 1 files still load, with an empty one.
+inline constexpr int kLevelFormatVersion = 2;
+inline constexpr int kOldestLevelFormatVersion = 1;
 
 // Reads a level from disk.
 //

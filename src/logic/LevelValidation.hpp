@@ -21,4 +21,8 @@ struct Problem {
 // by construction in the editor rather than validated here. See spec section 3.
 std::vector<Problem> validate(const Level& level);
 
+// Things worth knowing that do not stop the level being saved, such as a spawn
+// or exit with painted cells over it. Shown to the user verbatim.
+std::vector<std::string> warnings(const Level& level);
+
 } // namespace horde::logic

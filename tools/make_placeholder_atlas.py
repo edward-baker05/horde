@@ -8,6 +8,10 @@ gfx::atlasCell(col, row, 4, 4):
     (1,0) filled disc       unlocked tech node, circle walls, rotate handle
     (2,0) isoceles triangle triangle walls; apex at the TOP of the cell, which
                             is -y in world space, i.e. apex-up on screen
+    (3,0) right triangle    wall-grid slopes; the bottom-left half of the
+                            cell, so its two straight sides ARE the cell's
+                            left and bottom edges and only the diagonal is
+                            antialiased: slopes sit flush against neighbours
     (0,1) crossed disc      locked tech node
     (1,1) solid             lines, edges, flat fills, backgrounds, markers
 
@@ -55,6 +59,11 @@ def in_triangle(x, y):
     return abs(x - CELL / 2.0) <= half
 
 
+def in_right_triangle(x, y):
+    """Bottom-left half of the cell, below the diagonal from top-left to bottom-right."""
+    return y >= x
+
+
 def cell_pixel(col, row, lx, ly):
     """Returns (r, g, b, a) for one texel of cell (col, row)."""
     if (col, row) == (0, 0):
@@ -67,6 +76,9 @@ def cell_pixel(col, row, lx, ly):
 
     if (col, row) == (2, 0):
         return (255, 255, 255, round(255 * coverage(in_triangle, lx, ly)))
+
+    if (col, row) == (3, 0):
+        return (255, 255, 255, round(255 * coverage(in_right_triangle, lx, ly)))
 
     if (col, row) == (0, 1):
         alpha = coverage(in_disc, lx, ly)

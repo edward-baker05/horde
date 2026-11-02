@@ -17,6 +17,10 @@ public:
     // Viewport size in pixels. Call on resize.
     void setViewport(float width, float height);
 
+    glm::vec2 viewport() const {
+        return m_viewport;
+    }
+
     // World-space point at the centre of the screen.
     void setCenter(glm::vec2 center) {
         m_center = center;

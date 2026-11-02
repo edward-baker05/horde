@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -10,7 +11,26 @@
 namespace horde::editor {
 
 // Which tool the left mouse button is currently driving.
-enum class Tool { Select, Rectangle, Triangle, Circle, Polyline, Spawn, Exit, FieldRegion };
+enum class Tool { Select, Rectangle, Triangle, Circle, Polyline, Spawn, Exit, FieldRegion, Paint };
+
+// What the paint tool's left button does to the wall grid. The right button
+// does the opposite: erases in paint and slope modes, paints in erase mode.
+enum class PaintMode { Paint, Erase, Slope };
+
+enum class BrushShape { Circle, Square };
+
+inline constexpr int kMaxBrushSize = 64;
+
+// The paint tool's settings. Kept between uses of the tool, like the other
+// "next wall" settings.
+struct PaintSettings {
+    PaintMode mode = PaintMode::Paint;
+    BrushShape shape = BrushShape::Circle;
+    int size = 4; // cells across, 1 .. kMaxBrushSize
+    std::uint8_t colorIndex = 0;
+    // Fill staircase notches with slopes when a paint stroke ends.
+    bool autoSmooth = true;
+};
 
 enum class SelectionKind { None, Wall, Marker, FieldRegion };
 
@@ -74,6 +94,8 @@ struct EditorState {
 
     // Push strength applied to the next field region placed.
     float newFieldStrength = logic::FieldRegion{}.strength;
+
+    PaintSettings paint;
 
     // Empty until the level has been saved or loaded from somewhere.
     std::filesystem::path path;

@@ -59,6 +59,7 @@ bool LevelScene::onEnter(Services& services) {
 
     // Walls don't move: flatten and bin them once, for every system to share.
     m_walls->build(m_level, enemy_size * 0.5f);
+    m_gridPieces = logic::mergeWallGrid(m_level.wallGrid, true);
 
     sim::SimConfig config;
     config.worldSize = m_level.size;
@@ -154,7 +155,7 @@ void LevelScene::compute(SDL_GPUCommandBuffer* commands) {
 
 void LevelScene::render(gfx::SpriteBatch& batch) {
     // Render world geometry through SpriteBatch
-    gfx::renderLevel(m_level, batch, m_services->atlas->handle(), m_showFieldRegions);
+    gfx::renderLevel(m_level, batch, m_services->atlas->handle(), m_showFieldRegions, &m_gridPieces);
 
     // Explosions: red pushes, blue pulls. Units are drawn over these.
     const auto explosionColor = [](float strength, float alpha) {

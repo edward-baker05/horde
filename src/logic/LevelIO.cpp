@@ -37,25 +37,36 @@ bool readVec2(const json& node, const char* key, glm::vec2& out, std::string* er
     return true;
 }
 
+// Reads a colour from `value` itself; `name` only labels the error.
+bool readRgbValue(const json& value, const char* name, Rgb& out, std::string* error) {
+    if (!value.is_array() || value.size() != 3) {
+        if (error) {
+            *error = std::string("key is not a three-number array: ") + name;
+        }
+        return false;
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (!value[i].is_number_integer()) {
+            if (error) {
+                *error = std::string("colour component is not an integer: ") + name;
+            }
+            return false;
+        }
+    }
+    out.r = static_cast<std::uint8_t>(std::clamp(value[0].get<int>(), 0, 255));
+    out.g = static_cast<std::uint8_t>(std::clamp(value[1].get<int>(), 0, 255));
+    out.b = static_cast<std::uint8_t>(std::clamp(value[2].get<int>(), 0, 255));
+    return true;
+}
+
 bool readRgb(const json& node, const char* key, Rgb& out, std::string* error) {
-    if (!node.contains(key) || !node[key].is_array() || node[key].size() != 3) {
+    if (!node.contains(key)) {
         if (error) {
             *error = std::string("key is not a three-number array: ") + key;
         }
         return false;
     }
-    for (int i = 0; i < 3; ++i) {
-        if (!node[key][i].is_number_integer()) {
-            if (error) {
-                *error = std::string("colour component is not an integer: ") + key;
-            }
-            return false;
-        }
-    }
-    out.r = static_cast<std::uint8_t>(std::clamp(node[key][0].get<int>(), 0, 255));
-    out.g = static_cast<std::uint8_t>(std::clamp(node[key][1].get<int>(), 0, 255));
-    out.b = static_cast<std::uint8_t>(std::clamp(node[key][2].get<int>(), 0, 255));
-    return true;
+    return readRgbValue(node[key], key, out, error);
 }
 
 json writeVec2(glm::vec2 v) {
@@ -207,6 +218,93 @@ json writeWall(const Wall& wall) {
     return node;
 }
 
+// Reads into a grid already sized to the level, so a `dim` that disagrees with
+// the level's size is caught here rather than trusted.
+bool readWallGrid(const json& node, WallGrid& grid, std::string* error) {
+    const auto fail = [&](const char* message) {
+        if (error) {
+            *error = std::string("wall grid: ") + message;
+        }
+        return false;
+    };
+
+    if (!node.is_object()) {
+        return fail("not an object");
+    }
+
+    if (!node.contains("dim") || !node["dim"].is_array() || node["dim"].size() != 2 ||
+        !node["dim"][0].is_number_integer() || !node["dim"][1].is_number_integer()) {
+        return fail("'dim' is not a two-integer array");
+    }
+    const glm::ivec2 dim{node["dim"][0].get<int>(), node["dim"][1].get<int>()};
+    if (dim != grid.dim) {
+        return fail("'dim' does not match the level's size");
+    }
+
+    if (!node.contains("palette") || !node["palette"].is_array() || node["palette"].size() != kPaletteSize) {
+        return fail("'palette' is not an array of eight colours");
+    }
+    for (std::size_t i = 0; i < kPaletteSize; ++i) {
+        if (!readRgbValue(node["palette"][i], "palette", grid.palette[i], error)) {
+            return false;
+        }
+    }
+
+    if (!node.contains("runs") || !node["runs"].is_array() || node["runs"].size() % 2 != 0) {
+        return fail("'runs' is not an array of (cell, count) pairs");
+    }
+    const std::size_t total = grid.cells.size();
+    std::size_t filled = 0;
+    const json& runs = node["runs"];
+    for (std::size_t i = 0; i < runs.size(); i += 2) {
+        if (!runs[i].is_number_unsigned() || !runs[i + 1].is_number_unsigned()) {
+            return fail("a run is not two non-negative integers");
+        }
+        const std::uint64_t bits = runs[i].get<std::uint64_t>();
+        const std::uint64_t count = runs[i + 1].get<std::uint64_t>();
+        if (bits > 0x3Fu || (bits & 0x7u) >= kCellShapeCount) {
+            return fail("unknown cell value");
+        }
+        const Cell cell{static_cast<std::uint8_t>(bits)};
+        if (cell.shape() == CellShape::Empty && cell.colorIndex() != 0) {
+            return fail("an empty cell has a colour");
+        }
+        if (count > total - filled) {
+            return fail("runs cover more cells than the grid has");
+        }
+        std::fill_n(grid.cells.begin() + static_cast<std::ptrdiff_t>(filled), count, cell);
+        filled += count;
+    }
+    if (filled != total) {
+        return fail("runs cover fewer cells than the grid has");
+    }
+    return true;
+}
+
+json writeWallGrid(const WallGrid& grid) {
+    json node;
+    node["dim"] = json::array({grid.dim.x, grid.dim.y});
+
+    json palette = json::array();
+    for (const Rgb& color : grid.palette) {
+        palette.push_back(writeRgb(color));
+    }
+    node["palette"] = std::move(palette);
+
+    json runs = json::array();
+    for (std::size_t i = 0; i < grid.cells.size();) {
+        std::size_t end = i + 1;
+        while (end < grid.cells.size() && grid.cells[end] == grid.cells[i]) {
+            ++end;
+        }
+        runs.push_back(static_cast<unsigned>(grid.cells[i].bits));
+        runs.push_back(static_cast<std::uint64_t>(end - i));
+        i = end;
+    }
+    node["runs"] = std::move(runs);
+    return node;
+}
+
 } // namespace
 
 std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* error) {
@@ -227,7 +325,7 @@ std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* e
     }
 
     if (!root.contains("version") || !root["version"].is_number_integer() ||
-        root["version"].get<int>() != kLevelFormatVersion) {
+        root["version"].get<int>() < kOldestLevelFormatVersion || root["version"].get<int>() > kLevelFormatVersion) {
         if (error) {
             *error = "unsupported or missing level format version";
         }
@@ -323,6 +421,14 @@ std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* e
         }
     }
 
+    // Optional: version 1 levels have no wall grid, and get an empty one.
+    resizeWallGrid(level.wallGrid, level.size);
+    if (root.contains("wallGrid")) {
+        if (!readWallGrid(root["wallGrid"], level.wallGrid, error)) {
+            return std::nullopt;
+        }
+    }
+
     // A level on disk with no markers predates nothing and means a hand-edited
     // file lost them. Restore the minimum rather than refusing to load.
     if (countMarkers(level, MarkerKind::Spawn) == 0) {
@@ -368,6 +474,7 @@ bool saveLevel(const Level& level, const std::filesystem::path& path, std::strin
         regions.push_back(std::move(node));
     }
     root["fieldRegions"] = std::move(regions);
+    root["wallGrid"] = writeWallGrid(level.wallGrid);
 
     std::error_code code;
     std::filesystem::create_directories(path.parent_path(), code);

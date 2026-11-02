@@ -1,6 +1,7 @@
 #include "gfx/LevelRenderer.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 #include "gfx/SpriteBatch.hpp"
@@ -22,6 +23,10 @@ glm::vec4 cellTriangle() {
 
 glm::vec4 cellSolid() {
     return atlasCell(1, 1, 4, 4);
+}
+
+glm::vec4 cellRightTriangle() {
+    return atlasCell(3, 0, 4, 4);
 }
 
 glm::vec4 toFloatColor(logic::Rgb color) {
@@ -71,6 +76,43 @@ void renderWall(const logic::Wall& wall, SpriteBatch& batch, SDL_GPUTexture* atl
     }
 }
 
+void renderSlope(glm::ivec2 cell, logic::CellShape shape, SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec4 color) {
+    // The atlas right triangle is the cell's south-west half, its straight sides
+    // on the quad's edges. Drawing it over the whole cell, turned a quarter
+    // clockwise per step from SW, lands those sides exactly on the cell's
+    // edges, so a slope meets its neighbours with no seam; only the diagonal,
+    // the exposed face, is antialiased.
+    constexpr float kQuarterTurn = 1.5707964f;
+    float quarters = 0.0f;
+    switch (shape) {
+        case logic::CellShape::SlopeNW:
+            quarters = 1.0f;
+            break;
+        case logic::CellShape::SlopeNE:
+            quarters = 2.0f;
+            break;
+        case logic::CellShape::SlopeSE:
+            quarters = 3.0f;
+            break;
+        default:
+            break;
+    }
+    drawCentered(batch, atlas, (glm::vec2(cell) + 0.5f) * logic::kCellSize, glm::vec2(logic::kCellSize),
+                 quarters * kQuarterTurn, cellRightTriangle(), color);
+}
+
+void renderWallGrid(const logic::GridPieces& pieces, const logic::WallGrid& grid, SpriteBatch& batch,
+                    SDL_GPUTexture* atlas) {
+    for (const logic::GridRect& rect : pieces.rects) {
+        const glm::vec2 size = glm::vec2(rect.size) * logic::kCellSize;
+        drawCentered(batch, atlas, glm::vec2(rect.origin) * logic::kCellSize + size * 0.5f, size, 0.0f, cellSolid(),
+                     toFloatColor(grid.palette[rect.colorIndex]));
+    }
+    for (const logic::GridSlope& slope : pieces.slopes) {
+        renderSlope(slope.cell, slope.shape, batch, atlas, toFloatColor(grid.palette[slope.colorIndex]));
+    }
+}
+
 glm::vec4 fieldRegionColor() {
     return {0.35f, 0.6f, 1.0f, 0.18f};
 }
@@ -98,7 +140,8 @@ void renderFieldRegion(const logic::FieldRegion& region, SpriteBatch& batch, SDL
                  cellTriangle(), arrow);
 }
 
-void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas, bool showFieldRegions) {
+void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas, bool showFieldRegions,
+                 const logic::GridPieces* gridPieces) {
     // Background: exactly the bounds, drawn first so everything lands on top.
     drawCentered(batch, atlas, level.size * 0.5f, level.size, 0.0f, cellSolid(), toFloatColor(level.backgroundColor));
 
@@ -107,6 +150,12 @@ void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* 
         for (const logic::FieldRegion& region : level.fieldRegions) {
             renderFieldRegion(region, batch, atlas, fieldRegionColor());
         }
+    }
+
+    if (gridPieces != nullptr) {
+        renderWallGrid(*gridPieces, level.wallGrid, batch, atlas);
+    } else {
+        renderWallGrid(logic::mergeWallGrid(level.wallGrid, true), level.wallGrid, batch, atlas);
     }
 
     for (const logic::Wall& wall : level.walls) {

@@ -71,6 +71,20 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         m_cursorWorld = mouseWorld(event.motion.x, event.motion.y);
     }
 
+    if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard && m_state.tool == editor::Tool::Paint) {
+        // Shift and a number picks a palette colour; without shift, numbers
+        // still switch tools.
+        if ((event.key.mod & SDL_KMOD_SHIFT) != 0 && event.key.key >= SDLK_1 && event.key.key <= SDLK_8) {
+            m_state.paint.colorIndex = static_cast<std::uint8_t>(event.key.key - SDLK_1);
+            return true;
+        }
+        if (event.key.key == SDLK_LEFTBRACKET || event.key.key == SDLK_RIGHTBRACKET) {
+            const int step = event.key.key == SDLK_LEFTBRACKET ? -1 : 1;
+            m_state.paint.size = std::clamp(m_state.paint.size + step, 1, editor::kMaxBrushSize);
+            return true;
+        }
+    }
+
     if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard) {
         switch (event.key.key) {
             case SDLK_1:
@@ -97,6 +111,9 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
             case SDLK_8:
                 m_state.tool = editor::Tool::FieldRegion;
                 return true;
+            case SDLK_9:
+                m_state.tool = editor::Tool::Paint;
+                return true;
 
             case SDLK_DELETE:
             case SDLK_BACKSPACE:
@@ -116,6 +133,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 // committing a partial one.
                 m_draft.clear();
                 m_placement.active = false;
+                m_painting = false;
                 m_state.tool = editor::Tool::Select;
                 return true;
 
@@ -139,6 +157,14 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
 
             default:
                 break;
+        }
+    }
+
+    // A stroke already under way keeps going even over a panel, so releasing
+    // the button there still ends it.
+    if (m_state.tool == editor::Tool::Paint && (m_painting || !io.WantCaptureMouse)) {
+        if (handlePaintEvent(event)) {
+            return true;
         }
     }
 
@@ -423,9 +449,149 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
     return false;
 }
 
+bool EditorScene::handlePaintEvent(const SDL_Event& event) {
+    logic::WallGrid& grid = m_state.level.wallGrid;
+    const editor::PaintSettings& paint = m_state.paint;
+
+    switch (event.type) {
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            const std::uint8_t button = event.button.button;
+            if (m_painting || (button != SDL_BUTTON_LEFT && button != SDL_BUTTON_RIGHT)) {
+                break;
+            }
+            const SDL_Keymod mod = SDL_GetModState();
+
+            // Alt-click is an eyedropper: it picks up the colour under the
+            // cursor and paints nothing.
+            if (button == SDL_BUTTON_LEFT && (mod & SDL_KMOD_ALT) != 0) {
+                const logic::Cell cell = grid.at(editor::cellAt(m_cursorWorld));
+                if (!cell.empty()) {
+                    m_state.paint.colorIndex = cell.colorIndex();
+                }
+                return true;
+            }
+
+            // Slope mode's left click turns the one cell under the cursor to
+            // the next slope, rather than stamping the brush.
+            if (button == SDL_BUTTON_LEFT && paint.mode == editor::PaintMode::Slope) {
+                const glm::ivec2 cell = editor::cellAt(m_cursorWorld);
+                if (grid.contains(cell)) {
+                    m_state.beginMutation();
+                    grid.set(cell, logic::Cell::make(editor::nextSlope(grid.at(cell).shape()), paint.colorIndex));
+                }
+                return true;
+            }
+
+            const bool erase = (paint.mode == editor::PaintMode::Erase) == (button == SDL_BUTTON_LEFT);
+            m_paintValue = erase ? logic::Cell{} : logic::Cell::make(logic::CellShape::Full, paint.colorIndex);
+            m_paintButton = button;
+            m_painting = true;
+            m_strokeBox = editor::CellBox{};
+
+            // Snapshot once, at the start of the stroke, so it undoes whole.
+            m_state.beginMutation();
+            if ((mod & SDL_KMOD_SHIFT) != 0 && m_hasLastStamp) {
+                editor::stampLine(grid, m_lastStamp, m_cursorWorld, paint, m_paintValue, m_strokeBox);
+            } else {
+                editor::stampBrush(grid, m_cursorWorld, paint, m_paintValue, m_strokeBox);
+            }
+            m_lastStamp = m_cursorWorld;
+            m_hasLastStamp = true;
+            return true;
+        }
+
+        case SDL_EVENT_MOUSE_MOTION:
+            if (!m_painting) {
+                return false;
+            }
+            editor::stampLine(grid, m_lastStamp, m_cursorWorld, paint, m_paintValue, m_strokeBox);
+            m_lastStamp = m_cursorWorld;
+            return true;
+
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (!m_painting || event.button.button != m_paintButton) {
+                break;
+            }
+            m_painting = false;
+            // Smoothing fills notches, so it follows painting only: after an
+            // erase it would put back some of what was just removed.
+            if (!m_paintValue.empty() && paint.autoSmooth) {
+                editor::autoSmooth(grid, m_strokeBox, paint.colorIndex);
+            }
+            return true;
+
+        default:
+            break;
+    }
+    return false;
+}
+
+void EditorScene::renderPaintOverlay(gfx::SpriteBatch& batch) {
+    SDL_GPUTexture* atlas = m_services->atlas->handle();
+    const logic::WallGrid& grid = m_state.level.wallGrid;
+    const float zoom = m_camera.zoom();
+
+    // Cell lines, only once they are far enough apart on screen to help.
+    if (logic::kCellSize * zoom >= 6.0f) {
+        const glm::vec2 a = m_camera.screenToWorld({0.0f, 0.0f});
+        const glm::vec2 b = m_camera.screenToWorld(m_camera.viewport());
+        const glm::vec2 levelMax = glm::vec2(grid.dim) * logic::kCellSize;
+        const glm::vec2 lo = glm::max(glm::min(a, b), glm::vec2(0.0f));
+        const glm::vec2 hi = glm::min(glm::max(a, b), levelMax);
+        const glm::ivec2 first = glm::ivec2(glm::ceil(lo / logic::kCellSize));
+        const glm::ivec2 last = glm::ivec2(glm::floor(hi / logic::kCellSize));
+        const float width = 1.0f / zoom;
+        const glm::vec4 lineColor{1.0f, 1.0f, 1.0f, 0.06f};
+
+        for (int x = first.x; x <= last.x; ++x) {
+            const float wx = static_cast<float>(x) * logic::kCellSize;
+            gfx::drawCentered(batch, atlas, {wx, (lo.y + hi.y) * 0.5f}, {width, hi.y - lo.y}, 0.0f, gfx::cellSolid(),
+                              lineColor);
+        }
+        for (int y = first.y; y <= last.y; ++y) {
+            const float wy = static_cast<float>(y) * logic::kCellSize;
+            gfx::drawCentered(batch, atlas, {(lo.x + hi.x) * 0.5f, wy}, {hi.x - lo.x, width}, 0.0f, gfx::cellSolid(),
+                              lineColor);
+        }
+    }
+
+    // What the brush covers here: the next slope for slope mode, otherwise
+    // every cell under the brush, in the paint colour or red for erasing.
+    glm::vec4 paintColor = gfx::toFloatColor(grid.palette[m_state.paint.colorIndex]);
+    paintColor.a = 0.45f;
+
+    if (m_state.paint.mode == editor::PaintMode::Slope && !m_painting) {
+        const glm::ivec2 cell = editor::cellAt(m_cursorWorld);
+        if (grid.contains(cell)) {
+            const glm::vec2 centre = (glm::vec2(cell) + 0.5f) * logic::kCellSize;
+            gfx::drawCentered(batch, atlas, centre, glm::vec2(logic::kCellSize), 0.0f, gfx::cellSquare(),
+                              {1.0f, 1.0f, 1.0f, 0.5f});
+            const logic::CellShape next = editor::nextSlope(grid.at(cell).shape());
+            if (next != logic::CellShape::Empty) {
+                gfx::renderSlope(cell, next, batch, atlas, paintColor);
+            }
+        }
+        return;
+    }
+
+    const bool erase = m_painting ? m_paintValue.empty() : m_state.paint.mode == editor::PaintMode::Erase;
+    const glm::vec4 color = erase ? glm::vec4{1.0f, 0.3f, 0.25f, 0.35f} : paintColor;
+    for (const glm::ivec2& cell : editor::brushCells(grid, m_cursorWorld, m_state.paint)) {
+        gfx::drawCentered(batch, atlas, (glm::vec2(cell) + 0.5f) * logic::kCellSize, glm::vec2(logic::kCellSize), 0.0f,
+                          gfx::cellSolid(), color);
+    }
+}
+
 void EditorScene::render(gfx::SpriteBatch& batch) {
     SDL_GPUTexture* atlas = m_services->atlas->handle();
-    gfx::renderLevel(m_state.level, batch, atlas);
+
+    const logic::WallGrid& grid = m_state.level.wallGrid;
+    if (grid.dim != m_gridPiecesDim || grid.cells != m_gridPiecesCells) {
+        m_gridPieces = logic::mergeWallGrid(grid, true);
+        m_gridPiecesCells = grid.cells;
+        m_gridPiecesDim = grid.dim;
+    }
+    gfx::renderLevel(m_state.level, batch, atlas, true, &m_gridPieces);
 
     // Redraw the hovered and selected walls tinted, on top of the level. There
     // is no depth test, so drawing after is what puts them on top.
@@ -483,6 +649,10 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
         if (problem.wallIndex < m_state.level.walls.size()) {
             gfx::renderWall(m_state.level.walls[problem.wallIndex], batch, atlas, {1.0f, 0.25f, 0.2f, 0.55f});
         }
+    }
+
+    if (m_state.tool == editor::Tool::Paint) {
+        renderPaintOverlay(batch);
     }
 
     // The grips on the selected wall or field region, drawn last so nothing

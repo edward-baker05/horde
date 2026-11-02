@@ -6,6 +6,7 @@
 #include <variant>
 
 #include "logic/LevelGeometry.hpp"
+#include "logic/WallGridShapes.hpp"
 
 namespace horde::sim {
 
@@ -148,6 +149,19 @@ void WallColliders::build(const logic::Level& level, float reach) {
     m_primitives.clear();
     for (const logic::Wall& wall : level.walls) {
         appendWall(wall, m_primitives);
+    }
+
+    // The wall grid, merged ignoring colour so a block painted in several
+    // colours is still one box.
+    const logic::GridPieces pieces = logic::mergeWallGrid(level.wallGrid, false);
+    for (const logic::GridRect& rect : pieces.rects) {
+        const glm::vec2 half = glm::vec2(rect.size) * (logic::kCellSize * 0.5f);
+        const glm::vec2 centre = glm::vec2(rect.origin) * logic::kCellSize + half;
+        m_primitives.push_back({centre, {1.0f, 0.0f}, half, WallPrimitive::Box, 0.0f});
+    }
+    for (const logic::GridSlope& slope : pieces.slopes) {
+        const std::array<glm::vec2, 3> corners = logic::slopeCorners(slope.cell, slope.shape);
+        m_primitives.push_back({corners[0], corners[1], corners[2], WallPrimitive::Triangle, 0.0f});
     }
 
     // Bins a few unit-widths across: small enough that a unit tests only the

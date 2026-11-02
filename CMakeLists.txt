@@ -37,6 +37,7 @@ add_executable(horde
     src/editor/Handles.cpp
     src/editor/Markers.cpp
     src/editor/HitTest.cpp
+    src/editor/Paint.cpp
     src/editor/Tools.cpp
     src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
@@ -51,7 +52,8 @@ add_executable(horde
     src/logic/LevelGeometry.cpp
     src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
-    src/logic/LevelValidation.cpp)
+    src/logic/LevelValidation.cpp
+    src/logic/WallGridShapes.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

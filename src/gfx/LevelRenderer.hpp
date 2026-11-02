@@ -5,6 +5,7 @@
 #include <glm/vec4.hpp>
 
 #include "logic/Level.hpp"
+#include "logic/WallGridShapes.hpp"
 
 namespace horde::gfx {
 
@@ -15,17 +16,29 @@ glm::vec4 cellSquare();   // (0,0) bordered square
 glm::vec4 cellDisc();     // (1,0) filled disc
 glm::vec4 cellTriangle(); // (2,0) isoceles triangle, apex toward -y
 glm::vec4 cellSolid();    // (1,1) solid fill
+glm::vec4 cellRightTriangle(); // (3,0) right triangle, the cell's south-west half
 
 // Converts a stored colour to the linear float vector the GPU wants, opaque.
 glm::vec4 toFloatColor(logic::Rgb color);
 
-// Queues a whole level: background, then field regions (if shown), then walls
-// in list order, then markers.
+// Queues a whole level: background, then field regions (if shown), then the
+// wall grid, then walls in list order, then markers.
+//
+// `gridPieces` is the wall grid merged by colour (logic::mergeWallGrid with
+// byColor true). Callers that draw the same level every frame pass a cached
+// copy; null merges it here, which costs a pass over every cell.
 //
 // Shared by the editor and by LevelScene so the two views of a level cannot
 // drift apart. Draw order is submission order — there is no depth test.
-void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas,
-                 bool showFieldRegions = true);
+void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas, bool showFieldRegions = true,
+                 const logic::GridPieces* gridPieces = nullptr);
+
+// Queues a merged wall grid, each piece in its palette colour.
+void renderWallGrid(const logic::GridPieces& pieces, const logic::WallGrid& grid, SpriteBatch& batch,
+                    SDL_GPUTexture* atlas);
+
+// Queues one slope cell in `color`.
+void renderSlope(glm::ivec2 cell, logic::CellShape shape, SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec4 color);
 
 // Queues one field region: a translucent box with an arrow along its push
 // direction. `color`'s alpha is the box's; the arrow is drawn more opaque.

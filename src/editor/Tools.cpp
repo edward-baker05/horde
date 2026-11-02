@@ -28,6 +28,8 @@ const char* toolName(Tool tool) {
             return "Exit";
         case Tool::FieldRegion:
             return "Field region";
+        case Tool::Paint:
+            return "Paint cells";
     }
     return "Select";
 }
