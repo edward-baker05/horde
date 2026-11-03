@@ -326,7 +326,7 @@ void LevelScene::debugUi() {
     if (m_pendingOptions.collision.solver == sim::CollisionSolver::Average) {
         ImGui::SliderFloat("Omega", &m_pendingOptions.collision.averageOmega, 0.5f, 2.0f);
     } else {
-        ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.05f, 1.0f);
+        ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.0f, 0.5f);
     }
     if (m_pendingOptions.collision.solver == sim::CollisionSolver::Chebyshev) {
         ImGui::SliderFloat("Rho", &m_pendingOptions.collision.chebyshevRho, 0.05f, 0.99f);

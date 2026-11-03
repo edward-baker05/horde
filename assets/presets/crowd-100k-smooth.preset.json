@@ -7,7 +7,7 @@
   "spawnRate": 4000,
   "solver": "relaxed",
   "collisionIterations": 16,
-  "relaxation": 1.0,
+  "relaxation": 0.5,
   "speed": 200,
   "congestionStart": 1.0,
   "congestionStop": 1.6,

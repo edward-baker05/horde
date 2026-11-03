@@ -228,3 +228,43 @@ crowd moves as a body; high means it boils and mixes.
 - Lower mean speed is partly the point: units queue instead of compressing.
 
 `crowd-100k-smooth` is the 1.0-1.6 + 0.5 combination.
+
+### Against relaxation (2026-11-03, later still)
+
+Everything above ran at the preset's relaxation of 1.0. The same variants at
+0.25 and 0.5 (`--relaxation`, D3D12, 2 repeats, 16 passes):
+
+| Variant | Relaxation | GPU sim ms | Overlap % | Penetration | Jitter | Mean speed |
+| --- | --- | --- | --- | --- | --- | --- |
+| baseline | 0.25 | 0.47 | 65.1 | 0.194 | 8.8 | 127 |
+| baseline | 0.5 | 0.46 | 63.4 | 0.171 | 9.0 | 120 |
+| baseline | 1.0 | 0.48 | 65.4 | 0.199 | 74.0 | 139 |
+| smoothing 0.5 | 0.25 | 0.48 | 65.8 | 0.190 | 3.0 | 125 |
+| **smoothing 0.5** | **0.5** | **0.47** | **63.6** | **0.168** | **3.1** | **117** |
+| smoothing 0.5 | 1.0 | 0.47 | 63.1 | 0.195 | 16.2 | 113 |
+| congestion 1.0-1.6 | 0.25 | 0.46 | 81.8 | 0.121 | 3.5 | 59 |
+| congestion 1.0-1.6 | 0.5 | 0.46 | 78.1 | 0.099 | 3.8 | 68 |
+| congestion 1.0-1.6 | 1.0 | 0.43 | 73.3 | 0.138 | 21.1 | 94 |
+| congestion 1.2-2.0 + smoothing 0.5 | 0.25 | 0.45 | 74.1 | 0.171 | 1.6 | 78 |
+| **congestion 1.2-2.0 + smoothing 0.5** | **0.5** | **0.44** | **69.9** | **0.147** | **1.9** | **89** |
+| congestion 1.2-2.0 + smoothing 0.5 | 1.0 | 0.46 | 66.1 | 0.171 | 11.5 | 105 |
+| congestion 1.0-1.6 + smoothing 0.5 | 0.25 | 0.45 | 81.8 | 0.121 | 1.3 | 57 |
+| congestion 1.0-1.6 + smoothing 0.5 | 0.5 | 0.46 | 78.7 | 0.098 | 1.5 | 66 |
+| congestion 1.0-1.6 + smoothing 0.5 | 1.0 | 0.45 | 73.3 | 0.136 | 4.5 | 86 |
+| congestion 0.9-1.3 + smoothing 0.5 | 0.25 | 0.44 | 88.3 | 0.072 | 1.0 | 37 |
+| congestion 0.9-1.3 + smoothing 0.5 | 0.5 | 0.46 | 84.7 | 0.054 | 1.2 | 45 |
+| congestion 0.9-1.3 + smoothing 0.5 | 1.0 | 0.43 | 81.6 | 0.080 | 2.2 | 56 |
+
+- **Relaxation 1.0 is most of the boiling.** Dropping to 0.5 cuts baseline
+  jitter 8x (74 to 9) and *lowers* penetration (0.199 to 0.171): at 1.0 a unit
+  pushed by several neighbours at once overshoots, so the passes fight each
+  other instead of converging.
+- 0.5 beats 0.25 on penetration everywhere with about the same jitter: 0.25
+  under-corrects in 16 passes.
+- At 0.5, smoothing alone gets jitter to 3.1 at 117 speed (vs 139 at the
+  boiling baseline), without slowing the crowd the way congestion does.
+  Congestion on top is for capping density, not for calm.
+
+Since then `crowd-100k-relaxed` and `crowd-100k-smooth` run at relaxation 0.5
+and the level panel's slider stops at 0.5. Every `crowd-100k-relaxed` result
+above this section was at 1.0: add `--relaxation 1` to reproduce them.
