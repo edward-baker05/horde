@@ -3,6 +3,11 @@
 
 using namespace metal;
 
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
 struct UnitData
 {
     float2 pos;
@@ -48,7 +53,7 @@ struct type_IntegrateParams
     uint WobblePadding;
 };
 
-kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(1)]], device type_RWStructuredBuffer_v2float& PrevPos [[buffer(2)]], device type_RWStructuredBuffer_v2float& Fling [[buffer(3)]], device type_RWStructuredBuffer_float& Health [[buffer(4)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], device type_StructuredBuffer_uint& Ids [[buffer(1)]], device type_RWStructuredBuffer_UnitData& Units [[buffer(2)]], device type_RWStructuredBuffer_v2float& PrevPos [[buffer(3)]], device type_RWStructuredBuffer_v2float& Fling [[buffer(4)]], device type_RWStructuredBuffer_float& Health [[buffer(5)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
 {
     do
     {
@@ -56,182 +61,184 @@ kernel void main0(constant type_IntegrateParams& IntegrateParams [[buffer(0)]], 
         {
             break;
         }
-        float2 _97 = Units._m0[gl_GlobalInvocationID.x].pos;
-        float2 _99 = Units._m0[gl_GlobalInvocationID.x].vel;
-        PrevPos._m0[gl_GlobalInvocationID.x] = _97;
-        if (_97.x < (-100000001504746621987668885504.0))
+        float2 _101 = Units._m0[gl_GlobalInvocationID.x].pos;
+        float2 _103 = Units._m0[gl_GlobalInvocationID.x].vel;
+        PrevPos._m0[gl_GlobalInvocationID.x] = _101;
+        if (_101.x < (-100000001504746621987668885504.0))
         {
             break;
         }
-        float2 _108 = _97 + float2(IntegrateParams.Radius);
-        float2 _110;
-        _110 = float2(0.0);
-        float2 _111;
-        for (uint _113 = 0u; _113 < IntegrateParams.FieldCount; _110 = _111, _113++)
+        float2 _112 = _101 + float2(IntegrateParams.Radius);
+        float2 _114;
+        _114 = float2(0.0);
+        float2 _115;
+        for (uint _117 = 0u; _117 < IntegrateParams.FieldCount; _114 = _115, _117++)
         {
-            uint _120 = _113 * 2u;
-            uint _123 = _120 + 1u;
-            float2 _127 = _108 - IntegrateParams.Fields[_120].xy;
-            if (all(abs(float2(dot(_127, IntegrateParams.Fields[_123].xy), dot(_127, float2(-IntegrateParams.Fields[_123].y, IntegrateParams.Fields[_123].x)))) <= IntegrateParams.Fields[_120].zw))
+            uint _124 = _117 * 2u;
+            uint _127 = _124 + 1u;
+            float2 _131 = _112 - IntegrateParams.Fields[_124].xy;
+            if (all(abs(float2(dot(_131, IntegrateParams.Fields[_127].xy), dot(_131, float2(-IntegrateParams.Fields[_127].y, IntegrateParams.Fields[_127].x)))) <= IntegrateParams.Fields[_124].zw))
             {
-                _111 = _110 + (IntegrateParams.Fields[_123].xy * IntegrateParams.Fields[_123].z);
+                _115 = _114 + (IntegrateParams.Fields[_127].xy * IntegrateParams.Fields[_127].z);
             }
             else
             {
-                _111 = _110;
+                _115 = _114;
             }
         }
-        float _145 = length(_110);
-        float2 _203;
-        float _204;
-        if (_145 > 9.9999997473787516355514526367188e-05)
+        float _149 = length(_114);
+        float2 _207;
+        float _208;
+        if (_149 > 9.9999997473787516355514526367188e-05)
         {
-            _203 = (_110 / float2(_145)) * IntegrateParams.MaxSpeed;
-            _204 = _145;
+            _207 = (_114 / float2(_149)) * IntegrateParams.MaxSpeed;
+            _208 = _149;
         }
         else
         {
-            float2 _188;
+            float2 _192;
             do
             {
                 if (IntegrateParams.ExitCount == 0u)
                 {
-                    _188 = IntegrateParams.FallbackGoal;
+                    _192 = IntegrateParams.FallbackGoal;
                     break;
                 }
-                float2 _171;
-                _171 = IntegrateParams.Exits[0].xy;
-                float _168 = 3.3999999521443642490773241379936e+38;
-                uint _173 = 0u;
-                for (; _173 < IntegrateParams.ExitCount; )
+                float2 _175;
+                _175 = IntegrateParams.Exits[0].xy;
+                float _172 = 3.3999999521443642490773241379936e+38;
+                uint _177 = 0u;
+                for (; _177 < IntegrateParams.ExitCount; )
                 {
-                    float2 _183 = fast::clamp(_108, IntegrateParams.Exits[_173].xy - IntegrateParams.Exits[_173].zw, IntegrateParams.Exits[_173].xy + IntegrateParams.Exits[_173].zw);
-                    float2 _184 = _183 - _108;
-                    float _185 = dot(_184, _184);
-                    bool _186 = _185 < _168;
-                    _168 = _186 ? _185 : _168;
-                    _171 = select(_171, _183, bool2(_186));
-                    _173++;
+                    float2 _187 = fast::clamp(_112, IntegrateParams.Exits[_177].xy - IntegrateParams.Exits[_177].zw, IntegrateParams.Exits[_177].xy + IntegrateParams.Exits[_177].zw);
+                    float2 _188 = _187 - _112;
+                    float _189 = dot(_188, _188);
+                    bool _190 = _189 < _172;
+                    _172 = _190 ? _189 : _172;
+                    _175 = select(_175, _187, bool2(_190));
+                    _177++;
                     continue;
                 }
-                _188 = _171;
+                _192 = _175;
                 break;
             } while(false);
-            float2 _189 = _188 - _108;
-            float _190 = length(_189);
-            float2 _200;
-            if (_190 > 0.001000000047497451305389404296875)
+            float2 _193 = _192 - _112;
+            float _194 = length(_193);
+            float2 _204;
+            if (_194 > 0.001000000047497451305389404296875)
             {
-                _200 = (_189 / float2(_190)) * IntegrateParams.MaxSpeed;
+                _204 = (_193 / float2(_194)) * IntegrateParams.MaxSpeed;
             }
             else
             {
-                _200 = float2(0.0);
+                _204 = float2(0.0);
             }
-            _203 = _200;
-            _204 = IntegrateParams.Steering;
+            _207 = _204;
+            _208 = IntegrateParams.Steering;
         }
-        float2 _250;
+        float2 _281;
         if (IntegrateParams.WobbleAngle > 0.0)
         {
-            uint _212 = (gl_GlobalInvocationID.x ^ 2654435769u) * 2246822507u;
-            float _229 = IntegrateParams.Time * ((IntegrateParams.WobbleRate * 6.283185482025146484375) * (0.75 + (float(_212 & 65535u) * 7.629510946571826934814453125e-06)));
-            float _238 = IntegrateParams.WobbleAngle * ((0.64999997615814208984375 * sin(_229 + (float((gl_GlobalInvocationID.x * 2654435761u) >> 16u) * 9.5873801910784095525741577148438e-05))) + (0.3499999940395355224609375 * sin((_229 * 1.7000000476837158203125) + (float(_212 >> 16u) * 9.5873801910784095525741577148438e-05))));
-            float _239 = sin(_238);
-            float _240 = cos(_238);
-            _250 = float2((_203.x * _240) - (_203.y * _239), (_203.x * _239) + (_203.y * _240));
+            uint _218 = (Ids._m0[gl_GlobalInvocationID.x] ^ 2654435769u) * 2246822507u;
+            float _227 = IntegrateParams.WobbleRate * 6.283185482025146484375;
+            float _235 = IntegrateParams.Time * (_227 * (0.75 + (float(_218 & 65535u) * 7.629510946571826934814453125e-06)));
+            float _245 = sin(IntegrateParams.WobbleAngle * ((0.64999997615814208984375 * sin(_235 + (float((Ids._m0[gl_GlobalInvocationID.x] * 2654435761u) >> 16u) * 9.5873801910784095525741577148438e-05))) + (0.3499999940395355224609375 * sin((_235 * 1.7000000476837158203125) + (float(_218 >> 16u) * 9.5873801910784095525741577148438e-05)))));
+            uint _249 = (Ids._m0[gl_GlobalInvocationID.x] ^ 2654435769u) * 2246822507u;
+            float _261 = IntegrateParams.Time * (_227 * (0.75 + (float(_249 & 65535u) * 7.629510946571826934814453125e-06)));
+            float _271 = cos(IntegrateParams.WobbleAngle * ((0.64999997615814208984375 * sin(_261 + (float((Ids._m0[gl_GlobalInvocationID.x] * 2654435761u) >> 16u) * 9.5873801910784095525741577148438e-05))) + (0.3499999940395355224609375 * sin((_261 * 1.7000000476837158203125) + (float(_249 >> 16u) * 9.5873801910784095525741577148438e-05)))));
+            _281 = float2((_207.x * _271) - (_207.y * _245), (_207.x * _245) + (_207.y * _271));
         }
         else
         {
-            _250 = _203;
+            _281 = _207;
         }
-        float2 _257 = _99 + ((_250 - _99) * fast::clamp(_204 * IntegrateParams.Dt, 0.0, 1.0));
-        float2 _259;
-        float2 _262;
-        float _264;
-        _259 = float2(0.0);
-        _262 = float2(0.0);
-        _264 = 0.0;
-        float2 _260;
-        float2 _263;
-        float _265;
-        for (uint _266 = 0u; _266 < IntegrateParams.ExplosionCount; _259 = _260, _262 = _263, _264 = _265, _266++)
+        float2 _288 = _103 + ((_281 - _103) * fast::clamp(_208 * IntegrateParams.Dt, 0.0, 1.0));
+        float2 _292;
+        float2 _295;
+        float _297;
+        _292 = float2(0.0);
+        _295 = float2(0.0);
+        _297 = 0.0;
+        float2 _293;
+        float2 _296;
+        float _298;
+        for (uint _299 = 0u; _299 < IntegrateParams.ExplosionCount; _292 = _293, _295 = _296, _297 = _298, _299++)
         {
-            uint _273 = _266 * 2u;
-            uint _276 = _273 + 1u;
-            float2 _283 = _108 - IntegrateParams.Explosions[_273].xy;
-            float _284 = length(_283);
-            if (_284 >= IntegrateParams.Explosions[_273].z)
+            uint _306 = _299 * 2u;
+            uint _309 = _306 + 1u;
+            float2 _316 = _112 - IntegrateParams.Explosions[_306].xy;
+            float _317 = length(_316);
+            if (_317 >= IntegrateParams.Explosions[_306].z)
             {
-                _260 = _259;
-                _263 = _262;
-                _265 = _264;
+                _293 = _292;
+                _296 = _295;
+                _298 = _297;
                 continue;
             }
-            float _290 = float(gl_GlobalInvocationID.x) * 2.3999631404876708984375;
-            float2 _300;
-            if (_284 > 0.001000000047497451305389404296875)
+            float _323 = float(Ids._m0[gl_GlobalInvocationID.x]) * 2.3999631404876708984375;
+            float2 _333;
+            if (_317 > 0.001000000047497451305389404296875)
             {
-                _300 = _283 / float2(_284);
+                _333 = _316 / float2(_317);
             }
             else
             {
-                _300 = float2(cos(_290), sin(_290));
+                _333 = float2(cos(_323), sin(_323));
             }
-            float _301 = _284 / IntegrateParams.Explosions[_273].z;
-            float _314;
-            if (IntegrateParams.Explosions[_276].x < 0.5)
+            float _334 = _317 / IntegrateParams.Explosions[_306].z;
+            float _347;
+            if (IntegrateParams.Explosions[_309].x < 0.5)
             {
-                _314 = 1.0;
+                _347 = 1.0;
             }
             else
             {
-                float _313;
-                if (IntegrateParams.Explosions[_276].x < 1.5)
+                float _346;
+                if (IntegrateParams.Explosions[_309].x < 1.5)
                 {
-                    _313 = 1.0 - _301;
+                    _346 = 1.0 - _334;
                 }
                 else
                 {
-                    float _311 = 1.0 - _301;
-                    _313 = _311 * _311;
+                    float _344 = 1.0 - _334;
+                    _346 = _344 * _344;
                 }
-                _314 = _313;
+                _347 = _346;
             }
-            float _316 = IntegrateParams.Explosions[_273].w * _314;
-            float2 _333;
-            float2 _334;
-            if (IntegrateParams.Explosions[_276].y > 0.5)
+            float _349 = IntegrateParams.Explosions[_306].w * _347;
+            float2 _366;
+            float2 _367;
+            if (IntegrateParams.Explosions[_309].y > 0.5)
             {
-                _333 = _259;
-                _334 = _262 + (_300 * precise::max(_316, (-_284) / IntegrateParams.Dt));
+                _366 = _292;
+                _367 = _295 + (_333 * precise::max(_349, (-_317) / IntegrateParams.Dt));
             }
             else
             {
-                _333 = _259 + (_300 * precise::max(_316, -_284));
-                _334 = _262;
+                _366 = _292 + (_333 * precise::max(_349, -_317));
+                _367 = _295;
             }
-            _260 = _333;
-            _263 = _334;
-            _265 = _264 + (IntegrateParams.Explosions[_276].z * _314);
+            _293 = _366;
+            _296 = _367;
+            _298 = _297 + (IntegrateParams.Explosions[_309].z * _347);
         }
-        if (_264 > 0.0)
+        if (_297 > 0.0)
         {
-            Health._m0[gl_GlobalInvocationID.x] = precise::max(Health._m0[gl_GlobalInvocationID.x] - _264, 0.0);
+            Health._m0[gl_GlobalInvocationID.x] = precise::max(Health._m0[gl_GlobalInvocationID.x] - _297, 0.0);
         }
-        float2 _350 = (Fling._m0[gl_GlobalInvocationID.x] * fast::clamp(1.0 - (IntegrateParams.FlingDrag * IntegrateParams.Dt), 0.0, 1.0)) + _262;
-        float _351 = length(_350);
-        float2 _359;
-        if (_351 > IntegrateParams.FlingMaxSpeed)
+        float2 _383 = (Fling._m0[gl_GlobalInvocationID.x] * fast::clamp(1.0 - (IntegrateParams.FlingDrag * IntegrateParams.Dt), 0.0, 1.0)) + _295;
+        float _384 = length(_383);
+        float2 _392;
+        if (_384 > IntegrateParams.FlingMaxSpeed)
         {
-            _359 = _350 * (IntegrateParams.FlingMaxSpeed / _351);
+            _392 = _383 * (IntegrateParams.FlingMaxSpeed / _384);
         }
         else
         {
-            _359 = _350;
+            _392 = _383;
         }
-        Fling._m0[gl_GlobalInvocationID.x] = _359;
-        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _97 + (((_257 + _359) * IntegrateParams.Dt) + _259), _257 };
+        Fling._m0[gl_GlobalInvocationID.x] = _392;
+        Units._m0[gl_GlobalInvocationID.x] = UnitData{ _101 + (((_288 + _392) * IntegrateParams.Dt) + _292), _288 };
         break;
     } while(false);
 }

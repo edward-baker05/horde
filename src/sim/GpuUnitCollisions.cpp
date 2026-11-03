@@ -24,7 +24,7 @@ struct alignas(16) GPUCollideUniforms {
     float diameter;
     float relaxation;
     float maxCorrection;
-    Uint32 bucketCapacity; // unused: left over from a removed broadphase, kept for the HLSL layout
+    Uint32 unitsSorted; // 1 when units are in grid order (GpuUnitReorder)
     glm::uvec2 wallBinDim;
     float wallBinSize;
     Uint32 wallCount;
@@ -81,6 +81,7 @@ std::uint32_t GpuUnitCollisions::resolve(SDL_GPUCommandBuffer* commands, SDL_GPU
     uniforms.diameter = m_diameter;
     uniforms.relaxation = m_settings.relaxation;
     uniforms.maxCorrection = m_settings.maxCorrection * m_diameter;
+    uniforms.unitsSorted = m_settings.reorderUnits ? 1u : 0u;
     uniforms.wallBinDim = walls.binDim();
     uniforms.wallBinSize = walls.binSize();
     uniforms.wallCount = walls.primitiveCount();

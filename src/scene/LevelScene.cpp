@@ -327,6 +327,7 @@ void LevelScene::debugUi() {
     } else {
         ImGui::SliderFloat("Omega", &m_pendingOptions.collision.averageOmega, 0.5f, 2.0f);
     }
+    ImGui::Checkbox("Reorder units by cell", &m_pendingOptions.collision.reorderUnits);
     ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
 
     if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {

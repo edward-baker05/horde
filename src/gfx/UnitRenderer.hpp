@@ -34,12 +34,16 @@ public:
     //
     // `health` (one float of hit points per unit) tints each unit from the full
     // colour at `maxHealth` down to black at 0.
+    //
+    // `ids` (one uint per unit) is each unit's stable ID, for systems that
+    // reorder their units; unit 0 by ID is drawn red so it can be followed.
     struct DrawOptions {
         SDL_GPUBuffer* previous = nullptr; // null: draw current positions as they are
         float alpha = 1.0f;
         float maxJump = 0.0f;
         SDL_GPUBuffer* health = nullptr; // null: everyone at full health
         float maxHealth = 1.0f;
+        SDL_GPUBuffer* ids = nullptr; // null: a unit's ID is its index
     };
 
     // `units` holds at least `count` BaseUnitData entries.

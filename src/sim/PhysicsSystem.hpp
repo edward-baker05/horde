@@ -57,6 +57,11 @@ struct CollisionSettings {
     float averageOmega = 1.0f;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;
+    // Reorder the units by grid cell after each broadphase (GpuUnitReorder),
+    // so neighbours sit next to each other in memory. Costs a gather of every
+    // per-unit buffer per step; pays it back in every pass that reads
+    // neighbours.
+    bool reorderUnits = true;
 };
 
 // Where units are trying to go, and how fast.

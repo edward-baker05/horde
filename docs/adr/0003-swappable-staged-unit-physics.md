@@ -8,6 +8,8 @@ chain:
 
 - **Broadphase**: `sim::GpuSpatialGrid` buckets units into a uniform grid
   (clear, key, sort, find ranges) and exposes `sortedKeys` and `cellRanges`.
+- **Reorder**: `sim::GpuUnitReorder` puts every per-unit buffer into the
+  grid's order, so neighbours sit together in memory (see ADR 0004).
 - **Collision**: `sim::GpuUnitCollisions` runs N Jacobi relaxation passes
   (`unit_collide.comp`) over a pair of unit buffers, using the grid.
 - **Integration and finalize**: per system. `gpu-collide` uses position-based

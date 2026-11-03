@@ -22,6 +22,9 @@ struct UnitData {
     float2 vel;
 };
 
+// Each unit's stable ID: its index changes whenever units are reordered by
+// cell, so anything that has to stay with one unit is keyed on this instead.
+StructuredBuffer<uint> Ids : register(t0, space0);
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float2> PrevPos : register(u1, space1);
 // Velocity from flinging explosions, on top of the walking velocity in Units.
@@ -67,11 +70,11 @@ cbuffer IntegrateParams : register(b0, space2) {
 };
 
 // How far this unit's heading sways from straight at this moment, in radians.
-// Two sines at unrelated rates, each with a phase hashed from the unit's index,
+// Two sines at unrelated rates, each with a phase hashed from the unit's ID,
 // so the sway never quite repeats and neighbours are out of step.
-float wobble(uint index) {
-    uint h = index * 2654435761u;
-    uint g = (index ^ 0x9E3779B9u) * 0x85EBCA6Bu;
+float wobble(uint id) {
+    uint h = id * 2654435761u;
+    uint g = (id ^ 0x9E3779B9u) * 0x85EBCA6Bu;
     float phaseA = float(h >> 16) * (6.2831853f / 65536.0f);
     float phaseB = float(g >> 16) * (6.2831853f / 65536.0f);
     // Each unit's own speed, 0.75x to 1.25x the rate.
@@ -83,7 +86,7 @@ float wobble(uint index) {
 // shoves move it (`push`), how much flings add to its velocity (`launch`),
 // and how many hit points it loses (`damage`). Damage fades with distance by
 // the same falloff as the push.
-void explosionPush(float2 centre, uint index, out float2 push, out float2 launch, out float damage) {
+void explosionPush(float2 centre, uint id, out float2 push, out float2 launch, out float damage) {
     push = float2(0.0f, 0.0f);
     launch = float2(0.0f, 0.0f);
     damage = 0.0f;
@@ -96,8 +99,8 @@ void explosionPush(float2 centre, uint index, out float2 push, out float2 launch
         if (distance >= blast.z) {
             continue;
         }
-        // A unit right on the centre still gets a direction: spread by index.
-        float angle = float(index) * 2.39996323f;
+        // A unit right on the centre still gets a direction: spread by ID.
+        float angle = float(id) * 2.39996323f;
         float2 dir = distance > 0.001f ? d / distance : float2(cos(angle), sin(angle));
         float t = distance / blast.z;
         float scale = falloff < 0.5f ? 1.0f : (falloff < 1.5f ? 1.0f - t : (1.0f - t) * (1.0f - t));
@@ -183,7 +186,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     if (WobbleAngle > 0.0f) {
         float s;
         float c;
-        sincos(wobble(index), s, c);
+        sincos(wobble(Ids[index]), s, c);
         desired = float2(desired.x * c - desired.y * s, desired.x * s + desired.y * c);
     }
 
@@ -191,7 +194,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     float2 push;
     float2 launch;
     float damage;
-    explosionPush(centre, index, push, launch, damage);
+    explosionPush(centre, Ids[index], push, launch, damage);
     if (damage > 0.0f) {
         Health[index] = max(Health[index] - damage, 0.0f);
     }

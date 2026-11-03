@@ -91,7 +91,8 @@ bool GpuSpatialGrid::init(scene::Services& services, std::uint32_t maxUnits, glm
     m_scatterPipeline = shaders.loadCompute("grid_scatter.comp", 0, 0, 3, 0, 2, 1, 256, 1, 1);
     m_keys = createBuffer(m_device, sizeof(glm::uvec2) * std::uint64_t{maxUnits});
     m_ranges = createBuffer(m_device, sizeof(glm::uvec2) * std::uint64_t{cells});
-    m_counts = createBuffer(m_device, sizeof(std::uint32_t) * std::uint64_t{cells});
+    // One more than the cells: grid_count tallies dead units there.
+    m_counts = createBuffer(m_device, sizeof(std::uint32_t) * (std::uint64_t{cells} + 1));
     m_unitCells = createBuffer(m_device, sizeof(glm::uvec2) * std::uint64_t{maxUnits});
     m_scanScratch = createBuffer(m_device, sizeof(std::uint32_t));
 
@@ -168,8 +169,8 @@ void GpuSpatialGrid::build(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* units,
     }
     const std::uint32_t cells = cellCount();
 
-    // 1. Zero the per-cell counts.
-    fill(commands, m_counts, cells, 0, 1);
+    // 1. Zero the per-cell counts, and the dead count after them.
+    fill(commands, m_counts, cells + 1, 0, 1);
 
     // 2. Count units per cell; each unit remembers its (cell, slot).
     {

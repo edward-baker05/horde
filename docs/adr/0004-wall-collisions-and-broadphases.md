@@ -121,13 +121,50 @@ Every method uses only compute features all three SDL_GPU backends have
 (structured buffers, 32-bit atomics, group-shared memory). There are no wave
 intrinsics or 64-bit atomics.
 
+## Reordering units by cell
+
+**Added 2026-11-02.** After the counting sort, `sim::GpuUnitReorder` gathers
+every per-unit buffer (units, previous positions, health, fling, IDs) into
+the sorted order and renumbers the grid's keys to match. A cell's key range
+`[start, end)` is then exactly the units in it, so a collision pass reads its
+neighbours from a few contiguous runs of memory, and a workgroup's threads
+handle units from one part of the level. `--reorder off` keeps the old order.
+
+To make the keys a full permutation, the grid now gives dead units slots
+too, after every live unit and outside every cell's range. A unit's index
+changes every step, so what has to stay with one unit is keyed on a stable ID
+buffer instead: the wobble phase, the explosion fallback direction and the
+red marker unit. A unit's ID is the slot it spawned into. Health and anything
+else per unit must be listed as a reorder stream, or it parts company with
+its unit.
+
+Measured on an RTX 5080, GPU sim ms per step, random spawn, same seed:
+
+| units, passes | off | on | |
+|---|---|---|---|
+| 100k, 16 | 0.90 | 0.43 | 2.1x |
+| 1M (8000x8000), 4 | 1.54 | 0.72 | 2.1x |
+| 1M (8000x8000), 16 | 5.10 | 1.20 | 4.2x |
+| 4M (8000x8000), 4 | 24.5 | 2.79 | 8.8x |
+| 4M (8000x8000), 16 | 96.4 | 6.47 | 14.9x |
+| `crowd-100k-relaxed` preset | 1.24 | 0.56 | 2.2x |
+
+Collision quality is unchanged: mean penetration at 1M x16 averaged 0.226
+both ways over three runs. The gather costs a fixed few passes per step,
+which more collision passes pay back many times over, so the gain grows with
+the pass count and with how far the unit buffer outgrows the GPU's caches.
+
+Drawing order now follows the grid, which changes from step to step. Units
+are drawn in cell order, so overlapping units may swap which is on top
+between steps.
+
 ## Not done yet, in rough order of expected payoff
 
-- **Reorder units by cell** after the counting sort, so the collision passes
-  read neighbours from contiguous memory instead of scattered across the unit
-  buffer. This is the biggest likely win at 1M+. It moves unit indices every
-  frame, so per-unit game data (health, team) would need the same permutation
-  or a stable ID.
+- **Tune the reorder per solver**: a coloured Gauss-Seidel solver could run a
+  thread per cell straight over the sorted ranges, and a shared-memory tile
+  solver could load a tile of cells as one contiguous block. Cell order is row
+  major; a Z-order cell numbering would keep the cells above and below closer
+  in memory too.
 - **Adaptive quality**: lower the pass count when GPU sim time exceeds a frame
   budget, instead of picking a preset by hand.
 - **Fewer passes for the same quality**: graph-coloured Gauss-Seidel (cells in

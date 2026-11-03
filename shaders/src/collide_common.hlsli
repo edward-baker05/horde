@@ -39,7 +39,9 @@ cbuffer CollideParams : register(b0, space2) {
     float Diameter;
     float Relaxation;    // relaxed solver: fraction of the summed correction applied per pass
     float MaxCorrection; // per pass, so dense clumps cannot explode
-    uint BucketCapacity; // buckets variant only
+    // Nonzero once sim/GpuUnitReorder has put the units in grid order: key s
+    // then names unit s, so GridA needn't be read.
+    uint UnitsSorted;
     uint2 WallBinDim;
     float WallBinSize;
     uint WallCount;

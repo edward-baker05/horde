@@ -31,6 +31,7 @@ namespace horde::scene {
 //   collisionIterations  int, passes per physics step
 //   relaxation           float, relaxed solver
 //   omega                float 1-2, average solver
+//   reorder              bool, reorder units by grid cell every step (default true)
 //   seed                 int
 struct Preset {
     std::string name;

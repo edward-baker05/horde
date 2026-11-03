@@ -92,7 +92,7 @@ bool loadPreset(const std::string& name, const LevelOptions& base, Preset& out, 
     static const std::set<std::string> known = {
         "description", "level",      "physics", "units",      "spawn",      "spawnRate",
         "respawnAtExit", "speed",    "physicsRate", "maxHp",  "exitDamage",
-        "solver",      "collisionIterations", "relaxation", "omega", "seed"};
+        "solver",      "collisionIterations", "relaxation", "omega", "reorder", "seed"};
     for (const auto& [key, value] : root.items()) {
         if (!known.contains(key)) {
             error = path.generic_string() + ": unknown key '" + key + "'";
@@ -150,6 +150,7 @@ bool loadPreset(const std::string& name, const LevelOptions& base, Preset& out, 
     if (!read(root, "relaxation", o.collision.relaxation, error)) return fail(error);
     if (!read(root, "omega", o.collision.averageOmega, error)) return fail(error);
     if (o.collision.averageOmega <= 0.0f || o.collision.averageOmega > 2.0f) return fail("omega must be in (0, 2]");
+    if (!read(root, "reorder", o.collision.reorderUnits, error)) return fail(error);
     if (!read(root, "seed", o.seed, error)) return fail(error);
 
     o.presetName = preset.name;

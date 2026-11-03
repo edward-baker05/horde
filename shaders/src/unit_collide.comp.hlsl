@@ -1,5 +1,5 @@
-// One Jacobi relaxation pass of unit-vs-unit and unit-vs-wall collision, for
-// the sorted broadphases (bitonic and counting sort, sim/GpuSpatialGrid):
+// One Jacobi relaxation pass of unit-vs-unit and unit-vs-wall collision, over
+// the counting-sort broadphase (sim/GpuSpatialGrid):
 //
 //   GridA = SortedKeys  (cellId, unitIndex), sorted by cell
 //   GridB = CellRanges  per cell: first key, then one past the last, as two
@@ -48,7 +48,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
             }
             uint end = GridB[c * 2 + 1];
             for (uint s = start; s < end; ++s) {
-                accumulatePair(index, unit.pos, GridA[s].y, correction, overlaps);
+                accumulatePair(index, unit.pos, UnitsSorted != 0 ? s : GridA[s].y, correction, overlaps);
             }
         }
     }

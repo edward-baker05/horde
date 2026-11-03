@@ -5,6 +5,7 @@
 #include "gfx/UnitRenderer.hpp"
 #include "sim/GpuSpatialGrid.hpp"
 #include "sim/GpuUnitCollisions.hpp"
+#include "sim/GpuUnitReorder.hpp"
 #include "sim/GpuWalls.hpp"
 #include "sim/PhysicsSystem.hpp"
 
@@ -20,6 +21,8 @@ namespace horde::sim {
 //                         region's flow inside one; predict new positions,
 //                         then push them by any active debug explosions
 //   2. GpuSpatialGrid     bucket the predicted positions (the broadphase)
+//      GpuUnitReorder     (CollisionSettings::reorderUnits) put every
+//                         per-unit buffer in grid order
 //   3. GpuUnitCollisions  N relaxation passes, each separating units then
 //                         pushing them out of walls
 //   4. unit_finalize      out of walls once more, clamp to the level,
@@ -82,6 +85,7 @@ private:
     gfx::UnitRenderer m_renderer;
     GpuSpatialGrid m_grid;
     GpuUnitCollisions m_collisions;
+    GpuUnitReorder m_reorder;
     GpuWalls m_walls;
 
     SDL_GPUComputePipeline* m_integratePipeline = nullptr;
@@ -92,7 +96,19 @@ private:
     SDL_GPUBuffer* m_prevPositions = nullptr;
     // Hit points per unit, 0 to maxHp. Not ping-ponged: only positions are.
     SDL_GPUBuffer* m_health = nullptr;
+    // Each unit's stable ID, which stays with it when units are reordered.
+    // Slot i starts out holding i, so a unit spawned into slot i gets ID i
+    // whatever order the units before it are in.
+    SDL_GPUBuffer* m_ids = nullptr;
     std::uint32_t m_current = 0;
+
+    // GpuUnitReorder's targets for the per-unit buffers above, which swap with
+    // them every step; null unless reordering. (Units reorder into whichever
+    // of m_units isn't current.)
+    SDL_GPUBuffer* m_prevSpare = nullptr;
+    SDL_GPUBuffer* m_healthSpare = nullptr;
+    SDL_GPUBuffer* m_flingSpare = nullptr;
+    SDL_GPUBuffer* m_idsSpare = nullptr;
 
     // Streaming spawns: units [m_unitCount, m_capacity) are still to come.
     std::uint32_t m_capacity = 0;

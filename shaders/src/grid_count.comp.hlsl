@@ -1,7 +1,9 @@
 // Counting-sort broadphase, step 1: count units per cell. Each unit claims a
 // slot in its cell with an atomic add and remembers (cell, slot), so the
 // scatter step can place it without another atomic. A dead unit claims no
-// cell, so no other unit ever finds it as a neighbour.
+// cell, so no other unit ever finds it as a neighbour; it takes a slot in the
+// extra counter after the last cell's instead, so the sorted keys still hold
+// every unit (live ones by cell, then the dead) for sim/GpuUnitReorder.
 
 #include "unit_state.hlsli"
 
@@ -11,7 +13,8 @@ struct UnitData {
 };
 
 StructuredBuffer<UnitData> Units : register(t0, space0);
-RWStructuredBuffer<uint> Counts : register(u0, space1);    // per cell, cleared to 0 beforehand
+// Per cell, then one more for the dead; all cleared to 0 beforehand.
+RWStructuredBuffer<uint> Counts : register(u0, space1);
 RWStructuredBuffer<uint2> UnitCell : register(u1, space1); // per unit: (cell, slot within cell)
 
 // Matches GPUGridCountUniforms in sim/GpuSpatialGrid.cpp
@@ -29,15 +32,16 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     }
 
     float2 pos = Units[index].pos;
+    uint slot;
     if (isDead(pos)) {
-        UnitCell[index] = uint2(NO_CELL, 0);
+        InterlockedAdd(Counts[GridDim.x * GridDim.y], 1, slot);
+        UnitCell[index] = uint2(NO_CELL, slot);
         return;
     }
 
     int2 cell = clamp((int2)(pos * InvCellSize), int2(0, 0), (int2)GridDim - 1);
     uint cellId = (uint)cell.x + (uint)cell.y * GridDim.x;
 
-    uint slot;
     InterlockedAdd(Counts[cellId], 1, slot);
     UnitCell[index] = uint2(cellId, slot);
 }

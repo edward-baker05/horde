@@ -39,6 +39,8 @@ void printUsage() {
         "                     relaxation, the default) | average (mean of the overlaps)\n"
         "  --relaxation F     relaxed solver: fraction of each pass's correction applied, default 0.5\n"
         "  --omega F          average solver: over-relaxation on the mean, 1 (plain) to 2, default 1\n"
+        "  --reorder on|off   reorder units by grid cell every step, so neighbours sit together in\n"
+        "                     memory, default on\n"
         "  --speed F          unit speed toward the exit, default 60\n"
         "\n"
         "Benchmarking:\n"
@@ -218,6 +220,10 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
                 level.collision.averageOmega > 2.0f) {
                 return bad(v);
             }
+            wantsLevel = true;
+        } else if (arg == "--reorder") {
+            if (!value(v) || (v != "on" && v != "off")) return bad(v);
+            level.collision.reorderUnits = v == "on";
             wantsLevel = true;
         } else if (arg == "--low-power-gpu") {
             config.lowPowerGpu = true;

@@ -142,8 +142,9 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         SDL_Log("GpuCollidePhysics: only the first %zu field regions are used", kMaxFieldRegions);
     }
 
-    // unit_integrate.comp: 4 rw buffers (units, previous positions, fling, health), 1 uniform buffer
-    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 0, 0, 4, 1, 256, 1, 1);
+    // unit_integrate.comp: 1 ro buffer (IDs), 4 rw buffers (units, previous positions, fling, health), 1 uniform
+    // buffer
+    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 1, 0, 4, 1, 256, 1, 1);
     // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 3 rw buffers (units, health, fling),
     // 1 uniform buffer
     m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 3, 1, 256, 1, 1);
@@ -157,7 +158,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     if (!m_renderer.init(services) ||
         !m_grid.init(services, m_capacity, config.worldSize, config.unitSize) ||
         !m_collisions.init(services, collision, config.unitSize, config.worldSize) ||
-        !m_walls.init(m_device, config.walls.get())) {
+        (collision.reorderUnits && !m_reorder.init(services)) || !m_walls.init(m_device, config.walls.get())) {
         return false;
     }
 
@@ -182,7 +183,20 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     flingInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
     m_fling = SDL_CreateGPUBuffer(m_device, &flingInfo);
 
-    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling) {
+    // Read by unit.vert too, to find unit 0.
+    SDL_GPUBufferCreateInfo idsInfo = healthInfo;
+    m_ids = SDL_CreateGPUBuffer(m_device, &idsInfo);
+
+    bool spares = true;
+    if (collision.reorderUnits) {
+        m_prevSpare = SDL_CreateGPUBuffer(m_device, &prevInfo);
+        m_healthSpare = SDL_CreateGPUBuffer(m_device, &healthInfo);
+        m_flingSpare = SDL_CreateGPUBuffer(m_device, &flingInfo);
+        m_idsSpare = SDL_CreateGPUBuffer(m_device, &idsInfo);
+        spares = m_prevSpare && m_healthSpare && m_flingSpare && m_idsSpare;
+    }
+
+    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling || !m_ids || !spares) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s",
                      SDL_GetError());
         return false;
@@ -204,15 +218,34 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
 
     m_current = 0;
     const std::vector<float> health = startingHealth(m_unitCount);
-    // Every unit, including those still to spawn, starts unflung.
+    // Every unit, including those still to spawn, starts unflung and with its
+    // slot as its ID. The spares too: a reorder only ever writes the slots of
+    // units already in play, so the slots past them keep these until a spawn
+    // reaches them, in whichever buffer is live by then.
     const std::vector<glm::vec2> fling(std::max<std::uint32_t>(m_capacity, 1), glm::vec2(0.0f));
+    std::vector<std::uint32_t> ids(std::max<std::uint32_t>(m_capacity, 1));
+    for (std::uint32_t i = 0; i < ids.size(); ++i) {
+        ids[i] = i;
+    }
+    const auto flingSize = static_cast<std::uint32_t>(sizeof(glm::vec2) * fling.size());
+    const auto idsSize = static_cast<std::uint32_t>(sizeof(std::uint32_t) * ids.size());
+    for (SDL_GPUBuffer* buffer : {m_fling, m_flingSpare}) {
+        if (buffer && !uploadBytesNow(m_device, fling.data(), flingSize, buffer)) {
+            return false;
+        }
+    }
+    for (SDL_GPUBuffer* buffer : {m_ids, m_idsSpare}) {
+        if (buffer && !uploadBytesNow(m_device, ids.data(), idsSize, buffer)) {
+            return false;
+        }
+    }
     return uploadUnitsNow(m_device, config.initialUnits.data(), m_unitCount, m_units, 1) &&
-           uploadBytesNow(m_device, health.data(), static_cast<std::uint32_t>(sizeof(float) * health.size()), m_health) &&
-           uploadBytesNow(m_device, fling.data(), static_cast<std::uint32_t>(sizeof(glm::vec2) * fling.size()), m_fling);
+           uploadBytesNow(m_device, health.data(), static_cast<std::uint32_t>(sizeof(float) * health.size()), m_health);
 }
 
 void GpuCollidePhysics::shutdown() {
     m_walls.shutdown();
+    m_reorder.shutdown();
     m_collisions.shutdown();
     m_grid.shutdown();
     m_renderer.shutdown();
@@ -236,7 +269,8 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
-    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions, &m_health, &m_fling};
+    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions, &m_health,     &m_fling,
+                                 &m_ids,      &m_prevSpare, &m_healthSpare,   &m_flingSpare, &m_idsSpare};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
             SDL_ReleaseGPUBuffer(m_device, *buffer);
@@ -385,6 +419,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 
         if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 4)) {
             SDL_BindGPUComputePipeline(pass, m_integratePipeline);
+            SDL_BindGPUComputeStorageBuffers(pass, 0, &m_ids, 1);
             SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
             SDL_EndGPUComputePass(pass);
         }
@@ -392,6 +427,19 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 
     // 2. Broadphase over the predicted positions.
     m_grid.build(commands, m_units[m_current], m_unitCount);
+
+    // Units into grid order, every per-unit buffer alike. Previous positions
+    // too, so drawing still blends each unit from where it was.
+    if (m_config.collision.reorderUnits) {
+        const GpuUnitReorder::Stream streams[] = {
+            {&m_units[m_current], &m_units[1 - m_current], sizeof(BaseUnitData)},
+            {&m_prevPositions, &m_prevSpare, sizeof(glm::vec2)},
+            {&m_health, &m_healthSpare, sizeof(float)},
+            {&m_fling, &m_flingSpare, sizeof(glm::vec2)},
+            {&m_ids, &m_idsSpare, sizeof(std::uint32_t)},
+        };
+        m_reorder.reorder(commands, m_grid, m_unitCount, streams);
+    }
 
     // 3. Separate overlapping units.
     m_current = m_collisions.resolve(commands, m_units, m_current, m_unitCount, m_grid, m_walls);
@@ -442,6 +490,7 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.maxJump = std::max(4.0f * m_config.unitSize, 2.0f * m_config.movement.maxSpeed * m_dt);
     options.health = m_health;
     options.maxHealth = static_cast<float>(m_config.health.maxHp);
+    options.ids = m_ids;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
 }
 

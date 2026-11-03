@@ -24,6 +24,10 @@ namespace horde::sim {
 //   GridA = sorted (cellId, unitIndex) keys
 //   GridB = per cell [start, end) into GridA, or 0xFFFFFFFF start when empty
 //
+// GridA holds every unit: live ones by cell, then dead ones as (NO_CELL,
+// unitIndex), outside every cell's range. So it is a full permutation of the
+// units, which GpuUnitReorder relies on.
+//
 // Anything that needs neighbours can share one grid per frame: unit collisions
 // now, and later separation steering, target finding, area damage and so on.
 class GpuSpatialGrid {

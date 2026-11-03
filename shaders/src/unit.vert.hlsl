@@ -18,6 +18,9 @@ StructuredBuffer<UnitData> Units : register(t0, space0);
 StructuredBuffer<float2> PrevPos : register(t1, space0);
 // Each unit's hit points, when InvMaxHealth > 0.
 StructuredBuffer<float> Health : register(t2, space0);
+// Each unit's stable ID, when HasIds: its index changes when units are
+// reordered by cell, so the marked unit is picked by ID.
+StructuredBuffer<uint> Ids : register(t3, space0);
 
 #include "unit_state.hlsli"
 
@@ -29,7 +32,8 @@ cbuffer UnitUniforms : register(b0, space1) {
     float Alpha;     // 0 = draw at PrevPos, 1 = draw at Units[].pos
     float MaxJump;   // 0: no PrevPos. Moves longer than this (a respawn) are not blended.
     float InvMaxHealth; // 1 / max hit points; 0: no Health buffer, draw everyone at full health
-    float3 Padding;
+    uint HasIds;        // 0: no Ids buffer, a unit's ID is its index
+    float2 Padding;
 };
 
 struct Output {
@@ -78,6 +82,7 @@ Output main(uint id : SV_VertexID) {
     // Full health draws in Color, fading linearly to black at 0.
     float health = InvMaxHealth > 0.0f ? saturate(Health[unitIndex] * InvMaxHealth) : 1.0f;
     float4 tint = float4(Color.rgb * health, Color.a);
-    output.Color = (unitIndex == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
+    uint unitId = HasIds != 0 ? Ids[unitIndex] : unitIndex;
+    output.Color = (unitId == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
     return output;
 }

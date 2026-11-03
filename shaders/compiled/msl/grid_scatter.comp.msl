@@ -29,23 +29,29 @@ kernel void main0(constant type_ScatterParams& ScatterParams [[buffer(0)]], devi
 {
     if (gl_GlobalInvocationID.x < ScatterParams.UnitCount)
     {
-        if (UnitCell._m0[gl_GlobalInvocationID.x].x != 4294967295u)
+        uint2 _45 = UnitCell._m0[gl_GlobalInvocationID.x];
+        if (_45.x != 4294967295u)
         {
-            SortedKeys._m0[Starts._m0[UnitCell._m0[gl_GlobalInvocationID.x].x] + UnitCell._m0[gl_GlobalInvocationID.x].y] = uint2(UnitCell._m0[gl_GlobalInvocationID.x].x, gl_GlobalInvocationID.x);
+            SortedKeys._m0[Starts._m0[_45.x] + _45.y] = uint2(_45.x, gl_GlobalInvocationID.x);
+        }
+        else
+        {
+            uint _59 = ScatterParams.CellCount - 1u;
+            SortedKeys._m0[(Starts._m0[_59] + Counts._m0[_59]) + _45.y] = uint2(4294967295u, gl_GlobalInvocationID.x);
         }
     }
     if (gl_GlobalInvocationID.x < ScatterParams.CellCount)
     {
-        uint2 _71;
+        uint2 _85;
         if (Counts._m0[gl_GlobalInvocationID.x] == 0u)
         {
-            _71 = uint2(4294967295u);
+            _85 = uint2(4294967295u);
         }
         else
         {
-            _71 = uint2(Starts._m0[gl_GlobalInvocationID.x], Starts._m0[gl_GlobalInvocationID.x] + Counts._m0[gl_GlobalInvocationID.x]);
+            _85 = uint2(Starts._m0[gl_GlobalInvocationID.x], Starts._m0[gl_GlobalInvocationID.x] + Counts._m0[gl_GlobalInvocationID.x]);
         }
-        CellRanges._m0[gl_GlobalInvocationID.x] = _71;
+        CellRanges._m0[gl_GlobalInvocationID.x] = _85;
     }
 }
 

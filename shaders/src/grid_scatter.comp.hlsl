@@ -1,10 +1,11 @@
 // Counting-sort broadphase, last step: with each cell's first index known
 // (the prefix sum of counts), write every unit's key to its sorted place and
-// record each cell's [start, end) range, in the same layout the bitonic
-// broadphase produces.
+// record each cell's [start, end) range.
 //
 // Dispatched over max(units, cells) threads: thread i places unit i and fills
-// range i. Dead units have no cell and are left out.
+// range i. Dead units have no cell, so no range covers them; their keys go
+// after every live unit's, as (NO_CELL, unit), so the keys are a complete
+// permutation of the units.
 
 #include "unit_state.hlsli"
 
@@ -28,6 +29,9 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         uint2 cellSlot = UnitCell[i];
         if (cellSlot.x != NO_CELL) {
             SortedKeys[Starts[cellSlot.x] + cellSlot.y] = uint2(cellSlot.x, i);
+        } else {
+            uint live = Starts[CellCount - 1] + Counts[CellCount - 1];
+            SortedKeys[live + cellSlot.y] = uint2(NO_CELL, i);
         }
     }
 

@@ -21,7 +21,8 @@ struct alignas(16) UnitDrawUniforms {
     float alpha;
     float maxJump;
     float invMaxHealth;
-    float padding[3];
+    Uint32 hasIds;
+    float padding[2];
 };
 static_assert(sizeof(UnitDrawUniforms) == 128);
 
@@ -35,10 +36,11 @@ bool UnitRenderer::init(scene::Services& services) {
     m_device = services.gpu->device();
     m_atlas = services.atlas->handle();
 
-    // unit.vert: 3 storage buffers (units t0, previous positions t1, health t2, space0), 1 uniform buffer (b0, space1)
+    // unit.vert: 4 storage buffers (units t0, previous positions t1, health t2, IDs t3, space0), 1 uniform buffer
+    // (b0, space1)
     SDL_GPUShader* vertexShader = services.shaders->loadGraphics(
         "unit.vert", SDL_GPU_SHADERSTAGE_VERTEX,
-        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 3, .uniformBuffers = 1});
+        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 4, .uniformBuffers = 1});
 
     // sprite.frag: 1 sampler (s0, space2), 1 sampled texture (t0, space2)
     SDL_GPUShader* fragmentShader = services.shaders->loadGraphics(
@@ -121,9 +123,9 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
     // Slots the shader won't read still need something bound.
-    SDL_GPUBuffer* buffers[3] = {units, options.previous ? options.previous : units,
-                                 options.health ? options.health : units};
-    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 3);
+    SDL_GPUBuffer* buffers[4] = {units, options.previous ? options.previous : units,
+                                 options.health ? options.health : units, options.ids ? options.ids : units};
+    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 4);
 
     UnitDrawUniforms uniforms{};
     uniforms.viewProjection = viewProjection;
@@ -133,6 +135,7 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
     uniforms.alpha = options.alpha;
     uniforms.maxJump = options.previous ? options.maxJump : 0.0f;
     uniforms.invMaxHealth = options.health && options.maxHealth > 0.0f ? 1.0f / options.maxHealth : 0.0f;
+    uniforms.hasIds = options.ids ? 1u : 0u;
     SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
     SDL_GPUTextureSamplerBinding atlasBinding{};

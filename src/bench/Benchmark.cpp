@@ -150,6 +150,7 @@ bool Recorder::finish(const RunInfo& info) const {
         {"collision_relaxation", collision.relaxation},
         {"solver", info.collision ? sim::solverName(collision.solver) : "n/a"},
         {"average_omega", collision.averageOmega},
+        {"reorder_units", collision.reorderUnits},
         {"max_speed", level.maxSpeed},
     };
     if (info.healthMeasured) {
