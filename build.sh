@@ -28,4 +28,15 @@ cmake --build --preset "$PRESET"
 
 # No need to cd first: assets and shaders are resolved relative to the
 # executable via SDL_GetBasePath(), not the working directory.
-exec mangohud "./build/${PRESET}/bin/horde"
+case "$(uname -s)" in
+  Darwin) 
+    ./build/${PRESET}/bin/horde ;;
+  Linux)  
+    exec mangohud "./build/${PRESET}/bin/horde" ;;
+  *)
+    echo "Unsupported platform: $(uname -s). See README.md for Windows instructions (build.ps1)." >&2
+    exit 1
+    ;;
+esac
+
+
