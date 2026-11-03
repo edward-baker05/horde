@@ -17,7 +17,7 @@ Examples:
     python tools/bench.py --physics gpu-collide --solver relaxed,chebyshev --collision-iterations 8
     python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95
     python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
-    python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average   # shared test setups
+    python tools/bench.py --preset big-world-1m-chebyshev-60hz-10,big-world-1m-chebyshev-120hz-10   # shared test setups
     python tools/bench.py --physics gpu-collide --gpu-driver direct3d12,vulkan   # compare GPU backends
     python tools/bench.py --low-power-gpu --level assets/levels/bench_walls.level.json
 
@@ -113,7 +113,7 @@ def git_info() -> dict:
 
 def variant_label(preset: str | None, physics: str | None, solver: str | None, omega: str | None,
                   reorder: str | None = None, rho: str | None = None, driver: str | None = None) -> str:
-    """'gpu-collide', 'gpu-collide/average w1.5', 'gpu-collide reorder-off', 'crowd-100k-relaxed:gpu-collide'"""
+    """'gpu-collide', 'gpu-collide/average w1.5', 'gpu-collide reorder-off', 'big-world-1m-relaxed-120hz:gpu-collide'"""
     base = ":".join(part for part in (preset, physics) if part)
     return (base + (f"/{solver}" if solver else "") + (f" w{omega}" if omega else "")
             + (f" rho{rho}" if rho else "")

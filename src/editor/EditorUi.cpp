@@ -19,7 +19,6 @@
 #include "logic/LevelFiles.hpp"
 #include "logic/LevelIO.hpp"
 #include "logic/LevelValidation.hpp"
-#include "sim/PhysicsRegistry.hpp"
 
 namespace horde::editor {
 
@@ -192,14 +191,6 @@ void drawLevelPanel(EditorState& state, bool& wantsExit, bool& wantsPlay) {
 
     ImGui::SeparatorText("Test play");
 
-    if (ImGui::BeginCombo("Physics", state.testPhysics.c_str())) {
-        for (const std::string& name : sim::physicsNames()) {
-            if (ImGui::Selectable(name.c_str(), name == state.testPhysics)) {
-                state.testPhysics = name;
-            }
-        }
-        ImGui::EndCombo();
-    }
     ImGui::InputInt("Units", &state.testUnits, 1000, 10000);
     state.testUnits = std::clamp(state.testUnits, 0, 4'000'000);
 

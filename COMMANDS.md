@@ -185,18 +185,15 @@ committing the file; anyone with the build can then run it.
 
 | Preset | Setup |
 | --- | --- |
-| `crowd-100k-relaxed` | walls level, 100k units, 4000/s spawn, relaxed solver, 16 passes, relaxation 0.5, speed 200 |
-| `crowd-100k-average` | the same, but the average solver at omega 2.0 |
-| `crowd-100k-relaxed-120hz` | the same as `crowd-100k-relaxed`, but 120 Hz physics |
-| `crowd-100k-smooth` | `crowd-100k-relaxed` with crowd flow: congestion 1.0-1.2 units/cell, velocity smoothing 1.0 |
-| `crowd-100k-chebyshev-60hz-10` | walls level, 100k units, chebyshev solver (relaxation 0.5, rho 0.95, delay 2), 60 Hz, 10 passes, congestion 1.0-1.2, smoothing 1.0 |
-| `crowd-100k-chebyshev-120hz-10` | the same at 120 Hz |
-| `crowd-100k-chebyshev-120hz-16` | the same at 120 Hz, 16 passes |
+| `big-world-1m-chebyshev-60hz-10` | big world test level, 1M units, 50k/s spawn, chebyshev solver (relaxation 0.5, rho 0.95, delay 2), 60 Hz, 10 passes, congestion 1.0-1.2, smoothing 1.0, speed 200 |
+| `big-world-1m-chebyshev-120hz-10` | the same at 120 Hz |
+| `big-world-1m-chebyshev-120hz-16` | the same at 120 Hz, 16 passes |
+| `big-world-1m-relaxed-120hz` | big world test level, 1M units, 50k/s spawn, relaxed solver, 120 Hz, 16 passes, relaxation 0.5, velocity smoothing 1.0, speed 200 |
 
 **To try one:** start the game and click it under *Presets* in the main menu, or
 
 ```powershell
-.\build\windows\bin\Release\horde.exe --preset crowd-100k-relaxed
+.\build\windows\bin\Release\horde.exe --preset big-world-1m-chebyshev-60hz-10
 ```
 
 The Level panel's *Frame cost* section shows what each frame costs (physics
@@ -208,8 +205,8 @@ pressing *Restart level*.
 **To benchmark one** (results land in `bench_results/`):
 
 ```sh
-python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average
-horde --bench --preset crowd-100k-relaxed --duration 20 --out result.json
+python tools/bench.py --preset big-world-1m-chebyshev-60hz-10,big-world-1m-chebyshev-120hz-10
+horde --bench --preset big-world-1m-chebyshev-60hz-10 --duration 20 --out result.json
 ```
 
 With `--preset`, only flags you pass yourself override the preset.
@@ -242,7 +239,7 @@ python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,2   #
 python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95   # sweep Chebyshev's rho
 python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
 python tools/bench.py --physics gpu-collide --gpu-driver direct3d12,vulkan   # compare GPU backends
-python tools/bench.py --exe saved/horde.exe --preset crowd-100k-relaxed   # benchmark a saved build
+python tools/bench.py --exe saved/horde.exe --preset big-world-1m-chebyshev-60hz-10   # benchmark a saved build
 python tools/bench.py --help
 ```
 
@@ -374,7 +371,7 @@ finding neighbours with a counting-sort grid.
 | `--rho F` | 0.95 | chebyshev solver: estimated spectral radius, 0 to 1; higher extrapolates harder |
 | `--chebyshev-delay N` | 2 | chebyshev solver: plain relaxed passes before extrapolating, at least 2 (1 bounced units off walls) |
 | `--congestion START,STOP` | off | slow units down as the crowd two cells ahead goes from START to STOP units per cell (hex packing ~1.15); calmer, denser-proof crowds, slower flow (`docs/gpu-optimisation-overnight.md`) |
-| `--smoothing F` | 0 | one extra pass blending each unit's velocity toward its touching neighbours' mean, 0-1: stops dense crowds boiling and mixing; 0.5 is enough |
+| `--smoothing F` | 1 | one extra pass blending each unit's velocity toward its touching neighbours' mean, 0-1: stops dense crowds boiling and mixing; 0.5 is enough |
 | `--reorder on\|off` | on | reorder units by grid cell every step so neighbours sit together in memory: 2-15x less GPU time, the same collisions |
 
 The level's debug panel has the same controls, applied on *Restart level*. Measurements and the reasoning are

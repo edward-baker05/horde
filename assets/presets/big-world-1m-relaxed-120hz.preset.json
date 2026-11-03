@@ -1,0 +1,14 @@
+{
+  "description": "1M units on the big world test level, 50k/s spawn, relaxed solver at 120 Hz physics: 16 passes at relaxation 0.5, speed 200; velocity smoothing 1.0",
+  "level": "big world test",
+  "physics": "gpu-collide",
+  "units": 1000000,
+  "spawn": "markers",
+  "spawnRate": 50000,
+  "physicsRate": 120,
+  "solver": "relaxed",
+  "collisionIterations": 16,
+  "relaxation": 0.5,
+  "speed": 200,
+  "smoothing": 1.0
+}

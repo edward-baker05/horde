@@ -197,10 +197,6 @@ void LevelScene::debugUi() {
 
     frameCostUi();
     ImGui::Text("Units: %u", m_physics->unitCount());
-    if (!m_options.presetName.empty()) {
-        ImGui::Text("Preset: %s", m_options.presetName.c_str());
-    }
-    m_physics->debugUi();
     healthUi();
 
     // Drawing only: hidden regions still push units.
@@ -225,8 +221,6 @@ void LevelScene::debugUi() {
     ImGui::SameLine();
     ImGui::TextDisabled("%.2f steps/frame", m_stepsPerFrame);
 
-    // Same collision passes per second two ways: more, smaller steps or fewer
-    // steps with more passes each. Both apply live, for side-by-side looks.
     if (const sim::CollisionSettings* collision = m_physics->collisionSettings()) {
         const float rateHz = m_options.physicsRate;
         if (rateHz > 0.0f) {
@@ -234,18 +228,6 @@ void LevelScene::debugUi() {
                         static_cast<float>(collision->iterations) * rateHz);
         } else {
             ImGui::Text("%u passes, one step per frame", collision->iterations);
-        }
-
-        const bool fast = rateHz >= 120.0f && collision->iterations == 16;
-        if (ImGui::Button(fast ? "Swap to 60 Hz x 32 passes" : "Swap to 120 Hz x 16 passes")) {
-            const float newRate = fast ? 60.0f : 120.0f;
-            const std::uint32_t newPasses = fast ? 32 : 16;
-            if (m_physics->setCollisionPasses(newPasses)) {
-                m_options.physicsRate = newRate;
-                m_options.collision.iterations = newPasses;
-                m_pendingOptions.physicsRate = newRate;
-                m_pendingOptions.collision.iterations = newPasses;
-            }
         }
     }
 
@@ -271,15 +253,6 @@ void LevelScene::debugUi() {
         ImGui::EndCombo();
     }
 
-    if (ImGui::BeginCombo("Physics", m_pendingOptions.physics.c_str())) {
-        for (const std::string& name : sim::physicsNames()) {
-            if (ImGui::Selectable(name.c_str(), name == m_pendingOptions.physics)) {
-                m_pendingOptions.physics = name;
-            }
-        }
-        ImGui::EndCombo();
-    }
-
     int units = static_cast<int>(m_pendingOptions.unitCount);
     if (ImGui::InputInt("Units", &units, 1000, 10000)) {
         m_pendingOptions.unitCount = static_cast<std::uint32_t>(std::clamp(units, 0, 4'000'000));
@@ -299,24 +272,12 @@ void LevelScene::debugUi() {
         ImGui::SliderFloat("Spawn rate", &m_pendingOptions.spawnRate, 0.0f, 20000.0f, "%.0f/s",
                            ImGuiSliderFlags_Logarithmic);
     }
-    ImGui::Checkbox("Respawn at exit", &m_pendingOptions.respawnAtExit);
     int maxHp = static_cast<int>(m_pendingOptions.health.maxHp);
     if (ImGui::InputInt("Max HP", &maxHp)) {
         m_pendingOptions.health.maxHp = static_cast<std::uint32_t>(std::clamp(maxHp, 1, 100000));
     }
     if (ImGui::InputFloat("Damage at exit", &m_pendingOptions.health.exitDamage, 0.5f, 5.0f, "%.1f")) {
         m_pendingOptions.health.exitDamage = std::max(m_pendingOptions.health.exitDamage, 0.0f);
-    }
-
-    constexpr sim::CollisionSolver solvers[] = {sim::CollisionSolver::Relaxed, sim::CollisionSolver::Average,
-                                                sim::CollisionSolver::Chebyshev};
-    if (ImGui::BeginCombo("Solver", sim::solverName(m_pendingOptions.collision.solver))) {
-        for (const sim::CollisionSolver solver : solvers) {
-            if (ImGui::Selectable(sim::solverName(solver), solver == m_pendingOptions.collision.solver)) {
-                m_pendingOptions.collision.solver = solver;
-            }
-        }
-        ImGui::EndCombo();
     }
 
     int iterations = static_cast<int>(m_pendingOptions.collision.iterations);
@@ -335,7 +296,6 @@ void LevelScene::debugUi() {
             m_pendingOptions.collision.chebyshevDelay = static_cast<std::uint32_t>(delay);
         }
     }
-    ImGui::Checkbox("Reorder units by cell", &m_pendingOptions.collision.reorderUnits);
     ImGui::SeparatorText("Crowd flow");
     bool congestion = m_pendingOptions.collision.congestionStop > 0.0f;
     if (ImGui::Checkbox("Slow down for crowds ahead", &congestion)) {
@@ -346,8 +306,28 @@ void LevelScene::debugUi() {
         ImGui::SliderFloat("Stop (units/cell)", &m_pendingOptions.collision.congestionStop,
                            m_pendingOptions.collision.congestionStart + 0.05f, 2.0f);
     }
-    ImGui::SliderFloat("Velocity smoothing", &m_pendingOptions.collision.velocitySmoothing, 0.0f, 1.0f);
     ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
+
+    // Settings that rarely need touching, folded away. Presets set the solver.
+    if (ImGui::CollapsingHeader("Advanced")) {
+        ImGui::TextDisabled("Live");
+        m_physics->debugUi();
+
+        ImGui::TextDisabled("On restart");
+        ImGui::Checkbox("Reorder units by cell", &m_pendingOptions.collision.reorderUnits);
+        ImGui::Checkbox("Respawn at exit", &m_pendingOptions.respawnAtExit);
+        constexpr sim::CollisionSolver solvers[] = {sim::CollisionSolver::Relaxed, sim::CollisionSolver::Average,
+                                                    sim::CollisionSolver::Chebyshev};
+        if (ImGui::BeginCombo("Solver", sim::solverName(m_pendingOptions.collision.solver))) {
+            for (const sim::CollisionSolver solver : solvers) {
+                if (ImGui::Selectable(sim::solverName(solver), solver == m_pendingOptions.collision.solver)) {
+                    m_pendingOptions.collision.solver = solver;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SliderFloat("Velocity smoothing", &m_pendingOptions.collision.velocitySmoothing, 0.0f, 1.0f);
+    }
 
     if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {
         // The explosion tool is set live, not as a pending option: take it as

@@ -44,7 +44,7 @@ void printUsage() {
         "  --chebyshev-delay N   chebyshev: plain passes before accelerating, at least 2, default 2\n"
         "  --congestion START,STOP   slow units down as the crowd ahead goes from START to STOP\n"
         "                     units per cell (hex packing ~1.15), e.g. 0.7,1.0; default off\n"
-        "  --smoothing F      blend velocity toward touching neighbours' mean each step, 0-1, default 0\n"
+        "  --smoothing F      blend velocity toward touching neighbours' mean each step, 0-1, default 1\n"
         "  --reorder on|off   reorder units by grid cell every step, so neighbours sit together in\n"
         "                     memory, default on\n"
         "  --speed F          unit speed toward the exit, default 60\n"

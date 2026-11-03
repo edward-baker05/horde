@@ -88,7 +88,7 @@ struct CollisionSettings {
     float congestionStop = 0.0f;
     // Each step, how far a unit's velocity moves toward the mean of the units
     // touching it, 0 (off) to 1 (XSPH viscosity). One extra pass when on.
-    float velocitySmoothing = 0.0f;
+    float velocitySmoothing = 1.0f;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;
     // Reorder the units by grid cell after each broadphase (GpuUnitReorder),
@@ -107,7 +107,7 @@ struct MovementSettings {
     // wobbleAngle radians, about wobbleRate times a second, each unit out of
     // step with its neighbours. Steering smooths it into a gentle wobble.
     // An angle of 0 turns it off.
-    float wobbleAngle = 0.3f;
+    float wobbleAngle = 0.2618f; // 15 degrees
     float wobbleRate = 1.0f; // Hz
 };
 
