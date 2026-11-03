@@ -18,6 +18,7 @@ Examples:
     python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95
     python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
     python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average   # shared test setups
+    python tools/bench.py --physics gpu-collide --gpu-driver direct3d12,vulkan   # compare GPU backends
     python tools/bench.py --low-power-gpu --level assets/levels/bench_walls.level.json
 
 Results land in bench_results/<timestamp>/ (git-ignored).
@@ -111,19 +112,20 @@ def git_info() -> dict:
 
 
 def variant_label(preset: str | None, physics: str | None, solver: str | None, omega: str | None,
-                  reorder: str | None = None, rho: str | None = None) -> str:
+                  reorder: str | None = None, rho: str | None = None, driver: str | None = None) -> str:
     """'gpu-collide', 'gpu-collide/average w1.5', 'gpu-collide reorder-off', 'crowd-100k-relaxed:gpu-collide'"""
     base = ":".join(part for part in (preset, physics) if part)
     return (base + (f"/{solver}" if solver else "") + (f" w{omega}" if omega else "")
             + (f" rho{rho}" if rho else "")
-            + (f" reorder-{reorder}" if reorder else ""))
+            + (f" reorder-{reorder}" if reorder else "")
+            + (f" @{driver}" if driver else ""))
 
 
 def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: str | None, solver: str | None,
-            omega: str | None, reorder: str | None, rho: str | None, units: int | None, repeat: int,
-            out_dir: Path) -> dict:
-    label = variant_label(preset, physics, solver, omega, reorder, rho)
-    stem = (f"{label.replace('/', '_').replace(' ', '_').replace(':', '_')}"
+            omega: str | None, reorder: str | None, rho: str | None, driver: str | None, units: int | None,
+            repeat: int, out_dir: Path) -> dict:
+    label = variant_label(preset, physics, solver, omega, reorder, rho, driver)
+    stem = (f"{label.replace('/', '_').replace(' ', '_').replace(':', '_').replace('@', '')}"
             f"_{units if units is not None else 'preset'}_r{repeat}")
     json_path = out_dir / "runs" / f"{stem}.json"
     log_path = out_dir / "logs" / f"{stem}.log"
@@ -175,9 +177,12 @@ def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: st
         cmd.append("--no-gpu-sync")
     cmd += args.extra
 
+    env = dict(os.environ)
+    if driver:
+        env["SDL_GPU_DRIVER"] = driver
     timeout = args.warmup + args.duration + args.timeout_slack
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         log_path.write_text(proc.stdout + proc.stderr, encoding="utf-8")
     except subprocess.TimeoutExpired as e:
         log_path.write_text(f"TIMEOUT after {timeout}s\n{e.stdout or ''}{e.stderr or ''}", encoding="utf-8")
@@ -234,6 +239,7 @@ def aggregate(results: list[dict]) -> list[dict]:
             "average_omega": ok[0].get("average_omega"),
             "reorder_units": ok[0].get("reorder_units"),
             "chebyshev_rho": ok[0].get("chebyshev_rho"),
+            "gpu_driver": ok[0].get("gpu_driver"),
             "in_walls_pct": in_walls * 100 / units if in_walls is not None and units else None,
             "fps_mean": mean_of("fps_mean"),
             "fps_1pct_low": mean_of("fps_1pct_low"),
@@ -247,6 +253,8 @@ def aggregate(results: list[dict]) -> list[dict]:
                 mean_of_quality(ok, "overlapping_fraction")),
             "penetration_mean": mean_of_quality(ok, "mean_penetration"),
             "penetration_max": mean_of_quality(ok, "max_penetration"),
+            "jitter": mean_of_quality(ok, "velocity_jitter"),
+            "mean_speed": mean_of_quality(ok, "mean_speed"),
             "fps_spread": (max(r["fps_mean"] for r in ok) - min(r["fps_mean"] for r in ok)) if len(ok) > 1 else 0.0,
         })
         rows.append(row)
@@ -266,14 +274,14 @@ def fmt(value, digits: int = 2) -> str:
 def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
     columns = ["physics", "units", "status", "fps_mean", "fps_1pct_low", "frame_ms_mean", "frame_ms_p99",
                "update_ms_mean", "sim_gpu_ms_mean", "sim_ms_mean", "overlap_pct", "penetration_mean", "penetration_max",
-               "in_walls_pct", "solver", "average_omega", "chebyshev_rho", "reorder_units", "fps_spread", "runs", "ok"]
+               "in_walls_pct", "jitter", "mean_speed", "solver", "average_omega", "chebyshev_rho", "reorder_units", "gpu_driver", "fps_spread", "runs", "ok"]
     with open(out_dir / "summary.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
     headers = ["physics", "units", "fps", "1% low", "frame ms", "p99 ms", "cpu sim ms", "gpu sim ms", "sim ms",
-               "overlap %", "penetration", "in walls %"]
+               "overlap %", "penetration", "in walls %", "jitter", "speed"]
     lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
     for r in rows:
         if r.get("status") != "ok":
@@ -283,7 +291,8 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
             r["physics"], f"{r['units']:,}", fmt(r["fps_mean"], 1), fmt(r["fps_1pct_low"], 1),
             fmt(r["frame_ms_mean"]), fmt(r["frame_ms_p99"]), fmt(r["update_ms_mean"], 3),
             fmt(r["sim_gpu_ms_mean"], 3), fmt(r["sim_ms_mean"], 3), fmt(r["overlap_pct"], 1),
-            fmt(r["penetration_mean"], 3), fmt(r["in_walls_pct"], 2)]) + " |")
+            fmt(r["penetration_mean"], 3), fmt(r["in_walls_pct"], 2), fmt(r["jitter"], 1),
+            fmt(r["mean_speed"], 1)]) + " |")
     table = "\n".join(lines)
 
     notes = []
@@ -304,7 +313,8 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
           "*cpu sim ms* is the scene update on the CPU, *gpu sim ms* the physics compute work on the GPU, "
           "timed in isolation; *sim ms* is their sum. *overlap %* is the share of units overlapping another at the "
           "end of the run, *penetration* the mean overlap depth as a fraction of a unit's diameter, *in walls %* the "
-          "share of units overlapping a wall. `name/solver` rows with `--solver solver`, `wN` with `--omega N`, `rhoN` with `--rho N`, `reorder-X` with `--reorder X`.", ""]
+          "share of units overlapping a wall, *jitter* each unit's speed relative to its touching neighbours' mean "
+          "velocity (world units/s; boiling), *speed* the mean unit speed. `name/solver` rows with `--solver solver`, `wN` with `--omega N`, `rhoN` with `--rho N`, `reorder-X` with `--reorder X`, `@driver` with `--gpu-driver driver`.", ""]
     (out_dir / "summary.md").write_text("\n".join(md), encoding="utf-8")
     return table + ("\n\n" + notes[0] if notes else "")
 
@@ -349,6 +359,8 @@ def main() -> int:
     parser.add_argument("--rho", help="comma-separated spectral radius estimates to sweep for the chebyshev solver")
     parser.add_argument("--reorder", help="comma-separated on/off to sweep reordering units by grid cell "
                                           "(game default on)")
+    parser.add_argument("--gpu-driver", help="comma-separated SDL GPU backends to sweep (direct3d12, vulkan, metal); "
+                                             "default lets SDL pick")
     parser.add_argument("--low-power-gpu", action="store_true", help="run on the integrated GPU, if there is one")
     parser.add_argument("--fixed-dt", type=float, help="simulation step per frame (game default 1/60; 0 = real)")
     parser.add_argument("--width", type=int, default=1600)
@@ -359,11 +371,16 @@ def main() -> int:
                         help="skip larger unit counts for a system once it falls below this fps (0 = never)")
     parser.add_argument("--timeout-slack", type=float, default=90.0, help="seconds allowed beyond warmup+duration")
     parser.add_argument("--no-build", action="store_true", help="use the existing release build")
+    parser.add_argument("--exe", type=Path, help="benchmark this horde executable instead of the release build "
+                                               "(implies --no-build), e.g. a saved copy of an older build")
     parser.add_argument("--out-dir", type=Path, help="default bench_results/<timestamp>")
     parser.add_argument("extra", nargs="*", help="extra arguments passed to horde after --")
     args = parser.parse_args()
 
     configure_preset, build_preset, exe = platform_presets()
+    if args.exe:
+        exe = args.exe.resolve()
+        args.no_build = True
     if not args.no_build:
         build(find_cmake(), configure_preset, build_preset)
     if not exe.exists():
@@ -397,20 +414,23 @@ def main() -> int:
     if bad_reorder:
         sys.exit(f"bench: --reorder takes on and/or off, not {bad_reorder}")
     rhos: list[str | None] = [v.strip() for v in args.rho.split(",") if v.strip()] if args.rho else [None]
-    variants = [(preset, name, solver, omega, reorder, rho) for preset in presets for name in physics
-                for solver in solvers for omega in omegas for reorder in reorders for rho in rhos]
+    drivers: list[str | None] = ([v.strip() for v in args.gpu_driver.split(",") if v.strip()]
+                                 if args.gpu_driver else [None])
+    variants = [(preset, name, solver, omega, reorder, rho, driver) for preset in presets for name in physics
+                for solver in solvers for omega in omegas for reorder in reorders for rho in rhos
+                for driver in drivers]
 
     total = len(variants) * len(counts) * args.repeats
     print(f"== {total} run(s): presets {presets} x physics {physics} x solver {solvers} x omega {omegas} "
-          f"x reorder {reorders} x rho {rhos} "
+          f"x reorder {reorders} x rho {rhos} x driver {drivers} "
           f"x units {counts} "
           f"x {args.repeats} "
           f"-> {out_dir}", flush=True)
 
     results: list[dict] = []
     n = 0
-    for preset, name, solver, omega, reorder, rho in variants:
-        label = variant_label(preset, name, solver, omega, reorder, rho)
+    for preset, name, solver, omega, reorder, rho, driver in variants:
+        label = variant_label(preset, name, solver, omega, reorder, rho, driver)
         too_slow = False
         for units in counts:
             for repeat in range(args.repeats):
@@ -421,7 +441,7 @@ def main() -> int:
                     continue
                 units_text = f"{units:>9,} units" if units is not None else "preset units"
                 print(f"[{n}/{total}] {label:<24} {units_text}  run {repeat + 1}... ", end="", flush=True)
-                r = run_one(exe, args, preset, name, solver, omega, reorder, rho, units, repeat, out_dir)
+                r = run_one(exe, args, preset, name, solver, omega, reorder, rho, driver, units, repeat, out_dir)
                 results.append(r)
                 if r.get("status") == "ok":
                     print(f"{r['fps_mean']:8.1f} fps  frame {stat(r, 'frame_ms'):7.2f} ms  "
