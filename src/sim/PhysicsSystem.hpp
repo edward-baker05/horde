@@ -57,7 +57,7 @@ struct CollisionSettings {
     // Relaxation passes per frame. More converge further (less overlap left in
     // dense crowds) at a linear cost.
     std::uint32_t iterations = 4;
-    CollisionSolver solver = CollisionSolver::Relaxed;
+    CollisionSolver solver = CollisionSolver::Chebyshev;
     // Relaxed and Chebyshev solvers: fraction of each pass's summed correction applied. Below
     // 1 because a unit pushed by several neighbours at once would otherwise
     // overshoot.

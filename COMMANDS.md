@@ -185,9 +185,13 @@ committing the file; anyone with the build can then run it.
 
 | Preset | Setup |
 | --- | --- |
-| `crowd-100k-relaxed` | walls level, 100k units, 4000/s spawn, relaxed solver, 16 passes, relaxation 1.0, speed 200 |
+| `crowd-100k-relaxed` | walls level, 100k units, 4000/s spawn, relaxed solver, 16 passes, relaxation 0.5, speed 200 |
 | `crowd-100k-average` | the same, but the average solver at omega 2.0 |
-| `crowd-100k-relaxed-120hz` | the same as `crowd-100k-relaxed`, but 120 Hz physics and relaxation 0.5 |
+| `crowd-100k-relaxed-120hz` | the same as `crowd-100k-relaxed`, but 120 Hz physics |
+| `crowd-100k-smooth` | `crowd-100k-relaxed` with crowd flow: congestion 1.0-1.2 units/cell, velocity smoothing 1.0 |
+| `crowd-100k-chebyshev-60hz-10` | walls level, 100k units, chebyshev solver (relaxation 0.5, rho 0.95, delay 2), 60 Hz, 10 passes, congestion 1.0-1.2, smoothing 1.0 |
+| `crowd-100k-chebyshev-120hz-10` | the same at 120 Hz |
+| `crowd-100k-chebyshev-120hz-16` | the same at 120 Hz, 16 passes |
 
 **To try one:** start the game and click it under *Presets* in the main menu, or
 
@@ -364,7 +368,7 @@ finding neighbours with a counting-sort grid.
 | Flag | Default | Effect |
 | --- | --- | --- |
 | `--collision-iterations N` | 4 | relaxation passes per frame: the main cost and quality knob |
-| `--solver relaxed\|average\|chebyshev` | relaxed | how a Jacobi pass combines a unit's overlaps: their sum times the relaxation, their average, or relaxed passes accelerated by Chebyshev semi-iteration |
+| `--solver relaxed\|average\|chebyshev` | chebyshev | how a Jacobi pass combines a unit's overlaps: their sum times the relaxation, their average, or relaxed passes accelerated by Chebyshev semi-iteration |
 | `--relaxation F` | 0.5 | relaxed and chebyshev solvers: fraction of each pass's correction applied |
 | `--omega F` | 1 | average solver: over-relaxation on the mean, 1 (plain average) to 2 (fastest measured) |
 | `--rho F` | 0.95 | chebyshev solver: estimated spectral radius, 0 to 1; higher extrapolates harder |

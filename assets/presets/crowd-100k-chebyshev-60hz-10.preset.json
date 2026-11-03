@@ -1,0 +1,18 @@
+{
+  "description": "100k units on the walls level, chebyshev solver at 60 Hz physics: 10 passes at relaxation 0.5, rho 0.95, delay 2, speed 200; crowd flow: congestion 1.0 to 1.2 units/cell, velocity smoothing 1.0",
+  "level": "bench_walls",
+  "physics": "gpu-collide",
+  "units": 100000,
+  "spawn": "markers",
+  "spawnRate": 4000,
+  "physicsRate": 60,
+  "solver": "chebyshev",
+  "collisionIterations": 10,
+  "relaxation": 0.5,
+  "rho": 0.95,
+  "chebyshevDelay": 2,
+  "speed": 200,
+  "congestionStart": 1.0,
+  "congestionStop": 1.2,
+  "smoothing": 1.0
+}
