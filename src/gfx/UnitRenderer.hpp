@@ -37,6 +37,10 @@ public:
     //
     // `ids` (one uint per unit) is each unit's stable ID, for systems that
     // reorder their units; unit 0 by ID is drawn red so it can be followed.
+    //
+    // `slots` (one uint per unit, by ID) is where each unit is now, for systems
+    // that reorder: units are then drawn in ID order, so the one on top of an
+    // overlap stays on top however the units are reordered.
     struct DrawOptions {
         SDL_GPUBuffer* previous = nullptr; // null: draw current positions as they are
         float alpha = 1.0f;
@@ -44,6 +48,7 @@ public:
         SDL_GPUBuffer* health = nullptr; // null: everyone at full health
         float maxHealth = 1.0f;
         SDL_GPUBuffer* ids = nullptr; // null: a unit's ID is its index
+        SDL_GPUBuffer* slots = nullptr; // null: draw in index order
     };
 
     // `units` holds at least `count` BaseUnitData entries.

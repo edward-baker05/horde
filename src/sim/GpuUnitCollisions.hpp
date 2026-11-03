@@ -24,7 +24,8 @@ class GpuWalls;
 // Each iteration is one Jacobi relaxation pass (unit_collide.comp) reading one
 // unit buffer and writing the other,
 // so the caller owns a pair of buffers and resolve() reports which holds the
-// result.
+// result. The buffer a pass writes holds the iterate from two passes back,
+// which the Chebyshev solver reads before overwriting.
 class GpuUnitCollisions {
 public:
     GpuUnitCollisions() = default;

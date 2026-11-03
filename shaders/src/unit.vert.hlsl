@@ -21,6 +21,10 @@ StructuredBuffer<float> Health : register(t2, space0);
 // Each unit's stable ID, when HasIds: its index changes when units are
 // reordered by cell, so the marked unit is picked by ID.
 StructuredBuffer<uint> Ids : register(t3, space0);
+// Where each unit is by ID, when HasSlots: instance i draws the unit whose ID
+// is i. Draw order is then ID order, which stays put when units are
+// reordered, so overlapping units don't swap which is on top every step.
+StructuredBuffer<uint> Slots : register(t4, space0);
 
 #include "unit_state.hlsli"
 
@@ -33,7 +37,8 @@ cbuffer UnitUniforms : register(b0, space1) {
     float MaxJump;   // 0: no PrevPos. Moves longer than this (a respawn) are not blended.
     float InvMaxHealth; // 1 / max hit points; 0: no Health buffer, draw everyone at full health
     uint HasIds;        // 0: no Ids buffer, a unit's ID is its index
-    float2 Padding;
+    uint HasSlots;      // 0: no Slots buffer, draw in index order
+    float Padding;
 };
 
 struct Output {
@@ -52,7 +57,8 @@ static const float2 QuadCorners[4] = {
 };
 
 Output main(uint id : SV_VertexID) {
-    uint unitIndex = id / 6;
+    uint instance = id / 6;
+    uint unitIndex = HasSlots != 0 ? Slots[instance] : instance;
     uint corner = TriangleIndices[id % 6];
 
     UnitData unit = Units[unitIndex];

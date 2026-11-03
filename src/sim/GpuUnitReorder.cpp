@@ -22,6 +22,12 @@ struct alignas(16) GPUReorderUniforms {
     Uint32 padding;
 };
 
+// Matches cbuffer SlotsParams in unit_slots.comp.hlsl
+struct alignas(16) GPUSlotsUniforms {
+    Uint32 unitCount;
+    Uint32 padding[3];
+};
+
 } // namespace
 
 GpuUnitReorder::~GpuUnitReorder() {
@@ -32,17 +38,24 @@ bool GpuUnitReorder::init(scene::Services& services) {
     m_device = services.gpu->device();
     // 1 ro buffer (source), 2 rw buffers (sorted keys, target), 1 uniform buffer
     m_pipeline = services.shaders->loadCompute("unit_reorder.comp", 0, 0, 1, 0, 2, 1, 256, 1, 1);
-    if (m_pipeline == nullptr) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuUnitReorder: failed to load unit_reorder.comp");
+    // 1 ro buffer (IDs), 1 rw buffer (slots), 1 uniform buffer
+    m_slotsPipeline = services.shaders->loadCompute("unit_slots.comp", 0, 0, 1, 0, 1, 1, 256, 1, 1);
+    if (m_pipeline == nullptr || m_slotsPipeline == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuUnitReorder: failed to load its pipelines");
         return false;
     }
     return true;
 }
 
 void GpuUnitReorder::shutdown() {
-    if (m_device && m_pipeline) {
-        SDL_ReleaseGPUComputePipeline(m_device, m_pipeline);
-        m_pipeline = nullptr;
+    if (m_device == nullptr) {
+        return;
+    }
+    for (SDL_GPUComputePipeline** pipeline : {&m_pipeline, &m_slotsPipeline}) {
+        if (*pipeline) {
+            SDL_ReleaseGPUComputePipeline(m_device, *pipeline);
+            *pipeline = nullptr;
+        }
     }
     m_device = nullptr;
 }
@@ -69,6 +82,25 @@ void GpuUnitReorder::reorder(SDL_GPUCommandBuffer* commands, GpuSpatialGrid& gri
             SDL_EndGPUComputePass(pass);
         }
         std::swap(*stream.live, *stream.spare);
+    }
+}
+
+void GpuUnitReorder::writeSlots(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* ids, SDL_GPUBuffer* slots,
+                                std::uint32_t unitCount) const {
+    if (m_slotsPipeline == nullptr || unitCount == 0) {
+        return;
+    }
+
+    const GPUSlotsUniforms uniforms{unitCount, {0, 0, 0}};
+    SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
+
+    SDL_GPUStorageBufferReadWriteBinding binding{};
+    binding.buffer = slots;
+    if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, &binding, 1)) {
+        SDL_BindGPUComputePipeline(pass, m_slotsPipeline);
+        SDL_BindGPUComputeStorageBuffers(pass, 0, &ids, 1);
+        SDL_DispatchGPUCompute(pass, std::max<Uint32>(1, (unitCount + 255) / 256), 1, 1);
+        SDL_EndGPUComputePass(pass);
     }
 }
 

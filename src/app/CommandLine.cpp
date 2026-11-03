@@ -36,9 +36,12 @@ void printUsage() {
         "  --level-size WxH   the built-in level at another size, e.g. 8000x8000\n"
         "  --collision-iterations N   relaxation passes per frame, default 4\n"
         "  --solver NAME      how a Jacobi pass combines a unit's overlaps: relaxed (sum x\n"
-        "                     relaxation, the default) | average (mean of the overlaps)\n"
-        "  --relaxation F     relaxed solver: fraction of each pass's correction applied, default 0.5\n"
+        "                     relaxation, the default) | average (mean of the overlaps) |\n"
+        "                     chebyshev (relaxed, accelerated by Chebyshev semi-iteration)\n"
+        "  --relaxation F     relaxed and chebyshev: fraction of each pass's correction applied, default 0.5\n"
         "  --omega F          average solver: over-relaxation on the mean, 1 (plain) to 2, default 1\n"
+        "  --rho F            chebyshev: estimated spectral radius, 0 to 1 (exclusive), default 0.95\n"
+        "  --chebyshev-delay N   chebyshev: plain passes before accelerating, at least 2, default 2\n"
         "  --reorder on|off   reorder units by grid cell every step, so neighbours sit together in\n"
         "                     memory, default on\n"
         "  --speed F          unit speed toward the exit, default 60\n"
@@ -218,6 +221,18 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--omega") {
             if (!value(v) || !parseNumber(v, level.collision.averageOmega) || level.collision.averageOmega <= 0 ||
                 level.collision.averageOmega > 2.0f) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--rho") {
+            if (!value(v) || !parseNumber(v, level.collision.chebyshevRho) || level.collision.chebyshevRho <= 0 ||
+                level.collision.chebyshevRho >= 1.0f) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--chebyshev-delay") {
+            if (!value(v) || !parseNumber(v, level.collision.chebyshevDelay) ||
+                level.collision.chebyshevDelay < sim::kMinChebyshevDelay) {
                 return bad(v);
             }
             wantsLevel = true;

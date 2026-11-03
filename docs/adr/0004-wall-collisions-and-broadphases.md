@@ -104,6 +104,51 @@ mean. ω makes no difference to GPU time. The average solver is worth choosing
 when the hard no-overshoot guarantee at ω = 1 matters (for example tiny
 time steps or very dense spawns); otherwise relaxed is the better default.
 
+### Chebyshev acceleration
+
+**Added 2026-11-03.** `--solver chebyshev` runs relaxed passes and
+accelerates them by Chebyshev semi-iteration (Wang 2015): after
+`--chebyshev-delay` plain passes, each pass extrapolates its relaxed result
+along the change from two passes back, `next = w * (relaxed - older) +
+older`, with a weight `w` rising each pass from 2 / (2 - rho^2) toward 2 /
+(1 + sqrt(1 - rho^2)). It needs no extra buffer: the buffer a pass writes
+still holds this unit's iterate from two passes back, so a unit reads that
+before overwriting it. The extrapolated move is capped at `maxCorrection`,
+like any pass's, and walls are resolved after it. Cost per pass is the same
+as relaxed.
+
+The delay is at least 2. The first pass can't extrapolate at all: the buffer
+it writes doesn't hold this step's units yet. The second could, but it would
+extrapolate from the predicted positions, which no pass has pushed out of
+walls yet. A unit that walked into a wall would have its push back out
+multiplied by `w`, bouncing it off the wall; in play that showed as units
+bouncing hard off walls they walked into. From the third pass on, "two passes
+back" has been through wall resolution.
+
+Measured on an RTX 5080, `crowd-100k-relaxed` (a dense crowd pressing on the
+exits, relaxation 0.5), mean penetration at the end of the run. The rho
+sweep was run at delay 1, before the bounce was found; the delay 2 column is
+the default now:
+
+| passes | relaxed | rho 0.5 | 0.8 | 0.9 | 0.95 | 0.97 | 0.99 | 0.95, delay 2 | 0.97, delay 2 |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 | 0.308 | 0.302 | 0.278 | 0.258 | 0.243 | | | 0.278 | |
+| 8 | 0.264 | | | 0.176 | 0.144 | | | 0.165 | |
+| 16 | 0.197 | 0.184 | 0.149 | 0.124 | 0.088 | 0.072 | 0.161 | 0.096 | 0.082 |
+| 32 | 0.133 | | | | | | | | |
+
+Delay 2 gives back a little, most at 4 passes, where one less pass
+extrapolates. Even so, 8 Chebyshev passes beat 16 relaxed ones, and 16 beat
+32. Higher rho helps until it overshoots: 0.97 was best at 16 passes and 0.99
+got worse again. The default is 0.95, the best value measured at every pass
+count. Sweep it with `tools/bench.py --solver chebyshev --rho ...` if the pass
+count or relaxation changes a lot.
+
+Penetration alone undersells it when contacts are sparse. At 1M random units
+(8000x8000, 16 passes), Chebyshev left 155 overlapping pairs against relaxed's
+310, though those few went slightly deeper (0.35 against 0.26 of a diameter).
+Compare overlapping pairs too there.
+
 ## Scaling down
 
 `sim::collisionPreset` (`--quality low|medium|high|ultra`, also in the level
@@ -154,9 +199,16 @@ both ways over three runs. The gather costs a fixed few passes per step,
 which more collision passes pay back many times over, so the gain grows with
 the pass count and with how far the unit buffer outgrows the GPU's caches.
 
-Drawing order now follows the grid, which changes from step to step. Units
-are drawn in cell order, so overlapping units may swap which is on top
-between steps.
+Drawn in index order, units would follow the grid order, which changes every
+step: within a cell it is whichever unit claimed its slot first, an atomic
+race. In a dense crowd that made overlapping units of different health swap
+which is on top 60 times a second, and colours seemed to jumble. So after each
+reorder, `GpuUnitReorder::writeSlots` records where each unit landed by ID
+(`unit_slots.comp`), and `unit.vert` draws instance i from that slot. Drawing
+is in ID order, which never changes, as it was before reordering. It costs
+one uint per unit, a scattered write per step and a scattered read when
+drawing: GPU sim time went from 1.20 to 1.26 ms at 1M units x16 and from 6.47
+to 7.26 ms at 4M, where frame time went from 6.90 to 7.84 ms.
 
 ## Not done yet, in rough order of expected payoff
 
@@ -169,7 +221,8 @@ between steps.
   budget, instead of picking a preset by hand.
 - **Fewer passes for the same quality**: graph-coloured Gauss-Seidel (cells in
   a 2×2 checkerboard), or warm-starting from last frame's corrections. Jacobi
-  only spreads crowd pressure one neighbour per pass.
+  only spreads crowd pressure one neighbour per pass; Chebyshev (above) helps,
+  but each pass still only reaches one neighbour further.
 - **Pathing**: units head straight for the exit and slide along whatever is in
   the way. A flow field (the old `bailen-testing` branch has a `VectorField`)
   would send them around walls rather than into them.

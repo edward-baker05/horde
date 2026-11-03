@@ -193,7 +193,8 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         m_healthSpare = SDL_CreateGPUBuffer(m_device, &healthInfo);
         m_flingSpare = SDL_CreateGPUBuffer(m_device, &flingInfo);
         m_idsSpare = SDL_CreateGPUBuffer(m_device, &idsInfo);
-        spares = m_prevSpare && m_healthSpare && m_flingSpare && m_idsSpare;
+        m_slots = SDL_CreateGPUBuffer(m_device, &idsInfo);
+        spares = m_prevSpare && m_healthSpare && m_flingSpare && m_idsSpare && m_slots;
     }
 
     if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling || !m_ids || !spares) {
@@ -221,7 +222,8 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     // Every unit, including those still to spawn, starts unflung and with its
     // slot as its ID. The spares too: a reorder only ever writes the slots of
     // units already in play, so the slots past them keep these until a spawn
-    // reaches them, in whichever buffer is live by then.
+    // reaches them, in whichever buffer is live by then. Slots start as the
+    // same identity: right until the first reorder.
     const std::vector<glm::vec2> fling(std::max<std::uint32_t>(m_capacity, 1), glm::vec2(0.0f));
     std::vector<std::uint32_t> ids(std::max<std::uint32_t>(m_capacity, 1));
     for (std::uint32_t i = 0; i < ids.size(); ++i) {
@@ -234,7 +236,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
             return false;
         }
     }
-    for (SDL_GPUBuffer* buffer : {m_ids, m_idsSpare}) {
+    for (SDL_GPUBuffer* buffer : {m_ids, m_idsSpare, m_slots}) {
         if (buffer && !uploadBytesNow(m_device, ids.data(), idsSize, buffer)) {
             return false;
         }
@@ -269,8 +271,9 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
-    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1], &m_prevPositions, &m_health,     &m_fling,
-                                 &m_ids,      &m_prevSpare, &m_healthSpare,   &m_flingSpare, &m_idsSpare};
+    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1],   &m_prevPositions, &m_health,
+                                 &m_fling,    &m_ids,        &m_prevSpare,     &m_healthSpare,
+                                 &m_flingSpare, &m_idsSpare, &m_slots};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
             SDL_ReleaseGPUBuffer(m_device, *buffer);
@@ -439,6 +442,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
             {&m_ids, &m_idsSpare, sizeof(std::uint32_t)},
         };
         m_reorder.reorder(commands, m_grid, m_unitCount, streams);
+        m_reorder.writeSlots(commands, m_ids, m_slots, m_unitCount);
     }
 
     // 3. Separate overlapping units.
@@ -491,6 +495,7 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.health = m_health;
     options.maxHealth = static_cast<float>(m_config.health.maxHp);
     options.ids = m_ids;
+    options.slots = m_slots;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
 }
 

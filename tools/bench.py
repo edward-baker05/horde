@@ -14,6 +14,8 @@ Examples:
     python tools/bench.py --physics gpu-collide --collision-iterations 2 --units 10k,100k,1m
     python tools/bench.py --physics gpu-collide --solver relaxed,average --collision-iterations 8
     python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,1.9
+    python tools/bench.py --physics gpu-collide --solver relaxed,chebyshev --collision-iterations 8
+    python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95
     python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
     python tools/bench.py --preset crowd-100k-relaxed,crowd-100k-average   # shared test setups
     python tools/bench.py --low-power-gpu --level assets/levels/bench_walls.level.json
@@ -109,16 +111,18 @@ def git_info() -> dict:
 
 
 def variant_label(preset: str | None, physics: str | None, solver: str | None, omega: str | None,
-                  reorder: str | None = None) -> str:
+                  reorder: str | None = None, rho: str | None = None) -> str:
     """'gpu-collide', 'gpu-collide/average w1.5', 'gpu-collide reorder-off', 'crowd-100k-relaxed:gpu-collide'"""
     base = ":".join(part for part in (preset, physics) if part)
     return (base + (f"/{solver}" if solver else "") + (f" w{omega}" if omega else "")
+            + (f" rho{rho}" if rho else "")
             + (f" reorder-{reorder}" if reorder else ""))
 
 
 def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: str | None, solver: str | None,
-            omega: str | None, reorder: str | None, units: int | None, repeat: int, out_dir: Path) -> dict:
-    label = variant_label(preset, physics, solver, omega, reorder)
+            omega: str | None, reorder: str | None, rho: str | None, units: int | None, repeat: int,
+            out_dir: Path) -> dict:
+    label = variant_label(preset, physics, solver, omega, reorder, rho)
     stem = (f"{label.replace('/', '_').replace(' ', '_').replace(':', '_')}"
             f"_{units if units is not None else 'preset'}_r{repeat}")
     json_path = out_dir / "runs" / f"{stem}.json"
@@ -157,6 +161,8 @@ def run_one(exe: Path, args: argparse.Namespace, preset: str | None, physics: st
         cmd += ["--omega", omega]
     if reorder:
         cmd += ["--reorder", reorder]
+    if rho:
+        cmd += ["--rho", rho]
     if args.low_power_gpu:
         cmd.append("--low-power-gpu")
     for flag, value in (("--collision-iterations", args.collision_iterations), ("--relaxation", args.relaxation),
@@ -227,6 +233,7 @@ def aggregate(results: list[dict]) -> list[dict]:
             "solver": ok[0].get("solver", "-"),
             "average_omega": ok[0].get("average_omega"),
             "reorder_units": ok[0].get("reorder_units"),
+            "chebyshev_rho": ok[0].get("chebyshev_rho"),
             "in_walls_pct": in_walls * 100 / units if in_walls is not None and units else None,
             "fps_mean": mean_of("fps_mean"),
             "fps_1pct_low": mean_of("fps_1pct_low"),
@@ -259,7 +266,7 @@ def fmt(value, digits: int = 2) -> str:
 def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
     columns = ["physics", "units", "status", "fps_mean", "fps_1pct_low", "frame_ms_mean", "frame_ms_p99",
                "update_ms_mean", "sim_gpu_ms_mean", "sim_ms_mean", "overlap_pct", "penetration_mean", "penetration_max",
-               "in_walls_pct", "solver", "average_omega", "reorder_units", "fps_spread", "runs", "ok"]
+               "in_walls_pct", "solver", "average_omega", "chebyshev_rho", "reorder_units", "fps_spread", "runs", "ok"]
     with open(out_dir / "summary.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
@@ -297,7 +304,7 @@ def write_summary(rows: list[dict], out_dir: Path, meta: dict) -> str:
           "*cpu sim ms* is the scene update on the CPU, *gpu sim ms* the physics compute work on the GPU, "
           "timed in isolation; *sim ms* is their sum. *overlap %* is the share of units overlapping another at the "
           "end of the run, *penetration* the mean overlap depth as a fraction of a unit's diameter, *in walls %* the "
-          "share of units overlapping a wall. `name/solver` rows with `--solver solver`, `wN` with `--omega N`, `reorder-X` with `--reorder X`.", ""]
+          "share of units overlapping a wall. `name/solver` rows with `--solver solver`, `wN` with `--omega N`, `rhoN` with `--rho N`, `reorder-X` with `--reorder X`.", ""]
     (out_dir / "summary.md").write_text("\n".join(md), encoding="utf-8")
     return table + ("\n\n" + notes[0] if notes else "")
 
@@ -337,8 +344,9 @@ def main() -> int:
     parser.add_argument("--collision-iterations", type=int, help="relaxation passes per frame (game default 4)")
     parser.add_argument("--relaxation", type=float, help="fraction of each pass's correction applied (default 0.5)")
     parser.add_argument("--speed", type=float, help="unit speed toward the exit (default 60)")
-    parser.add_argument("--solver", help="comma-separated collision solvers to sweep (relaxed, average)")
+    parser.add_argument("--solver", help="comma-separated collision solvers to sweep (relaxed, average, chebyshev)")
     parser.add_argument("--omega", help="comma-separated over-relaxation factors to sweep for the average solver")
+    parser.add_argument("--rho", help="comma-separated spectral radius estimates to sweep for the chebyshev solver")
     parser.add_argument("--reorder", help="comma-separated on/off to sweep reordering units by grid cell "
                                           "(game default on)")
     parser.add_argument("--low-power-gpu", action="store_true", help="run on the integrated GPU, if there is one")
@@ -388,20 +396,21 @@ def main() -> int:
     bad_reorder = [v for v in reorders if v not in (None, "on", "off")]
     if bad_reorder:
         sys.exit(f"bench: --reorder takes on and/or off, not {bad_reorder}")
-    variants = [(preset, name, solver, omega, reorder) for preset in presets for name in physics
-                for solver in solvers for omega in omegas for reorder in reorders]
+    rhos: list[str | None] = [v.strip() for v in args.rho.split(",") if v.strip()] if args.rho else [None]
+    variants = [(preset, name, solver, omega, reorder, rho) for preset in presets for name in physics
+                for solver in solvers for omega in omegas for reorder in reorders for rho in rhos]
 
     total = len(variants) * len(counts) * args.repeats
     print(f"== {total} run(s): presets {presets} x physics {physics} x solver {solvers} x omega {omegas} "
-          f"x reorder {reorders} "
+          f"x reorder {reorders} x rho {rhos} "
           f"x units {counts} "
           f"x {args.repeats} "
           f"-> {out_dir}", flush=True)
 
     results: list[dict] = []
     n = 0
-    for preset, name, solver, omega, reorder in variants:
-        label = variant_label(preset, name, solver, omega, reorder)
+    for preset, name, solver, omega, reorder, rho in variants:
+        label = variant_label(preset, name, solver, omega, reorder, rho)
         too_slow = False
         for units in counts:
             for repeat in range(args.repeats):
@@ -412,7 +421,7 @@ def main() -> int:
                     continue
                 units_text = f"{units:>9,} units" if units is not None else "preset units"
                 print(f"[{n}/{total}] {label:<24} {units_text}  run {repeat + 1}... ", end="", flush=True)
-                r = run_one(exe, args, preset, name, solver, omega, reorder, units, repeat, out_dir)
+                r = run_one(exe, args, preset, name, solver, omega, reorder, rho, units, repeat, out_dir)
                 results.append(r)
                 if r.get("status") == "ok":
                     print(f"{r['fps_mean']:8.1f} fps  frame {stat(r, 'frame_ms'):7.2f} ms  "

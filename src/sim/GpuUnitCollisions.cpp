@@ -4,6 +4,8 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
+
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "scene/Scene.hpp"
@@ -28,10 +30,25 @@ struct alignas(16) GPUCollideUniforms {
     glm::uvec2 wallBinDim;
     float wallBinSize;
     Uint32 wallCount;
-    Uint32 solver; // 0 relaxed, 1 average: matches SOLVER_* in collide_common.hlsli
+    Uint32 solver; // 0 relaxed, 1 average, 2 chebyshev: matches SOLVER_* in collide_common.hlsli
     float averageOmega;
-    Uint32 solverPadding[2];
+    float chebyshevOmega; // this pass's weight; 1 = a plain relaxed pass
+    Uint32 solverPadding;
 };
+
+// The Chebyshev weight for each pass (Wang 2015, eq. 12): 1 for the first
+// `delay` passes, then 2 / (2 - rho^2), then 4 / (4 - rho^2 * previous),
+// rising toward 2 / (1 + sqrt(1 - rho^2)).
+float chebyshevOmega(std::uint32_t pass, std::uint32_t delay, float rho, float previous) {
+    if (pass < delay) {
+        return 1.0f;
+    }
+    const float rhoSq = rho * rho;
+    if (pass == delay) {
+        return 2.0f / (2.0f - rhoSq);
+    }
+    return 4.0f / (4.0f - rhoSq * previous);
+}
 static_assert(sizeof(GPUCollideUniforms) == 80);
 
 } // namespace
@@ -85,12 +102,22 @@ std::uint32_t GpuUnitCollisions::resolve(SDL_GPUCommandBuffer* commands, SDL_GPU
     uniforms.wallBinDim = walls.binDim();
     uniforms.wallBinSize = walls.binSize();
     uniforms.wallCount = walls.primitiveCount();
-    uniforms.solver = m_settings.solver == CollisionSolver::Average ? 1u : 0u;
+    uniforms.solver = static_cast<Uint32>(m_settings.solver);
     uniforms.averageOmega = m_settings.averageOmega;
+    uniforms.chebyshevOmega = 1.0f;
+
+    // The first pass can't extrapolate: the buffer it writes doesn't hold
+    // this step's units yet. The second mustn't: it would extrapolate from
+    // the predicted positions, before any pass has pushed units out of walls,
+    // and bounce them off (see CollisionSettings::chebyshevDelay).
+    const std::uint32_t delay = std::max<std::uint32_t>(m_settings.chebyshevDelay, kMinChebyshevDelay);
 
     for (std::uint32_t i = 0; i < m_settings.iterations; ++i) {
         const std::uint32_t next = 1 - current;
 
+        if (m_settings.solver == CollisionSolver::Chebyshev) {
+            uniforms.chebyshevOmega = chebyshevOmega(i, delay, m_settings.chebyshevRho, uniforms.chebyshevOmega);
+        }
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
         SDL_GPUStorageBufferReadWriteBinding binding{};

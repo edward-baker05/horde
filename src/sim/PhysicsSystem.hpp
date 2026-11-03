@@ -32,10 +32,21 @@ enum class CollisionSolver {
     // however many neighbours push at once, but converges slowly in deep
     // crowds; over-relaxing (omega 1-2) speeds that up. Ignores `relaxation`.
     Average,
+    // Relaxed passes, accelerated by Chebyshev semi-iteration (Wang 2015, "A
+    // Chebyshev Semi-Iterative Approach for Accelerating Projective and
+    // Position-based Dynamics"): from pass `chebyshevDelay` on, each pass
+    // overshoots its relaxed result along the change from two passes back,
+    // by a weight that grows each pass as `chebyshevRho` says. Same cost per
+    // pass as relaxed.
+    Chebyshev,
 };
 
 bool parseSolver(const std::string& text, CollisionSolver& out);
 const char* solverName(CollisionSolver solver);
+
+// Fewest plain passes the Chebyshev solver runs before extrapolating; see
+// CollisionSettings::chebyshevDelay.
+inline constexpr std::uint32_t kMinChebyshevDelay = 2;
 
 // Unit-vs-unit collision rules. Shared by every system that resolves
 // collisions, so that two systems are benchmarked against the same problem.
@@ -47,7 +58,7 @@ struct CollisionSettings {
     // dense crowds) at a linear cost.
     std::uint32_t iterations = 4;
     CollisionSolver solver = CollisionSolver::Relaxed;
-    // Relaxed solver: fraction of each pass's summed correction applied. Below
+    // Relaxed and Chebyshev solvers: fraction of each pass's summed correction applied. Below
     // 1 because a unit pushed by several neighbours at once would otherwise
     // overshoot.
     float relaxation = 0.5f;
@@ -55,6 +66,17 @@ struct CollisionSettings {
     // plain average; up to 2 converges faster (successive over-relaxation, as
     // in Mueller et al.'s PBD). Beyond 2 it diverges.
     float averageOmega = 1.0f;
+    // Chebyshev solver: the estimated spectral radius of a relaxed pass, 0 to
+    // 1 (exclusive), which sets how fast the weights grow toward 2 / (1 +
+    // sqrt(1 - rho^2)). Higher accelerates more; too high oscillates. 0.95
+    // was best across 4 to 16 passes in a dense crowd; 0.99 overshot.
+    float chebyshevRho = 0.95f;
+    // Chebyshev solver: plain relaxed passes before accelerating. At least 2:
+    // a pass extrapolates from two passes back, and before pass 2 that is
+    // the predicted positions, which walls haven't touched yet. A unit that
+    // walked into a wall would have its push back out extrapolated too, and
+    // bounce off the wall.
+    std::uint32_t chebyshevDelay = kMinChebyshevDelay;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;
     // Reorder the units by grid cell after each broadphase (GpuUnitReorder),

@@ -27,6 +27,8 @@ bool parseSolver(const std::string& text, CollisionSolver& out) {
         out = CollisionSolver::Relaxed;
     } else if (text == "average") {
         out = CollisionSolver::Average;
+    } else if (text == "chebyshev") {
+        out = CollisionSolver::Chebyshev;
     } else {
         return false;
     }
@@ -39,6 +41,8 @@ const char* solverName(CollisionSolver solver) {
             return "relaxed";
         case CollisionSolver::Average:
             return "average";
+        case CollisionSolver::Chebyshev:
+            return "chebyshev";
     }
     return "?";
 }

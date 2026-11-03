@@ -215,7 +215,7 @@ With `--preset`, only flags you pass yourself override the preset.
 anything left out uses the game's default. Unknown keys are an error, so a
 typo fails loudly instead of quietly testing the default. The keys are:
 `description`, `level`, `physics`, `units`, `spawn`, `spawnRate`,
-`respawnAtExit`, `speed`, `physicsRate`, `maxHp`, `exitDamage`, `solver`, `collisionIterations`, `relaxation`, `omega`, `reorder` and `seed`. `src/scene/Presets.hpp` says what each takes.
+`respawnAtExit`, `speed`, `physicsRate`, `maxHp`, `exitDamage`, `solver`, `collisionIterations`, `relaxation`, `omega`, `rho`, `chebyshevDelay`, `reorder` and `seed`. `src/scene/Presets.hpp` says what each takes.
 
 ## Benchmarking physics
 
@@ -235,6 +235,7 @@ python tools/bench.py --physics gpu-collide --collision-iterations 1 --low-power
 python tools/bench.py --level-size 8000x8000 --units 1m,4m   # room for a million units
 python tools/bench.py --physics gpu-collide --solver relaxed,average   # compare solvers
 python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,2   # sweep over-relaxation
+python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95   # sweep Chebyshev's rho
 python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
 python tools/bench.py --help
 ```
@@ -361,9 +362,11 @@ finding neighbours with a counting-sort grid.
 | Flag | Default | Effect |
 | --- | --- | --- |
 | `--collision-iterations N` | 4 | relaxation passes per frame: the main cost and quality knob |
-| `--solver relaxed\|average` | relaxed | how a Jacobi pass combines a unit's overlaps: their sum times the relaxation, or their average |
-| `--relaxation F` | 0.5 | relaxed solver: fraction of each pass's correction applied |
+| `--solver relaxed\|average\|chebyshev` | relaxed | how a Jacobi pass combines a unit's overlaps: their sum times the relaxation, their average, or relaxed passes accelerated by Chebyshev semi-iteration |
+| `--relaxation F` | 0.5 | relaxed and chebyshev solvers: fraction of each pass's correction applied |
 | `--omega F` | 1 | average solver: over-relaxation on the mean, 1 (plain average) to 2 (fastest measured) |
+| `--rho F` | 0.95 | chebyshev solver: estimated spectral radius, 0 to 1; higher extrapolates harder |
+| `--chebyshev-delay N` | 2 | chebyshev solver: plain relaxed passes before extrapolating, at least 2 (1 bounced units off walls) |
 | `--reorder on\|off` | on | reorder units by grid cell every step so neighbours sit together in memory: 2-15x less GPU time, the same collisions |
 
 The level's debug panel has the same controls, applied on *Restart level*. Measurements and the reasoning are

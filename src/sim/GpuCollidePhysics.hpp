@@ -109,6 +109,10 @@ private:
     SDL_GPUBuffer* m_healthSpare = nullptr;
     SDL_GPUBuffer* m_flingSpare = nullptr;
     SDL_GPUBuffer* m_idsSpare = nullptr;
+    // Where each unit is by ID, rewritten after every reorder, so drawing
+    // goes in ID order and overlaps don't flicker; null unless reordering.
+    // Starts as identity, which holds until the first reorder.
+    SDL_GPUBuffer* m_slots = nullptr;
 
     // Streaming spawns: units [m_unitCount, m_capacity) are still to come.
     std::uint32_t m_capacity = 0;

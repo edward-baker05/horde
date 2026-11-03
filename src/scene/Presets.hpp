@@ -27,10 +27,12 @@ namespace horde::scene {
 //   physicsRate          0 (once per frame), 60 or 120
 //   maxHp                int
 //   exitDamage           float
-//   solver               "relaxed" | "average"
+//   solver               "relaxed" | "average" | "chebyshev"
 //   collisionIterations  int, passes per physics step
-//   relaxation           float, relaxed solver
+//   relaxation           float, relaxed and chebyshev solvers
 //   omega                float 1-2, average solver
+//   rho                  float 0-1 (exclusive), chebyshev solver
+//   chebyshevDelay       int, at least 2, chebyshev solver
 //   reorder              bool, reorder units by grid cell every step (default true)
 //   seed                 int
 struct Preset {

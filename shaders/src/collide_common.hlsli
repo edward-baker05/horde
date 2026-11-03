@@ -45,15 +45,19 @@ cbuffer CollideParams : register(b0, space2) {
     uint2 WallBinDim;
     float WallBinSize;
     uint WallCount;
-    uint Solver;        // SOLVER_RELAXED or SOLVER_AVERAGE
-    float AverageOmega; // average solver: over-relaxation factor on the mean, 1 = plain average
-    uint2 SolverPadding;
+    uint Solver;          // SOLVER_*
+    float AverageOmega;   // average solver: over-relaxation factor on the mean, 1 = plain average
+    float ChebyshevOmega; // chebyshev solver: this pass's weight, 1 = a plain relaxed pass
+    uint SolverPadding;
 };
 
-// Both are Jacobi: every unit reads the same state (InUnits) and writes the
+// All are Jacobi: every unit reads the same state (InUnits) and writes the
 // next (OutUnits). They differ in how a unit combines its pair corrections:
 static const uint SOLVER_RELAXED = 0; // sum of corrections, scaled by Relaxation
 static const uint SOLVER_AVERAGE = 1; // mean of corrections times AverageOmega
+// Relaxed, then extrapolated from the iterate two passes back, which is what
+// OutUnits still holds for this unit: next = w * (relaxed - older) + older.
+static const uint SOLVER_CHEBYSHEV = 2;
 
 #define WALL_PRIMS_SLOT t3
 #define WALL_BINS_SLOT t4
@@ -103,6 +107,19 @@ void writeResolved(uint index, UnitData unit, float2 correction, uint overlaps) 
     float correctionLength = length(correction);
     if (correctionLength > MaxCorrection) {
         correction *= MaxCorrection / correctionLength;
+    }
+
+    // Before walls, so the extrapolated position is still kept out of them.
+    // Read before this thread overwrites it, and no other thread reads it.
+    // The whole move stays within MaxCorrection, as the stale grid requires.
+    if (Solver == SOLVER_CHEBYSHEV && ChebyshevOmega != 1.0f) {
+        float2 older = OutUnits[index].pos;
+        float2 relaxed = unit.pos + correction;
+        correction = ChebyshevOmega * (relaxed - older) + older - unit.pos;
+        correctionLength = length(correction);
+        if (correctionLength > MaxCorrection) {
+            correction *= MaxCorrection / correctionLength;
+        }
     }
 
     float radius = Diameter * 0.5f;

@@ -27,7 +27,9 @@ class GpuSpatialGrid;
 //
 // A unit's index changes every frame, so anything that has to follow a unit
 // (a per-unit random phase, picking one out) needs a stable ID stream of its
-// own.
+// own. So does drawing: units drawn in index order would swap which is on top
+// of an overlap whenever the order within a cell changes, which is every step
+// (writeSlots).
 class GpuUnitReorder {
 public:
     GpuUnitReorder() = default;
@@ -53,9 +55,17 @@ public:
     void reorder(SDL_GPUCommandBuffer* commands, GpuSpatialGrid& grid, std::uint32_t unitCount,
                  std::span<const Stream> streams) const;
 
+    // Records, after reorder(), where each unit now is by its stable ID:
+    // slots[id] = index. `ids` holds each unit's ID (a permutation of [0,
+    // unitCount)), already reordered. Lets drawing go in ID order, which
+    // stays put while the grid order changes every step.
+    void writeSlots(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* ids, SDL_GPUBuffer* slots,
+                    std::uint32_t unitCount) const;
+
 private:
     SDL_GPUDevice* m_device = nullptr;
     SDL_GPUComputePipeline* m_pipeline = nullptr;
+    SDL_GPUComputePipeline* m_slotsPipeline = nullptr;
 };
 
 } // namespace horde::sim

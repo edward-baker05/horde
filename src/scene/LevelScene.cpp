@@ -308,7 +308,8 @@ void LevelScene::debugUi() {
         m_pendingOptions.health.exitDamage = std::max(m_pendingOptions.health.exitDamage, 0.0f);
     }
 
-    constexpr sim::CollisionSolver solvers[] = {sim::CollisionSolver::Relaxed, sim::CollisionSolver::Average};
+    constexpr sim::CollisionSolver solvers[] = {sim::CollisionSolver::Relaxed, sim::CollisionSolver::Average,
+                                                sim::CollisionSolver::Chebyshev};
     if (ImGui::BeginCombo("Solver", sim::solverName(m_pendingOptions.collision.solver))) {
         for (const sim::CollisionSolver solver : solvers) {
             if (ImGui::Selectable(sim::solverName(solver), solver == m_pendingOptions.collision.solver)) {
@@ -322,10 +323,17 @@ void LevelScene::debugUi() {
     if (ImGui::SliderInt("Collision passes", &iterations, 0, 32)) {
         m_pendingOptions.collision.iterations = static_cast<std::uint32_t>(iterations);
     }
-    if (m_pendingOptions.collision.solver == sim::CollisionSolver::Relaxed) {
-        ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.05f, 1.0f);
-    } else {
+    if (m_pendingOptions.collision.solver == sim::CollisionSolver::Average) {
         ImGui::SliderFloat("Omega", &m_pendingOptions.collision.averageOmega, 0.5f, 2.0f);
+    } else {
+        ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.05f, 1.0f);
+    }
+    if (m_pendingOptions.collision.solver == sim::CollisionSolver::Chebyshev) {
+        ImGui::SliderFloat("Rho", &m_pendingOptions.collision.chebyshevRho, 0.05f, 0.99f);
+        int delay = static_cast<int>(m_pendingOptions.collision.chebyshevDelay);
+        if (ImGui::SliderInt("Chebyshev delay", &delay, static_cast<int>(sim::kMinChebyshevDelay), 8)) {
+            m_pendingOptions.collision.chebyshevDelay = static_cast<std::uint32_t>(delay);
+        }
     }
     ImGui::Checkbox("Reorder units by cell", &m_pendingOptions.collision.reorderUnits);
     ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
