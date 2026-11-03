@@ -77,6 +77,18 @@ struct CollisionSettings {
     // walked into a wall would have its push back out extrapolated too, and
     // bounce off the wall.
     std::uint32_t chebyshevDelay = kMinChebyshevDelay;
+
+    // Crowd flow, against dense crowds boiling (units kicked a different way
+    // every step, mixing). See docs/gpu-optimisation-overnight.md.
+    //
+    // Units per grid cell around the point one cell ahead of a unit at which
+    // it starts slowing down, and at which it stands still (hexagonal packing
+    // is ~1.15). A stop of 0 turns it off.
+    float congestionStart = 0.7f;
+    float congestionStop = 0.0f;
+    // Each step, how far a unit's velocity moves toward the mean of the units
+    // touching it, 0 (off) to 1 (XSPH viscosity). One extra pass when on.
+    float velocitySmoothing = 0.0f;
     // Largest correction per pass, as a fraction of the diameter.
     float maxCorrection = 0.5f;
     // Reorder the units by grid cell after each broadphase (GpuUnitReorder),

@@ -1,0 +1,15 @@
+{
+  "description": "crowd-100k-relaxed with crowd flow: units slow for crowds ahead (1.0 to 1.6 units/cell) and velocity smoothing 0.5, so dense crowds flow as a body instead of boiling",
+  "level": "bench_walls",
+  "physics": "gpu-collide",
+  "units": 100000,
+  "spawn": "markers",
+  "spawnRate": 4000,
+  "solver": "relaxed",
+  "collisionIterations": 16,
+  "relaxation": 1.0,
+  "speed": 200,
+  "congestionStart": 1.0,
+  "congestionStop": 1.6,
+  "smoothing": 0.5
+}

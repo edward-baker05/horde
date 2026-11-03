@@ -46,7 +46,7 @@ struct type_CollideParams
     uint Solver;
     float AverageOmega;
     float ChebyshevOmega;
-    uint SolverPadding;
+    float Smoothing;
 };
 
 struct WallPrimitive
@@ -87,118 +87,111 @@ kernel void main0(constant type_CollideParams& CollideParams [[buffer(0)]], devi
         float2 _122;
         for (int _123 = -1; _123 <= 1; _118 = _119, _121 = _122, _123++)
         {
-            int _129 = _116.y + _123;
-            bool _137;
-            if (_129 >= 0)
+            uint _178;
+            uint _179;
+            do
             {
-                _137 = _129 >= int(CollideParams.GridDim.y);
-            }
-            else
-            {
-                _137 = true;
-            }
-            if (_137)
-            {
-                _119 = _118;
-                _122 = _121;
-                continue;
-            }
-            uint _141;
-            float2 _144;
-            _141 = _118;
-            _144 = _121;
-            uint _142;
-            float2 _145;
-            for (int _146 = -1; _146 <= 1; _141 = _142, _144 = _145, _146++)
-            {
-                int _152 = _116.x + _146;
-                bool _160;
-                if (_152 >= 0)
+                int _131 = _116.y + _123;
+                bool _139;
+                if (_131 >= 0)
                 {
-                    _160 = _152 >= int(CollideParams.GridDim.x);
+                    _139 = _131 >= int(CollideParams.GridDim.y);
                 }
                 else
                 {
-                    _160 = true;
+                    _139 = true;
                 }
-                if (_160)
+                if (_139)
                 {
-                    _142 = _141;
-                    _145 = _144;
-                    continue;
+                    _178 = 0u;
+                    _179 = 4294967295u;
+                    break;
                 }
-                uint _169 = (uint(_152) + (uint(_129) * CollideParams.GridDim.x)) * 2u;
-                if (GridB._m0[_169] == 4294967295u)
+                int _142 = _116.x;
+                uint _145 = uint(max((_142 - 1), 0));
+                uint _152 = uint(min((_142 + 1), (int(CollideParams.GridDim.x) - 1)));
+                uint _154 = uint(_131) * CollideParams.GridDim.x;
+                uint _156;
+                uint _159;
+                _156 = 0u;
+                _159 = 4294967295u;
+                uint _157;
+                uint _160;
+                for (uint _161 = _145; _161 <= _152; _156 = _157, _159 = _160, _161++)
                 {
-                    _142 = _141;
-                    _145 = _144;
-                    continue;
-                }
-                uint _175 = _169 + 1u;
-                uint _179;
-                float2 _182;
-                _179 = _141;
-                _182 = _144;
-                uint _180;
-                float2 _183;
-                for (uint _184 = GridB._m0[_169]; _184 < GridB._m0[_175]; _179 = _180, _182 = _183, _184++)
-                {
-                    uint _197;
-                    if (CollideParams.UnitsSorted != 0u)
+                    uint _167 = (_154 + _161) * 2u;
+                    if (GridB._m0[_167] != 4294967295u)
                     {
-                        _197 = _184;
+                        _157 = max(_156, GridB._m0[_167 + 1u]);
+                        _160 = min(_159, GridB._m0[_167]);
                     }
                     else
                     {
-                        _197 = ((device uint*)&GridA._m0[_184])[1];
+                        _157 = _156;
+                        _160 = _159;
                     }
-                    do
+                }
+                _178 = _156;
+                _179 = _159;
+                break;
+            } while(false);
+            _119 = _118;
+            _122 = _121;
+            uint _181;
+            float2 _183;
+            for (uint _184 = _179; _184 < _178; _119 = _181, _122 = _183, _184++)
+            {
+                uint _197;
+                if (CollideParams.UnitsSorted != 0u)
+                {
+                    _197 = _184;
+                }
+                else
+                {
+                    _197 = ((device uint*)&GridA._m0[_184])[1];
+                }
+                do
+                {
+                    if (_197 == gl_GlobalInvocationID.x)
                     {
-                        if (_197 == gl_GlobalInvocationID.x)
+                        _181 = _119;
+                        _183 = _122;
+                        break;
+                    }
+                    float2 _205 = _99 - InUnits._m0[_197].pos;
+                    float _206 = dot(_205, _205);
+                    if (_206 >= (CollideParams.Diameter * CollideParams.Diameter))
+                    {
+                        _181 = _119;
+                        _183 = _122;
+                        break;
+                    }
+                    float _213 = sqrt(_206);
+                    float2 _238;
+                    if (_213 > 9.9999997473787516355514526367188e-05)
+                    {
+                        _238 = _205 / float2(_213);
+                    }
+                    else
+                    {
+                        float _228 = fract(sin(float((min(gl_GlobalInvocationID.x, _197) * 7919u) + max(gl_GlobalInvocationID.x, _197))) * 43758.546875) * 6.283185482025146484375;
+                        float2 _231 = float2(cos(_228), sin(_228));
+                        float2 _237;
+                        if (gl_GlobalInvocationID.x < _197)
                         {
-                            _180 = _179;
-                            _183 = _182;
-                            break;
-                        }
-                        float2 _205 = _99 - InUnits._m0[_197].pos;
-                        float _206 = dot(_205, _205);
-                        if (_206 >= (CollideParams.Diameter * CollideParams.Diameter))
-                        {
-                            _180 = _179;
-                            _183 = _182;
-                            break;
-                        }
-                        float _213 = sqrt(_206);
-                        float2 _238;
-                        if (_213 > 9.9999997473787516355514526367188e-05)
-                        {
-                            _238 = _205 / float2(_213);
+                            _237 = _231;
                         }
                         else
                         {
-                            float _228 = fract(sin(float((min(gl_GlobalInvocationID.x, _197) * 7919u) + max(gl_GlobalInvocationID.x, _197))) * 43758.546875) * 6.283185482025146484375;
-                            float2 _231 = float2(cos(_228), sin(_228));
-                            float2 _237;
-                            if (gl_GlobalInvocationID.x < _197)
-                            {
-                                _237 = _231;
-                            }
-                            else
-                            {
-                                _237 = -_231;
-                            }
-                            _238 = _237;
+                            _237 = -_231;
                         }
-                        _180 = _179 + 1u;
-                        _183 = _182 + (_238 * ((CollideParams.Diameter - _213) * 0.5));
-                        break;
-                    } while(false);
-                }
-                _142 = _179;
-                _145 = _182;
+                        _238 = _237;
+                    }
+                    _181 = _119 + 1u;
+                    _183 = _122 + (_238 * ((CollideParams.Diameter - _213) * 0.5));
+                    break;
+                } while(false);
             }
-            _119 = _141;
-            _122 = _144;
         }
         float2 _259;
         if (CollideParams.Solver == 1u)

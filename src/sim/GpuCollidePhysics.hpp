@@ -89,6 +89,8 @@ private:
     GpuWalls m_walls;
 
     SDL_GPUComputePipeline* m_integratePipeline = nullptr;
+    // Whether m_grid holds a step's grid yet, for unit_integrate's density map.
+    bool m_gridBuilt = false;
     SDL_GPUComputePipeline* m_finalizePipeline = nullptr;
 
     // Collision passes ping-pong between these; m_current holds the latest units.

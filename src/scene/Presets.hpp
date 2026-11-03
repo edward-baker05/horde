@@ -33,6 +33,9 @@ namespace horde::scene {
 //   omega                float 1-2, average solver
 //   rho                  float 0-1 (exclusive), chebyshev solver
 //   chebyshevDelay       int, at least 2, chebyshev solver
+//   congestionStart      float, units per cell ahead at which units start slowing
+//   congestionStop       float, ... at which they stand still; 0 = off
+//   smoothing            float 0-1, velocity blended toward touching neighbours' mean
 //   reorder              bool, reorder units by grid cell every step (default true)
 //   seed                 int
 struct Preset {

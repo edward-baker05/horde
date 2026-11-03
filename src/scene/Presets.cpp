@@ -92,7 +92,8 @@ bool loadPreset(const std::string& name, const LevelOptions& base, Preset& out, 
     static const std::set<std::string> known = {
         "description", "level",      "physics", "units",      "spawn",      "spawnRate",
         "respawnAtExit", "speed",    "physicsRate", "maxHp",  "exitDamage",
-        "solver",      "collisionIterations", "relaxation", "omega", "rho", "chebyshevDelay", "reorder", "seed"};
+        "solver",      "collisionIterations", "relaxation", "omega", "rho", "chebyshevDelay", "congestionStart", "congestionStop", "smoothing",
+        "reorder", "seed"};
     for (const auto& [key, value] : root.items()) {
         if (!known.contains(key)) {
             error = path.generic_string() + ": unknown key '" + key + "'";
@@ -154,6 +155,15 @@ bool loadPreset(const std::string& name, const LevelOptions& base, Preset& out, 
     if (o.collision.chebyshevRho <= 0.0f || o.collision.chebyshevRho >= 1.0f) return fail("rho must be in (0, 1)");
     if (!read(root, "chebyshevDelay", o.collision.chebyshevDelay, error)) return fail(error);
     if (o.collision.chebyshevDelay < sim::kMinChebyshevDelay) return fail("chebyshevDelay must be at least 2");
+    if (!read(root, "congestionStart", o.collision.congestionStart, error)) return fail(error);
+    if (!read(root, "congestionStop", o.collision.congestionStop, error)) return fail(error);
+    if (o.collision.congestionStop != 0.0f && o.collision.congestionStop <= o.collision.congestionStart) {
+        return fail("congestionStop must be 0 (off) or above congestionStart");
+    }
+    if (!read(root, "smoothing", o.collision.velocitySmoothing, error)) return fail(error);
+    if (o.collision.velocitySmoothing < 0.0f || o.collision.velocitySmoothing > 1.0f) {
+        return fail("smoothing must be in [0, 1]");
+    }
     if (!read(root, "reorder", o.collision.reorderUnits, error)) return fail(error);
     if (!read(root, "seed", o.seed, error)) return fail(error);
 

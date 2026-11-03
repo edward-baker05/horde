@@ -29,6 +29,13 @@ struct CollisionQuality {
     // on average (as a fraction of the diameter).
     std::uint32_t unitsInWalls = 0;
     double meanWallPenetration = 0.0;
+    // How much units move against the units touching them, in world units per
+    // second: each unit's speed relative to the average velocity of its
+    // touching neighbours, averaged over every unit that has one. A crowd
+    // flowing together scores near 0; one that boils, with units kicked in
+    // different directions every step, scores high, and mixes.
+    double velocityJitter = 0.0;
+    double meanSpeed = 0.0; // over all units, for scale
 };
 
 // Writes units as CSV (x, y = centre; vx, vy). Returns false on failure.

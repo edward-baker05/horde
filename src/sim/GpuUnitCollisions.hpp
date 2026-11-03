@@ -46,6 +46,12 @@ public:
         return m_settings;
     }
 
+    // Blends velocity toward touching neighbours' mean (unit_smooth.comp),
+    // reading units[current] and writing the other. Returns the index of the
+    // buffer holding the result; `current` itself when smoothing is off.
+    std::uint32_t smooth(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* const units[2], std::uint32_t current,
+                         std::uint32_t unitCount, const GpuSpatialGrid& grid, const GpuWalls& walls) const;
+
     // Takes effect from the next resolve(): passes are just a loop count.
     void setIterations(std::uint32_t iterations) {
         m_settings.iterations = iterations;
@@ -54,6 +60,7 @@ public:
 private:
     SDL_GPUDevice* m_device = nullptr;
     SDL_GPUComputePipeline* m_pipeline = nullptr;
+    SDL_GPUComputePipeline* m_smoothPipeline = nullptr;
     CollisionSettings m_settings;
     float m_diameter = 5.0f;
     glm::vec2 m_worldMax{0.0f, 0.0f};

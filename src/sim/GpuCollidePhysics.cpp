@@ -41,10 +41,15 @@ struct alignas(16) GPUIntegrateUniforms {
     float time; // seconds of simulation
     float wobbleAngle;
     float wobbleRate;
-    Uint32 wobblePadding;
+    Uint32 congestionEnabled; // nonzero once the grid has been built
+    glm::uvec2 gridDim;
+    float invCellSize;
+    float congestionStart;
+    float congestionStop;
+    Uint32 congestionPadding[3];
 };
 static_assert(sizeof(GPUIntegrateUniforms) ==
-              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions + 16);
+              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions + 48);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -144,7 +149,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
 
     // unit_integrate.comp: 1 ro buffer (IDs), 4 rw buffers (units, previous positions, fling, health), 1 uniform
     // buffer
-    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 1, 0, 4, 1, 256, 1, 1);
+    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 2, 0, 4, 1, 256, 1, 1);
     // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 3 rw buffers (units, health, fling),
     // 1 uniform buffer
     m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 3, 1, 256, 1, 1);
@@ -411,6 +416,12 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.time = static_cast<float>(m_frame) * m_dt;
         uniforms.wobbleAngle = m_config.movement.wobbleAngle;
         uniforms.wobbleRate = m_config.movement.wobbleRate;
+        // Last step's grid, as a density map: none before the first build.
+        uniforms.congestionEnabled = m_gridBuilt && m_config.collision.congestionStop > 0.0f ? 1u : 0u;
+        uniforms.gridDim = m_grid.gridDim();
+        uniforms.invCellSize = 1.0f / m_grid.cellSize();
+        uniforms.congestionStart = m_config.collision.congestionStart;
+        uniforms.congestionStop = m_config.collision.congestionStop;
         std::erase_if(m_explosions, [](const ActiveExplosion& active) { return active.left <= 1e-5f; });
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
@@ -422,7 +433,8 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 
         if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 4)) {
             SDL_BindGPUComputePipeline(pass, m_integratePipeline);
-            SDL_BindGPUComputeStorageBuffers(pass, 0, &m_ids, 1);
+            SDL_GPUBuffer* readOnly[2] = {m_ids, m_grid.gridB()};
+            SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 2);
             SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
             SDL_EndGPUComputePass(pass);
         }
@@ -430,6 +442,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 
     // 2. Broadphase over the predicted positions.
     m_grid.build(commands, m_units[m_current], m_unitCount);
+    m_gridBuilt = true;
 
     // Units into grid order, every per-unit buffer alike. Previous positions
     // too, so drawing still blends each unit from where it was.
@@ -481,6 +494,9 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
             SDL_EndGPUComputePass(pass);
         }
     }
+
+    // 5. Velocity toward the neighbours' mean, if asked for.
+    m_current = m_collisions.smooth(commands, m_units, m_current, m_unitCount, m_grid, m_walls);
 }
 
 void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,

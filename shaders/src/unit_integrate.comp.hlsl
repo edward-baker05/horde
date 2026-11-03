@@ -25,6 +25,9 @@ struct UnitData {
 // Each unit's stable ID: its index changes whenever units are reordered by
 // cell, so anything that has to stay with one unit is keyed on this instead.
 StructuredBuffer<uint> Ids : register(t0, space0);
+// The previous step's cell ranges from sim/GpuSpatialGrid (first key, one past
+// the last, per cell; 0xFFFFFFFF first if empty), read as a density map.
+StructuredBuffer<uint> CellRanges : register(t1, space0);
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float2> PrevPos : register(u1, space1);
 // Velocity from flinging explosions, on top of the walking velocity in Units.
@@ -66,7 +69,14 @@ cbuffer IntegrateParams : register(b0, space2) {
     float Time;        // seconds of simulation
     float WobbleAngle; // radians either side of the heading; 0 turns it off
     float WobbleRate;  // Hz
-    uint WobblePadding;
+    uint CongestionEnabled; // nonzero once CellRanges holds a grid
+    uint2 GridDim;
+    float InvCellSize;
+    // Units per cell around the point a cell ahead at which a unit starts
+    // slowing down, and at which it stops: hexagonal packing is ~1.15.
+    float CongestionStart;
+    float CongestionStop;
+    uint3 CongestionPadding;
 };
 
 // How far this unit's heading sways from straight at this moment, in radians.
@@ -133,6 +143,42 @@ float2 fieldFlow(float2 centre) {
     return flow;
 }
 
+// How fast a unit heading along `dir` from `pos` (its top-left corner) may go,
+// 0 to 1 of full speed, given how crowded the 3x3 cells centred two cells
+// ahead of it were last step: the space one to three cells in front, not the
+// unit's own cell or the units beside it, which would read any packed crowd
+// as blocked even when the way ahead is clear. A unit slows before it walks into a crowd, rather than
+// walking in and leaving collisions to push it back out; the unit behind it
+// then sees it in the way and slows too, so a jam backs up as a queue instead
+// of compressing.
+float congestionSpeed(float2 pos, float2 dir) {
+    if (CongestionEnabled == 0 || CongestionStop <= CongestionStart) {
+        return 1.0f;
+    }
+    float2 ahead = pos + dir * (2.0f / InvCellSize);
+    int2 cell = clamp((int2)(ahead * InvCellSize), int2(0, 0), (int2)GridDim - 1);
+    uint units = 0;
+    for (int dy = -1; dy <= 1; ++dy) {
+        int y = cell.y + dy;
+        if (y < 0 || y >= (int)GridDim.y) {
+            continue;
+        }
+        for (int dx = -1; dx <= 1; ++dx) {
+            int x = cell.x + dx;
+            if (x < 0 || x >= (int)GridDim.x) {
+                continue;
+            }
+            uint c = (uint)x + (uint)y * GridDim.x;
+            uint start = CellRanges[c * 2];
+            if (start != 0xFFFFFFFF) {
+                units += CellRanges[c * 2 + 1] - start;
+            }
+        }
+    }
+    float density = (float)units / 9.0f;
+    return saturate((CongestionStop - density) / (CongestionStop - CongestionStart));
+}
+
 // The point units steer toward: the nearest point of the nearest exit.
 float2 goalFor(float2 centre) {
     if (ExitCount == 0) {
@@ -188,6 +234,10 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         float c;
         sincos(wobble(Ids[index]), s, c);
         desired = float2(desired.x * c - desired.y * s, desired.x * s + desired.y * c);
+    }
+    float desiredSpeed = length(desired);
+    if (desiredSpeed > 0.001f) {
+        desired *= congestionSpeed(unit.pos, desired / desiredSpeed);
     }
 
     unit.vel += (desired - unit.vel) * saturate(turnRate * Dt);

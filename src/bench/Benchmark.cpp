@@ -152,6 +152,9 @@ bool Recorder::finish(const RunInfo& info) const {
         {"average_omega", collision.averageOmega},
         {"chebyshev_rho", collision.chebyshevRho},
         {"chebyshev_delay", collision.chebyshevDelay},
+        {"congestion_start", collision.congestionStart},
+        {"congestion_stop", collision.congestionStop},
+        {"velocity_smoothing", collision.velocitySmoothing},
         {"reorder_units", collision.reorderUnits},
         {"max_speed", level.maxSpeed},
     };
@@ -169,6 +172,8 @@ bool Recorder::finish(const RunInfo& info) const {
             {"density", q.density},
             {"units_in_walls", q.unitsInWalls},
             {"mean_wall_penetration", q.meanWallPenetration},
+            {"velocity_jitter", q.velocityJitter},
+            {"mean_speed", q.meanSpeed},
         };
     }
     if (m_config.syncGpu) {

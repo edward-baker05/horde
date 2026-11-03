@@ -105,6 +105,40 @@ CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float
         }
     }
 
+    // Velocity relative to the touching neighbours' mean.
+    double jitterSum = 0.0;
+    double speedSum = 0.0;
+    std::uint32_t jitterUnits = 0;
+    const float touchSq = diameter * diameter;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const glm::vec2 p = units[i].pos;
+        speedSum += std::sqrt(units[i].vel.x * units[i].vel.x + units[i].vel.y * units[i].vel.y);
+        const int cx = std::clamp(static_cast<int>(p.x / diameter), 0, cols - 1);
+        const int cy = std::clamp(static_cast<int>(p.y / diameter), 0, rows - 1);
+        glm::vec2 velSum(0.0f);
+        std::uint32_t neighbours = 0;
+        for (int y = std::max(0, cy - 1); y <= std::min(rows - 1, cy + 1); ++y) {
+            for (int x = std::max(0, cx - 1); x <= std::min(cols - 1, cx + 1); ++x) {
+                const int cell = x + y * cols;
+                for (std::uint32_t s = start[cell]; s < start[cell + 1]; ++s) {
+                    const std::uint32_t j = order[s];
+                    const glm::vec2 d = units[j].pos - p;
+                    if (j != i && d.x * d.x + d.y * d.y < touchSq) {
+                        velSum += units[j].vel;
+                        ++neighbours;
+                    }
+                }
+            }
+        }
+        if (neighbours > 0) {
+            const glm::vec2 rel = units[i].vel - velSum / static_cast<float>(neighbours);
+            jitterSum += std::sqrt(rel.x * rel.x + rel.y * rel.y);
+            ++jitterUnits;
+        }
+    }
+    q.velocityJitter = jitterUnits ? jitterSum / jitterUnits : 0.0;
+    q.meanSpeed = speedSum / count;
+
     q.overlappingUnits = static_cast<std::uint32_t>(std::count(overlapping.begin(), overlapping.end(), true));
     q.meanPenetration = q.overlappingPairs ? penetrationSum / static_cast<double>(q.overlappingPairs) : 0.0;
     return q;

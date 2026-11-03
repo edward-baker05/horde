@@ -237,6 +237,8 @@ python tools/bench.py --physics gpu-collide --solver relaxed,average   # compare
 python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,2   # sweep over-relaxation
 python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95   # sweep Chebyshev's rho
 python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
+python tools/bench.py --physics gpu-collide --gpu-driver direct3d12,vulkan   # compare GPU backends
+python tools/bench.py --exe saved/horde.exe --preset crowd-100k-relaxed   # benchmark a saved build
 python tools/bench.py --help
 ```
 
@@ -367,6 +369,8 @@ finding neighbours with a counting-sort grid.
 | `--omega F` | 1 | average solver: over-relaxation on the mean, 1 (plain average) to 2 (fastest measured) |
 | `--rho F` | 0.95 | chebyshev solver: estimated spectral radius, 0 to 1; higher extrapolates harder |
 | `--chebyshev-delay N` | 2 | chebyshev solver: plain relaxed passes before extrapolating, at least 2 (1 bounced units off walls) |
+| `--congestion START,STOP` | off | slow units down as the crowd two cells ahead goes from START to STOP units per cell (hex packing ~1.15); calmer, denser-proof crowds, slower flow (`docs/gpu-optimisation-overnight.md`) |
+| `--smoothing F` | 0 | one extra pass blending each unit's velocity toward its touching neighbours' mean, 0-1: stops dense crowds boiling and mixing; 0.5 is enough |
 | `--reorder on\|off` | on | reorder units by grid cell every step so neighbours sit together in memory: 2-15x less GPU time, the same collisions |
 
 The level's debug panel has the same controls, applied on *Restart level*. Measurements and the reasoning are

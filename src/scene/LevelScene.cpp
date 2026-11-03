@@ -336,6 +336,17 @@ void LevelScene::debugUi() {
         }
     }
     ImGui::Checkbox("Reorder units by cell", &m_pendingOptions.collision.reorderUnits);
+    ImGui::SeparatorText("Crowd flow");
+    bool congestion = m_pendingOptions.collision.congestionStop > 0.0f;
+    if (ImGui::Checkbox("Slow down for crowds ahead", &congestion)) {
+        m_pendingOptions.collision.congestionStop = congestion ? m_pendingOptions.collision.congestionStart + 0.3f : 0.0f;
+    }
+    if (congestion) {
+        ImGui::SliderFloat("Start (units/cell)", &m_pendingOptions.collision.congestionStart, 0.1f, 1.5f);
+        ImGui::SliderFloat("Stop (units/cell)", &m_pendingOptions.collision.congestionStop,
+                           m_pendingOptions.collision.congestionStart + 0.05f, 2.0f);
+    }
+    ImGui::SliderFloat("Velocity smoothing", &m_pendingOptions.collision.velocitySmoothing, 0.0f, 1.0f);
     ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
 
     if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {

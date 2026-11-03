@@ -48,7 +48,7 @@ cbuffer CollideParams : register(b0, space2) {
     uint Solver;          // SOLVER_*
     float AverageOmega;   // average solver: over-relaxation factor on the mean, 1 = plain average
     float ChebyshevOmega; // chebyshev solver: this pass's weight, 1 = a plain relaxed pass
-    uint SolverPadding;
+    float Smoothing;      // unit_smooth.comp: how far velocity moves toward the neighbours' mean, 0 to 1
 };
 
 // All are Jacobi: every unit reads the same state (InUnits) and writes the
@@ -95,6 +95,54 @@ void accumulatePair(uint index, float2 pos, uint otherIndex, inout float2 correc
 // The grid cell a unit's position falls in.
 int2 cellOf(float2 pos) {
     return clamp((int2)(pos * InvCellSize), int2(0, 0), (int2)GridDim - 1);
+}
+
+// The keys of the three cells around `cell` in row `cell.y + dy`, as
+// [start, end); empty (start >= end) if there are none or the row is off the
+// grid.
+//
+// Cells in a row have consecutive ids and the keys are sorted by cell, so the
+// three cells of a row are one contiguous run of keys: one loop per row
+// instead of one per cell. Empty cells hold 0xFFFFFFFF at both ends, so the
+// run starts at the smallest start, and ends at the largest end of the cells
+// that aren't empty.
+void rowKeys(int2 cell, int dy, out uint start, out uint end) {
+    start = 0xFFFFFFFF;
+    end = 0;
+    int ny = cell.y + dy;
+    if (ny < 0 || ny >= (int)GridDim.y) {
+        return;
+    }
+    uint xLo = (uint)max(cell.x - 1, 0);
+    uint xHi = (uint)min(cell.x + 1, (int)GridDim.x - 1);
+    uint row = (uint)ny * GridDim.x;
+    for (uint x = xLo; x <= xHi; ++x) {
+        uint c = row + x;
+        uint cellStart = GridB[c * 2];
+        if (cellStart != 0xFFFFFFFF) {
+            start = min(start, cellStart);
+            end = max(end, GridB[c * 2 + 1]);
+        }
+    }
+}
+
+// The unit key s names.
+uint keyUnit(uint s) {
+    return UnitsSorted != 0 ? s : GridA[s].y;
+}
+
+// Sums this unit's pair corrections against every unit in the 3x3 cells
+// around `cell`. Cells are one diameter wide, so every possible overlap is
+// within that block.
+void accumulateNeighbours(uint index, float2 pos, int2 cell, inout float2 correction, inout uint overlaps) {
+    for (int dy = -1; dy <= 1; ++dy) {
+        uint start;
+        uint end;
+        rowKeys(cell, dy, start, end);
+        for (uint s = start; s < end; ++s) {
+            accumulatePair(index, pos, keyUnit(s), correction, overlaps);
+        }
+    }
 }
 
 // Applies the combined unit correction, then walls, then the level bounds.

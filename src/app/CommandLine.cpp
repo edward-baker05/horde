@@ -42,6 +42,9 @@ void printUsage() {
         "  --omega F          average solver: over-relaxation on the mean, 1 (plain) to 2, default 1\n"
         "  --rho F            chebyshev: estimated spectral radius, 0 to 1 (exclusive), default 0.95\n"
         "  --chebyshev-delay N   chebyshev: plain passes before accelerating, at least 2, default 2\n"
+        "  --congestion START,STOP   slow units down as the crowd ahead goes from START to STOP\n"
+        "                     units per cell (hex packing ~1.15), e.g. 0.7,1.0; default off\n"
+        "  --smoothing F      blend velocity toward touching neighbours' mean each step, 0-1, default 0\n"
         "  --reorder on|off   reorder units by grid cell every step, so neighbours sit together in\n"
         "                     memory, default on\n"
         "  --speed F          unit speed toward the exit, default 60\n"
@@ -233,6 +236,21 @@ ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
         } else if (arg == "--chebyshev-delay") {
             if (!value(v) || !parseNumber(v, level.collision.chebyshevDelay) ||
                 level.collision.chebyshevDelay < sim::kMinChebyshevDelay) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--congestion") {
+            const auto comma = value(v) ? v.find(',') : std::string_view::npos;
+            if (comma == std::string_view::npos ||
+                !parseNumber(v.substr(0, comma), level.collision.congestionStart) ||
+                !parseNumber(v.substr(comma + 1), level.collision.congestionStop) ||
+                level.collision.congestionStart < 0 || level.collision.congestionStop <= level.collision.congestionStart) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--smoothing") {
+            if (!value(v) || !parseNumber(v, level.collision.velocitySmoothing) ||
+                level.collision.velocitySmoothing < 0 || level.collision.velocitySmoothing > 1.0f) {
                 return bad(v);
             }
             wantsLevel = true;
