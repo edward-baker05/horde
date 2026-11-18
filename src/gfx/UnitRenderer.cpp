@@ -1,11 +1,17 @@
 #include "gfx/UnitRenderer.hpp"
 
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_video.h>
+
+#include <cmath>
+
+#include "core/Paths.hpp"
 
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "gfx/UnitSpriteData.hpp"
 #include "scene/Scene.hpp"
 
 namespace horde::gfx {
@@ -23,9 +29,34 @@ struct alignas(16) UnitDrawUniforms {
     float invMaxHealth;
     Uint32 hasIds;
     Uint32 hasSlots;
+    Uint32 spriteMode;
+    Uint32 lod;
+    Uint32 species;
+    Uint32 seed;
+    Uint32 integerScale;
+    glm::vec2 viewportSize;
+    float pixelsPerUnit;
     float padding;
 };
-static_assert(sizeof(UnitDrawUniforms) == 128);
+static_assert(sizeof(UnitDrawUniforms) == 160);
+
+// Matches HLSL cbuffer UnitSpriteUniforms in unit_sprite.frag.hlsl
+struct alignas(16) UnitSpriteUniforms {
+    glm::vec4 palette[unit_sprites::kPaletteSize];
+    Uint32 spriteMode;
+    Uint32 padding[3];
+};
+static_assert(sizeof(UnitSpriteUniforms) == 16 * (unit_sprites::kPaletteSize + 1));
+
+// Screen pixels a unit must span to use each sprite LOD: near art is 7 sprite
+// pixels across the head and mid art 5, so below those they would be shrunk
+// and lose pixels. Below kDotPixels even the far circle breaks up, so units
+// become solid dots. Leaving a LOD needs kHysteresis fewer pixels than
+// entering it, so zooming across a threshold doesn't flicker.
+constexpr float kNearPixels = 7.0f;
+constexpr float kMidPixels = 5.0f;
+constexpr float kDotPixels = 3.0f;
+constexpr float kHysteresis = 0.5f;
 
 } // namespace
 
@@ -35,7 +66,22 @@ UnitRenderer::~UnitRenderer() {
 
 bool UnitRenderer::init(scene::Services& services) {
     m_device = services.gpu->device();
+    m_window = services.window;
     m_atlas = services.atlas->handle();
+
+    // The crowd sprites' role atlas. Optional: without it units stay discs.
+    Texture unitAtlas;
+    if (unitAtlas.loadFromFile(m_device, paths::asset("textures/units.png"))) {
+        if (unitAtlas.width() == unit_sprites::kAtlasWidth && unitAtlas.height() == unit_sprites::kAtlasHeight) {
+            m_unitAtlasTexture = std::move(unitAtlas);
+            m_unitAtlas = m_unitAtlasTexture.handle();
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "textures/units.png is %ux%u, expected %dx%d: re-run tools/make_unit_atlas.py",
+                         unitAtlas.width(), unitAtlas.height(), unit_sprites::kAtlasWidth,
+                         unit_sprites::kAtlasHeight);
+        }
+    }
 
     // unit.vert: 5 storage buffers (units t0, previous positions t1, health t2, IDs t3, slots t4, space0), 1 uniform
     // buffer (b0, space1)
@@ -43,10 +89,10 @@ bool UnitRenderer::init(scene::Services& services) {
         "unit.vert", SDL_GPU_SHADERSTAGE_VERTEX,
         ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 5, .uniformBuffers = 1});
 
-    // sprite.frag: 1 sampler (s0, space2), 1 sampled texture (t0, space2)
+    // unit_sprite.frag: 1 sampler (s0, space2), 1 sampled texture (t0, space2), 1 uniform buffer (b0, space3)
     SDL_GPUShader* fragmentShader = services.shaders->loadGraphics(
-        "sprite.frag", SDL_GPU_SHADERSTAGE_FRAGMENT,
-        ShaderResources{.samplers = 1, .storageTextures = 0, .storageBuffers = 0, .uniformBuffers = 0});
+        "unit_sprite.frag", SDL_GPU_SHADERSTAGE_FRAGMENT,
+        ShaderResources{.samplers = 1, .storageTextures = 0, .storageBuffers = 0, .uniformBuffers = 1});
 
     if (!vertexShader || !fragmentShader) {
         if (vertexShader) SDL_ReleaseGPUShader(m_device, vertexShader);
@@ -112,6 +158,8 @@ void UnitRenderer::shutdown() {
         SDL_ReleaseGPUGraphicsPipeline(m_device, m_pipeline);
         m_pipeline = nullptr;
     }
+    m_unitAtlasTexture.release();
+    m_unitAtlas = nullptr;
     m_device = nullptr;
 }
 
@@ -139,15 +187,67 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
     uniforms.invMaxHealth = options.health && options.maxHealth > 0.0f ? 1.0f / options.maxHealth : 0.0f;
     uniforms.hasIds = options.ids ? 1u : 0u;
     uniforms.hasSlots = options.slots ? 1u : 0u;
+
+    // Screen pixels per world unit, from the orthographic projection's x scale.
+    int width = 0;
+    int height = 0;
+    if (m_window) {
+        SDL_GetWindowSizeInPixels(m_window, &width, &height);
+    }
+    const float pixelsPerUnit = std::abs(viewProjection[0][0]) * static_cast<float>(width) * 0.5f;
+    m_unitPixels = unitSize * pixelsPerUnit;
+
+    const bool sprites = options.sprites && m_unitAtlas != nullptr;
+    if (sprites) {
+        m_lod = options.lod == Lod::Auto ? pickLod(m_unitPixels) : options.lod;
+        uniforms.spriteMode = 1u;
+        uniforms.lod = static_cast<Uint32>(m_lod);
+        uniforms.species = static_cast<Uint32>(options.species);
+        uniforms.seed = options.seed;
+        uniforms.integerScale = options.integerScale ? 1u : 0u;
+        uniforms.viewportSize = glm::vec2(static_cast<float>(width), static_cast<float>(height));
+        uniforms.pixelsPerUnit = pixelsPerUnit;
+    }
     SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
+    // The palette rides along every draw: ~1.7 KB, cheaper than a buffer to manage.
+    UnitSpriteUniforms spriteUniforms{};
+    if (sprites) {
+        for (int i = 0; i < unit_sprites::kPaletteSize; ++i) {
+            spriteUniforms.palette[i] = unit_sprites::kPalette[i];
+        }
+        spriteUniforms.spriteMode = 1u;
+    }
+    SDL_PushGPUFragmentUniformData(commands, 0, &spriteUniforms, sizeof(spriteUniforms));
+
     SDL_GPUTextureSamplerBinding atlasBinding{};
-    atlasBinding.texture = m_atlas;
+    atlasBinding.texture = sprites ? m_unitAtlas : m_atlas;
     atlasBinding.sampler = m_sampler;
     SDL_BindGPUFragmentSamplers(pass, 0, &atlasBinding, 1);
 
     // 6 vertices per unit quad
     SDL_DrawGPUPrimitives(pass, count * 6, 1, 0, 0);
+}
+
+UnitRenderer::Lod UnitRenderer::pickLod(float unitPixels) const {
+    // Thresholds to enter each LOD from below; staying in the current one (or
+    // anything more detailed) is allowed down to kHysteresis pixels lower.
+    const auto enter = [](Lod lod) {
+        switch (lod) {
+        case Lod::Near: return kNearPixels;
+        case Lod::Mid: return kMidPixels;
+        case Lod::Far: return kDotPixels;
+        default: return 0.0f;
+        }
+    };
+    const Lod order[] = {Lod::Near, Lod::Mid, Lod::Far, Lod::Dot};
+    for (Lod lod : order) {
+        const bool current = static_cast<int>(m_lod) <= static_cast<int>(lod);
+        if (unitPixels >= enter(lod) - (current ? kHysteresis : 0.0f)) {
+            return lod;
+        }
+    }
+    return Lod::Dot;
 }
 
 } // namespace horde::gfx

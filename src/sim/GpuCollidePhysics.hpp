@@ -83,6 +83,13 @@ private:
 
     SDL_GPUDevice* m_device = nullptr;
     gfx::UnitRenderer m_renderer;
+    // How units are drawn; changed from the debug UI.
+    struct SpriteSettings {
+        bool enabled = true;
+        gfx::UnitRenderer::Species species = gfx::UnitRenderer::Species::Humans;
+        gfx::UnitRenderer::Lod lod = gfx::UnitRenderer::Lod::Auto;
+        bool integerScale = false;
+    } m_sprites;
     GpuSpatialGrid m_grid;
     GpuUnitCollisions m_collisions;
     GpuUnitReorder m_reorder;

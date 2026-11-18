@@ -512,6 +512,11 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.maxHealth = static_cast<float>(m_config.health.maxHp);
     options.ids = m_ids;
     options.slots = m_slots;
+    options.sprites = m_sprites.enabled;
+    options.species = m_sprites.species;
+    options.lod = m_sprites.lod;
+    options.integerScale = m_sprites.integerScale;
+    options.seed = m_config.flow.seed;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
 }
 
@@ -522,6 +527,30 @@ void GpuCollidePhysics::debugUi() {
         m_config.movement.wobbleAngle = glm::radians(wobbleDegrees);
     }
     ImGui::SliderFloat("Wobble rate", &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
+
+    using Renderer = gfx::UnitRenderer;
+    ImGui::SeparatorText("Unit sprites");
+    if (!m_renderer.hasSprites()) {
+        ImGui::TextDisabled("textures/units.png not loaded: drawing discs");
+        return;
+    }
+    ImGui::Checkbox("Sprites", &m_sprites.enabled);
+    if (!m_sprites.enabled) {
+        return;
+    }
+    int species = static_cast<int>(m_sprites.species);
+    if (ImGui::Combo("Crowd", &species, "Humans Aliens ")) {
+        m_sprites.species = static_cast<Renderer::Species>(species);
+    }
+    // Combo index 0 is Auto (-1); the rest follow Lod's values.
+    int lod = static_cast<int>(m_sprites.lod) + 1;
+    if (ImGui::Combo("LOD", &lod, "Auto Near Mid Far Dot ")) {
+        m_sprites.lod = static_cast<Renderer::Lod>(lod - 1);
+    }
+    ImGui::Checkbox("Whole-pixel scale", &m_sprites.integerScale);
+    static const char* const kLodNames[] = {"near", "mid", "far", "dot"};
+    ImGui::Text("Drawing %s, %.1f px per unit", kLodNames[static_cast<int>(m_renderer.lastLod())],
+                m_renderer.lastUnitPixels());
 }
 
 bool GpuCollidePhysics::readHealth(std::vector<float>& out) {

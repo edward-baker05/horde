@@ -81,83 +81,209 @@ struct type_UnitUniforms
     float InvMaxHealth;
     uint HasIds;
     uint HasSlots;
+    uint SpriteMode;
+    uint Lod;
+    uint Species;
+    uint Seed;
+    uint IntegerScale;
+    float2 ViewportSize;
+    float PixelsPerUnit;
     float Padding;
 };
 
-constant spvUnsafeArray<uint, 6> _76 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
-constant spvUnsafeArray<float2, 4> _77 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
+constant spvUnsafeArray<uint, 7> _123 = spvUnsafeArray<uint, 7>({ 0u, 0u, 0u, 1u, 2u, 3u, 4u });
+constant spvUnsafeArray<float, 3> _124 = spvUnsafeArray<float, 3>({ 7.0, 5.0, 5.0 });
+constant spvUnsafeArray<float, 3> _125 = spvUnsafeArray<float, 3>({ 11.0, 9.0, 5.0 });
+constant spvUnsafeArray<uint, 6> _126 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
+constant spvUnsafeArray<float2, 4> _127 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
 
 struct main0_out
 {
     float4 out_var_TEXCOORD0 [[user(locn0)]];
     float2 out_var_TEXCOORD1 [[user(locn1)]];
+    uint4 out_var_TEXCOORD2 [[user(locn2)]];
     float4 gl_Position [[position]];
 };
 
 vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], const device type_StructuredBuffer_UnitData& Units [[buffer(1)]], const device type_StructuredBuffer_v2float& PrevPos [[buffer(2)]], const device type_StructuredBuffer_float& Health [[buffer(3)]], const device type_StructuredBuffer_uint& Ids [[buffer(4)]], const device type_StructuredBuffer_uint& Slots [[buffer(5)]], uint gl_VertexIndex [[vertex_id]])
 {
     main0_out out = {};
-    uint _83 = gl_VertexIndex / 6u;
-    uint _92;
+    uint _136 = gl_VertexIndex / 6u;
+    uint _145;
     if (UnitUniforms.HasSlots != 0u)
     {
-        _92 = Slots._m0[_83];
+        _145 = Slots._m0[_136];
     }
     else
     {
-        _92 = _83;
+        _145 = _136;
     }
-    uint _93 = gl_VertexIndex % 6u;
-    spvUnsafeArray<float2, 4> _110 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
-    spvUnsafeArray<float2, 4> _81 = _110;
-    float2 _121;
-    if (Units._m0[_92].pos.x < (-100000001504746621987668885504.0))
+    uint _146 = gl_VertexIndex % 6u;
+    uint _159;
+    if (UnitUniforms.HasIds != 0u)
     {
-        _121 = float2(0.0);
+        _159 = Ids._m0[_145];
     }
     else
     {
-        _121 = _77[_76[_93]] * UnitUniforms.UnitSize;
+        _159 = _145;
     }
-    float2 _138;
+    float2 _176;
     if (UnitUniforms.MaxJump > 0.0)
     {
-        float2 _137;
-        if (distance(PrevPos._m0[_92], Units._m0[_92].pos) <= UnitUniforms.MaxJump)
+        float2 _175;
+        if (distance(PrevPos._m0[_145], Units._m0[_145].pos) <= UnitUniforms.MaxJump)
         {
-            _137 = mix(PrevPos._m0[_92], Units._m0[_92].pos, float2(UnitUniforms.Alpha));
+            _175 = mix(PrevPos._m0[_145], Units._m0[_145].pos, float2(UnitUniforms.Alpha));
         }
         else
         {
-            _137 = Units._m0[_92].pos;
+            _175 = Units._m0[_145].pos;
         }
-        _138 = _137;
+        _176 = _175;
     }
     else
     {
-        _138 = Units._m0[_92].pos;
+        _176 = Units._m0[_145].pos;
     }
-    float _158;
+    bool _179 = UnitUniforms.SpriteMode == 0u;
+    uint4 _341;
+    float2 _342;
+    float2 _343;
+    float2 _344;
+    if (_179)
+    {
+        spvUnsafeArray<float2, 4> _195 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
+        spvUnsafeArray<float2, 4> _134 = _195;
+        _341 = uint4(0u);
+        _342 = _134[_126[_146]];
+        _343 = _176;
+        _344 = _176 + (_127[_126[_146]] * UnitUniforms.UnitSize);
+    }
+    else
+    {
+        uint _208 = (UnitUniforms.Seed ^ (UnitUniforms.Seed >> 16u)) * 2146121005u;
+        uint _211 = (_208 ^ (_208 >> 15u)) * 2221713035u;
+        uint _214 = _159 ^ (_211 ^ (_211 >> 16u));
+        uint _217 = (_214 ^ (_214 >> 16u)) * 2146121005u;
+        uint _220 = (_217 ^ (_217 >> 15u)) * 2221713035u;
+        uint _222 = _220 ^ (_220 >> 16u);
+        uint _223 = _222 + 2654435769u;
+        uint _226 = (_223 ^ (_223 >> 16u)) * 2146121005u;
+        uint _229 = (_226 ^ (_226 >> 15u)) * 2221713035u;
+        uint _231 = _229 ^ (_229 >> 16u);
+        uint4 _271;
+        uint _272;
+        if (UnitUniforms.Species == 0u)
+        {
+            uint _239 = _222 / 9u;
+            uint _251 = _231 / 5u;
+            _271 = uint4(((_239 / 7u) % 18u) * 3u, 54u + ((_231 % 5u) * 2u), 64u + (_251 % 8u), 72u + (((_251 / 8u) % 5u) * 2u));
+            _272 = ((_222 % 9u) * 5u) + _123[_239 % 7u];
+        }
+        else
+        {
+            uint _264 = 82u + (((_222 / 4u) % 5u) * 3u);
+            _271 = uint4(_264, _264, 100u + (_231 % 2u), 97u + ((_231 / 2u) % 3u));
+            _272 = 45u + (_222 % 4u);
+        }
+        float2 _275 = UnitUniforms.UnitSize * 0.5;
+        float2 _276 = _176 + _275;
+        uint _279 = min(UnitUniforms.Lod, 2u);
+        float2 _288 = (float2(float(_272 % 8u), float((_279 * 7u) + (_272 / 8u))) * 13.0) + float2(6.5);
+        float2 _338;
+        float2 _339;
+        float2 _340;
+        if (UnitUniforms.Lod >= 3u)
+        {
+            _338 = _288 * float2(0.009615384973585605621337890625, 0.00366300367750227451324462890625);
+            _339 = _276 - _275;
+            _340 = _276 + ((_127[_126[_146]] - float2(0.5)) * UnitUniforms.UnitSize);
+        }
+        else
+        {
+            float _304 = UnitUniforms.UnitSize.x / _124[_279];
+            bool _313;
+            if (UnitUniforms.IntegerScale != 0u)
+            {
+                _313 = UnitUniforms.PixelsPerUnit > 0.0;
+            }
+            else
+            {
+                _313 = false;
+            }
+            float _322;
+            if (_313)
+            {
+                _322 = precise::max(1.0, rint(_304 * UnitUniforms.PixelsPerUnit)) / UnitUniforms.PixelsPerUnit;
+            }
+            else
+            {
+                _322 = _304;
+            }
+            float _325 = _125[_279] * 0.5;
+            float2 _330 = ((_127[_126[_146]] * 2.0) - float2(1.0)) * _325;
+            _338 = (_288 + _330) * float2(0.009615384973585605621337890625, 0.00366300367750227451324462890625);
+            _339 = _276 - float2(_325 * _322);
+            _340 = _276 + (_330 * _322);
+        }
+        _341 = _271;
+        _342 = _338;
+        _343 = _339;
+        _344 = _340;
+    }
+    float4 _350 = UnitUniforms.ViewProjection * float4(_344, 0.0, 1.0);
+    bool _357;
+    if (UnitUniforms.SpriteMode != 0u)
+    {
+        _357 = UnitUniforms.ViewportSize.x > 0.0;
+    }
+    else
+    {
+        _357 = false;
+    }
+    float4 _377;
+    if (_357)
+    {
+        float2 _369 = (((UnitUniforms.ViewProjection * float4(_343, 0.0, 1.0)).xy * 0.5) + float2(0.5)) * UnitUniforms.ViewportSize;
+        float2 _375 = _350.xy + (((rint(_369) - _369) / UnitUniforms.ViewportSize) * 2.0);
+        _377 = float4(_375.x, _375.y, _350.z, _350.w);
+    }
+    else
+    {
+        _377 = _350;
+    }
+    float4 _385;
+    if (Units._m0[_145].pos.x < (-100000001504746621987668885504.0))
+    {
+        _385 = UnitUniforms.ViewProjection * float4(Units._m0[_145].pos, 0.0, 1.0);
+    }
+    else
+    {
+        _385 = _377;
+    }
+    float _396;
     if (UnitUniforms.InvMaxHealth > 0.0)
     {
-        _158 = fast::clamp(Health._m0[_92] * UnitUniforms.InvMaxHealth, 0.0, 1.0);
+        _396 = fast::clamp(Health._m0[_145] * UnitUniforms.InvMaxHealth, 0.0, 1.0);
     }
     else
     {
-        _158 = 1.0;
+        _396 = 1.0;
     }
-    uint _177;
-    if (UnitUniforms.HasIds != 0u)
+    float4 _414;
+    if (_179)
     {
-        _177 = Ids._m0[_92];
+        _414 = select(float4(UnitUniforms.Color.xyz * _396, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_159 == 0u));
     }
     else
     {
-        _177 = _92;
+        _414 = float4(_396, _396, _396, 1.0);
     }
-    out.out_var_TEXCOORD0 = select(float4(UnitUniforms.Color.xyz * _158, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_177 == 0u));
-    out.out_var_TEXCOORD1 = _81[_76[_93]];
-    out.gl_Position = UnitUniforms.ViewProjection * float4(_138 + _121, 0.0, 1.0);
+    out.out_var_TEXCOORD0 = _414;
+    out.out_var_TEXCOORD1 = _342;
+    out.out_var_TEXCOORD2 = _341;
+    out.gl_Position = _385;
     return out;
 }
 

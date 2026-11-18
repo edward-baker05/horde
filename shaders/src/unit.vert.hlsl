@@ -2,6 +2,14 @@
 //
 // Reads unit positions directly from the compute-updated storage buffer.
 //
+// Two modes, picked by SpriteMode:
+//   0: every unit is the same tinted atlas cell (UvRect): the flat disc.
+//   1: crowd sprites. Each unit's look - hairstyle, accessory, colours - comes
+//      from hashing its stable ID, so it costs no memory and survives the
+//      units being reordered. Lod picks the near / mid / far art, or 3 for a
+//      solid dot when units are only a couple of pixels across.
+//      See tools/make_unit_atlas.py and unit_sprites.hlsli.
+//
 // SDL_GPU vertex stage binding rules:
 //   (t[n], space0) - sampled textures, storage textures, storage buffers
 //   (s[n], space0) - samplers
@@ -27,6 +35,7 @@ StructuredBuffer<uint> Ids : register(t3, space0);
 StructuredBuffer<uint> Slots : register(t4, space0);
 
 #include "unit_state.hlsli"
+#include "unit_sprites.hlsli"
 
 cbuffer UnitUniforms : register(b0, space1) {
     float4x4 ViewProjection;
@@ -38,12 +47,20 @@ cbuffer UnitUniforms : register(b0, space1) {
     float InvMaxHealth; // 1 / max hit points; 0: no Health buffer, draw everyone at full health
     uint HasIds;        // 0: no Ids buffer, a unit's ID is its index
     uint HasSlots;      // 0: no Slots buffer, draw in index order
+    uint SpriteMode;    // 0: flat disc from UvRect, 1: crowd sprites
+    uint Lod;           // sprites: 0 near, 1 mid, 2 far, 3 solid dot
+    uint Species;       // sprites: 0 humans, 1 aliens
+    uint Seed;          // sprites: varies every unit's look per level
+    uint IntegerScale;  // sprites: round sprite pixels to whole screen pixels
+    float2 ViewportSize; // pixels, for snapping sprites to the pixel grid
+    float PixelsPerUnit; // screen pixels per world unit
     float Padding;
 };
 
 struct Output {
-    float4 Color : TEXCOORD0;
+    float4 Color : TEXCOORD0; // disc: final tint; sprites: multiplier on the palette colour
     float2 Texcoord : TEXCOORD1;
+    nointerpolation uint4 Pal : TEXCOORD2; // sprites: palette bases (hair, skin, clothes, accessory)
     float4 Position : SV_Position;
 };
 
@@ -56,23 +73,51 @@ static const float2 QuadCorners[4] = {
     float2(1.0f, 1.0f),
 };
 
+// Integer hash with good avalanche (lowbias32).
+uint hashU(uint x) {
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+// A unit's look from its ID: which atlas variant, and its palette bases.
+void appearance(uint unitId, out uint variant, out uint4 pal) {
+    uint h1 = hashU(unitId ^ hashU(Seed));
+    uint h2 = hashU(h1 + 0x9e3779b9u);
+    if (Species == 0) {
+        uint style = h1 % HUMAN_STYLE_COUNT;
+        h1 /= HUMAN_STYLE_COUNT;
+        uint accessory = ACCESSORY_TABLE[h1 % ACCESSORY_TABLE_SIZE];
+        h1 /= ACCESSORY_TABLE_SIZE;
+        variant = style * ACCESSORY_COUNT + accessory;
+        pal.x = PAL_HUMAN_HAIR + (h1 % HUMAN_HAIR_COUNT) * 3;
+        pal.y = PAL_HUMAN_SKIN + (h2 % HUMAN_SKIN_COUNT) * 2;
+        h2 /= HUMAN_SKIN_COUNT;
+        pal.z = PAL_HUMAN_CLOTHES + (h2 % HUMAN_CLOTHES_COUNT);
+        h2 /= HUMAN_CLOTHES_COUNT;
+        pal.w = PAL_HUMAN_ACCESSORY + (h2 % HUMAN_ACCESSORY_COUNT) * 2;
+    } else {
+        variant = ALIEN_VARIANT_BASE + h1 % ALIEN_STYLE_COUNT;
+        h1 /= ALIEN_STYLE_COUNT;
+        pal.x = PAL_ALIEN_SKIN + (h1 % ALIEN_SKIN_COUNT) * 3;
+        pal.y = pal.x; // aliens have no skin role; their skin is drawn in the hair roles
+        pal.z = PAL_ALIEN_SUIT + (h2 % ALIEN_SUIT_COUNT);
+        h2 /= ALIEN_SUIT_COUNT;
+        pal.w = PAL_ALIEN_TIP + (h2 % ALIEN_TIP_COUNT);
+    }
+}
+
 Output main(uint id : SV_VertexID) {
     uint instance = id / 6;
     uint unitIndex = HasSlots != 0 ? Slots[instance] : instance;
     uint corner = TriangleIndices[id % 6];
 
     UnitData unit = Units[unitIndex];
+    uint unitId = HasIds != 0 ? Ids[unitIndex] : unitIndex;
 
-    float2 texcoords[4] = {
-        float2(UvRect.x, UvRect.y),
-        float2(UvRect.z, UvRect.y),
-        float2(UvRect.x, UvRect.w),
-        float2(UvRect.z, UvRect.w),
-    };
-
-    // A dead unit's quad collapses to one point outside clip space, so it
-    // draws nothing.
-    float2 local = isDead(unit.pos) ? float2(0.0f, 0.0f) : QuadCorners[corner] * UnitSize;
     float2 pos = unit.pos;
     if (MaxJump > 0.0f) {
         float2 prev = PrevPos[unitIndex];
@@ -80,15 +125,76 @@ Output main(uint id : SV_VertexID) {
             pos = lerp(prev, pos, Alpha);
         }
     }
-    float2 world = pos + local;
 
     Output output;
-    output.Position = mul(ViewProjection, float4(world, 0.0f, 1.0f));
-    output.Texcoord = texcoords[corner];
-    // Full health draws in Color, fading linearly to black at 0.
+    output.Pal = uint4(0, 0, 0, 0);
+    float2 world;
+    // The quad's top-left in world space, which sprites snap to the pixel grid.
+    float2 snapOrigin = pos;
+
+    if (SpriteMode == 0) {
+        float2 texcoords[4] = {
+            float2(UvRect.x, UvRect.y),
+            float2(UvRect.z, UvRect.y),
+            float2(UvRect.x, UvRect.w),
+            float2(UvRect.z, UvRect.w),
+        };
+        world = pos + QuadCorners[corner] * UnitSize;
+        output.Texcoord = texcoords[corner];
+    } else {
+        uint variant;
+        appearance(unitId, variant, output.Pal);
+
+        // Positions are top-left corners; sprites are drawn around the centre.
+        float2 centre = pos + UnitSize * 0.5f;
+        uint lod = min(Lod, 2u);
+        float2 cell = float2(variant % ATLAS_COLUMNS, lod * ROWS_PER_LOD + variant / ATLAS_COLUMNS) * CELL;
+        float2 cellCentre = cell + CELL * 0.5f;
+
+        if (Lod >= 3) {
+            // A solid dot: the whole quad samples the far art's centre texel,
+            // which is in the unit's far-away colour (hair, skin or cap).
+            world = centre + (QuadCorners[corner] - 0.5f) * UnitSize;
+            snapOrigin = centre - UnitSize * 0.5f;
+            output.Texcoord = cellCentre / ATLAS_SIZE;
+        } else {
+            // The head is LOD_HEAD sprite pixels across and spans the unit.
+            float texel = UnitSize.x / LOD_HEAD[lod];
+            if (IntegerScale != 0 && PixelsPerUnit > 0.0f) {
+                texel = max(1.0f, round(texel * PixelsPerUnit)) / PixelsPerUnit;
+            }
+            float halfWindow = LOD_WINDOW[lod] * 0.5f;
+            float2 offset = (QuadCorners[corner] * 2.0f - 1.0f) * halfWindow;
+            world = centre + offset * texel;
+            snapOrigin = centre - halfWindow * texel;
+            output.Texcoord = (cellCentre + offset) / ATLAS_SIZE;
+        }
+    }
+
+    float4 clip = mul(ViewProjection, float4(world, 0.0f, 1.0f));
+    if (SpriteMode != 0 && ViewportSize.x > 0.0f) {
+        // Shift the whole quad so its top-left lands on a screen pixel, or a
+        // moving unit's pixels crawl as it slides between them.
+        float2 originClip = mul(ViewProjection, float4(snapOrigin, 0.0f, 1.0f)).xy;
+        float2 originPx = (originClip * 0.5f + 0.5f) * ViewportSize;
+        clip.xy += (round(originPx) - originPx) / ViewportSize * 2.0f;
+    }
+    // A dead unit's quad collapses to one point outside clip space, so it
+    // draws nothing.
+    if (isDead(unit.pos)) {
+        clip = mul(ViewProjection, float4(unit.pos, 0.0f, 1.0f));
+    }
+    output.Position = clip;
+
+    // Full health draws in Color (white for sprites, so the palette shows
+    // true), fading linearly to black at 0.
     float health = InvMaxHealth > 0.0f ? saturate(Health[unitIndex] * InvMaxHealth) : 1.0f;
-    float4 tint = float4(Color.rgb * health, Color.a);
-    uint unitId = HasIds != 0 ? Ids[unitIndex] : unitIndex;
-    output.Color = (unitId == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
+    if (SpriteMode == 0) {
+        float4 tint = float4(Color.rgb * health, Color.a);
+        // Unit 0 is drawn red so it can be followed; sprites are crowd texture, so they don't.
+        output.Color = (unitId == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
+    } else {
+        output.Color = float4(health, health, health, 1.0f);
+    }
     return output;
 }
