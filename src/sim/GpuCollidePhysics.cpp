@@ -555,8 +555,8 @@ void GpuCollidePhysics::debugUi() {
     // Screen pixels a unit must span for each LOD; below mid it's far.
     Renderer::LodThresholds& t = m_sprites.thresholds;
     ImGui::BeginDisabled(m_sprites.lod != Renderer::Lod::Auto);
-    ImGui::SliderFloat("Near from", &t.nearPixels, 1.0f, 30.0f, "%.1f px");
-    ImGui::SliderFloat("Mid from", &t.midPixels, 1.0f, 30.0f, "%.1f px");
+    ImGui::SliderFloat("Near from", &t.nearPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat("Mid from", &t.midPixels, 1.0f, 60.0f, "%.1f px");
     ImGui::SliderFloat("Hysteresis", &t.hysteresis, 0.0f, 3.0f, "%.1f px");
     t.midPixels = std::min(t.midPixels, t.nearPixels); // mid can't start above near
     if (ImGui::Button("Reset LOD thresholds")) {

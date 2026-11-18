@@ -90,7 +90,7 @@ private:
         gfx::UnitRenderer::Lod lod = gfx::UnitRenderer::Lod::Auto;
         gfx::UnitRenderer::LodThresholds thresholds;
         bool rotate = true;
-        int directionSteps = 0; // 0 = any angle
+        int directionSteps = 16; // 0 = any angle
         bool integerScale = false;
     } m_sprites;
     GpuSpatialGrid m_grid;

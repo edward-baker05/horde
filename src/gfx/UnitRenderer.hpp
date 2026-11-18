@@ -42,8 +42,8 @@ public:
     // LOD takes `hysteresis` pixels fewer than entering it, so zooming across
     // a threshold doesn't flicker.
     struct LodThresholds {
-        float nearPixels = 25.0f;
-        float midPixels = 10.0f;
+        float nearPixels = 30.0f;
+        float midPixels = 12.0f;
         float hysteresis = 0.0f;
     };
 
@@ -99,7 +99,7 @@ public:
         // to `directionSteps` directions (0 = any angle). Units slower than
         // `minTurnSpeed` (world units per second) keep facing up.
         bool rotate = true;
-        Uint32 directionSteps = 0;
+        Uint32 directionSteps = 16;
         float minTurnSpeed = 1.0f;
         Uint32 seed = 0;
     };
