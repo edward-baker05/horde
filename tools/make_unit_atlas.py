@@ -134,16 +134,30 @@ FREE_PAINT = {"cap", "bow"}                   # may paint outside the head
 OFFSET = {"near": (2, 3), "mid": (3, 3), "far": (4, 4)}
 
 # ---------------------------------------------------------------------------
-# Palettes. Repeats weight a colour. Shades are derived (see shade()).
+# Palettes. Shades are derived (see shade()). Hair colours are picked by
+# weight (HAIR_WEIGHTS, same order); everything else is picked evenly.
 # ---------------------------------------------------------------------------
+HAIR = [  # (colour, weight)
+    ((28, 24, 26), 15),     # black
+    ((52, 36, 30), 15),     # very dark brown
+    ((78, 52, 38), 15),     # dark brown
+    ((110, 76, 50), 10),    # brown
+    ((150, 110, 72), 5),    # light brown
+    ((130, 60, 40), 5),     # auburn
+    ((176, 92, 52), 5),     # ginger
+    ((190, 160, 100), 5),   # dirty blonde
+    ((220, 192, 128), 5),   # blonde
+    ((150, 148, 145), 1),   # grey  - rare
+    ((214, 210, 202), 1),   # white - rare
+]
 PALETTES = {
-    "human_hair": [(28, 24, 26)] * 3 + [(52, 36, 30)] * 3 + [(78, 52, 38)] * 3 + [(110, 76, 50)] * 2 + [
-        (150, 110, 72), (130, 60, 40), (176, 92, 52), (190, 160, 100), (220, 192, 128), (150, 148, 145),
-        (214, 210, 202)],
+    "human_hair": [c for c, _ in HAIR],
     "human_skin": [(242, 206, 172), (224, 178, 140), (194, 140, 100), (150, 102, 72), (104, 70, 50)],
     "human_clothes": [(196, 194, 186), (54, 56, 62), (72, 86, 118), (118, 54, 52), (92, 100, 72),
                       (148, 122, 86), (62, 70, 92), (128, 96, 108)],
-    "human_accessory": [(176, 64, 60), (66, 108, 156), (196, 168, 86), (214, 212, 204), (44, 44, 48)],
+    # No blue or white: from afar a cap wearer reads as a cap-coloured head,
+    # so those would look like blue / white hair.
+    "human_accessory": [(176, 64, 60), (196, 168, 86), (44, 44, 48)],
     "alien_skin": [(70, 110, 240), (240, 96, 190), (150, 80, 220), (60, 210, 220), (140, 230, 70)],
     "alien_tip": [(255, 240, 90), (255, 255, 255), (255, 120, 60)],
     "alien_suit": [(170, 176, 190), (120, 126, 140)],
@@ -369,6 +383,7 @@ def write_headers(vs, rows_per_lod, w, h):
     human_styles = list(HUMAN_NEAR)
     alien_styles = list(ALIEN_NEAR)
     acc_table = [i for i, n in enumerate(ACCESSORY_WEIGHTS) for _ in range(n)]
+    hair_table = [i for i, (_, n) in enumerate(HAIR) for _ in range(n)]
     counts = {
         "HUMAN_HAIR_COUNT": len(PALETTES["human_hair"]), "HUMAN_SKIN_COUNT": len(PALETTES["human_skin"]),
         "HUMAN_CLOTHES_COUNT": len(PALETTES["human_clothes"]),
@@ -387,6 +402,9 @@ def write_headers(vs, rows_per_lod, w, h):
            f"static const uint ALIEN_VARIANT_BASE = {len(human_styles) * len(ACCESSORIES)};",
            f"static const uint ACCESSORY_TABLE_SIZE = {len(acc_table)};",
            "static const uint ACCESSORY_TABLE[" + str(len(acc_table)) + "] = {" + ", ".join(map(str, acc_table)) + "};",
+           "// Hair colour index by weight: pick HUMAN_HAIR_TABLE[hash % HUMAN_HAIR_TABLE_SIZE].",
+           f"static const uint HUMAN_HAIR_TABLE_SIZE = {len(hair_table)};",
+           "static const uint HUMAN_HAIR_TABLE[" + str(len(hair_table)) + "] = {" + ", ".join(map(str, hair_table)) + "};",
            "// Head diameter in sprite pixels, and the square drawn around the cell centre, per LOD."]
     hl += ["static const float LOD_HEAD[3] = {" + ", ".join(f"{HEAD[l]}.0f" for l in LODS) + "};",
            "static const float LOD_WINDOW[3] = {" + ", ".join(f"{WINDOW[l]}.0f" for l in LODS) + "};", ""]

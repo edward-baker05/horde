@@ -12,26 +12,29 @@ static const uint ALIEN_STYLE_COUNT = 4;
 static const uint ALIEN_VARIANT_BASE = 45;
 static const uint ACCESSORY_TABLE_SIZE = 7;
 static const uint ACCESSORY_TABLE[7] = {0, 0, 0, 1, 2, 3, 4};
+// Hair colour index by weight: pick HUMAN_HAIR_TABLE[hash % HUMAN_HAIR_TABLE_SIZE].
+static const uint HUMAN_HAIR_TABLE_SIZE = 82;
+static const uint HUMAN_HAIR_TABLE[82] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 10};
 // Head diameter in sprite pixels, and the square drawn around the cell centre, per LOD.
 static const float LOD_HEAD[3] = {7.0f, 5.0f, 5.0f};
 static const float LOD_WINDOW[3] = {11.0f, 9.0f, 5.0f};
 
-static const uint HUMAN_HAIR_COUNT = 18;
+static const uint HUMAN_HAIR_COUNT = 11;
 static const uint HUMAN_SKIN_COUNT = 5;
 static const uint HUMAN_CLOTHES_COUNT = 8;
-static const uint HUMAN_ACCESSORY_COUNT = 5;
+static const uint HUMAN_ACCESSORY_COUNT = 3;
 static const uint ALIEN_SKIN_COUNT = 5;
 static const uint ALIEN_TIP_COUNT = 3;
 static const uint ALIEN_SUIT_COUNT = 2;
 static const uint PAL_HUMAN_HAIR = 0;
-static const uint PAL_HUMAN_SKIN = 54;
-static const uint PAL_HUMAN_CLOTHES = 64;
-static const uint PAL_HUMAN_ACCESSORY = 72;
-static const uint PAL_ALIEN_SKIN = 82;
-static const uint PAL_ALIEN_TIP = 97;
-static const uint PAL_ALIEN_SUIT = 100;
-static const uint PAL_GLASSES = 102;
-static const uint PALETTE_SIZE = 104;
+static const uint PAL_HUMAN_SKIN = 33;
+static const uint PAL_HUMAN_CLOTHES = 43;
+static const uint PAL_HUMAN_ACCESSORY = 51;
+static const uint PAL_ALIEN_SKIN = 57;
+static const uint PAL_ALIEN_TIP = 72;
+static const uint PAL_ALIEN_SUIT = 75;
+static const uint PAL_GLASSES = 77;
+static const uint PALETTE_SIZE = 79;
 
 static const uint ROLE_EMPTY = 0;
 static const uint ROLE_HAIR = 1;

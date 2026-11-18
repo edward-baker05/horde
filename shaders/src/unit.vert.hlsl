@@ -94,7 +94,7 @@ void appearance(uint unitId, out uint variant, out uint4 pal) {
         uint accessory = ACCESSORY_TABLE[h1 % ACCESSORY_TABLE_SIZE];
         h1 /= ACCESSORY_TABLE_SIZE;
         variant = style * ACCESSORY_COUNT + accessory;
-        pal.x = PAL_HUMAN_HAIR + (h1 % HUMAN_HAIR_COUNT) * 3;
+        pal.x = PAL_HUMAN_HAIR + HUMAN_HAIR_TABLE[h1 % HUMAN_HAIR_TABLE_SIZE] * 3;
         pal.y = PAL_HUMAN_SKIN + (h2 % HUMAN_SKIN_COUNT) * 2;
         h2 /= HUMAN_SKIN_COUNT;
         pal.z = PAL_HUMAN_CLOTHES + (h2 % HUMAN_CLOTHES_COUNT);

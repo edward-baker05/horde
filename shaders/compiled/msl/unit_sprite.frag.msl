@@ -5,7 +5,7 @@ using namespace metal;
 
 struct type_UnitSpriteUniforms
 {
-    float4 Palette[104];
+    float4 Palette[79];
     uint SpriteMode;
     uint Lod;
     uint2 Padding;
@@ -90,12 +90,12 @@ fragment main0_out main0(main0_in in [[stage_in]], constant type_UnitSpriteUnifo
                 }
                 case 9u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[102u].xyz;
+                    _144 = UnitSpriteUniforms.Palette[77u].xyz;
                     break;
                 }
                 default:
                 {
-                    _144 = UnitSpriteUniforms.Palette[103u].xyz;
+                    _144 = UnitSpriteUniforms.Palette[78u].xyz;
                     break;
                 }
             }
@@ -167,12 +167,12 @@ fragment main0_out main0(main0_in in [[stage_in]], constant type_UnitSpriteUnifo
             }
             case 9u:
             {
-                _234 = UnitSpriteUniforms.Palette[102u].xyz;
+                _234 = UnitSpriteUniforms.Palette[77u].xyz;
                 break;
             }
             default:
             {
-                _234 = UnitSpriteUniforms.Palette[103u].xyz;
+                _234 = UnitSpriteUniforms.Palette[78u].xyz;
                 break;
             }
         }
