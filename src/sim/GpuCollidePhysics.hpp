@@ -89,6 +89,8 @@ private:
         gfx::UnitRenderer::Species species = gfx::UnitRenderer::Species::Humans;
         gfx::UnitRenderer::Lod lod = gfx::UnitRenderer::Lod::Auto;
         gfx::UnitRenderer::LodThresholds thresholds;
+        bool rotate = true;
+        int directionSteps = 0; // 0 = any angle
         bool integerScale = false;
     } m_sprites;
     GpuSpatialGrid m_grid;

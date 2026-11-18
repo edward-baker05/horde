@@ -8,6 +8,9 @@
 //      from hashing its stable ID, so it costs no memory and survives the
 //      units being reordered. Lod picks the near / mid / far art; far is a
 //      hard-edged circle drawn at the unit's own size in unit_sprite.frag.
+//      With Rotate, near and mid art turn to face the way the unit walks;
+//      unit_sprite.frag rotates which sprite pixel each screen-aligned sprite
+//      pixel shows, so the art stays crisp pixels rather than tilted squares.
 //      See tools/make_unit_atlas.py and unit_sprites.hlsli.
 //
 // SDL_GPU vertex stage binding rules:
@@ -54,14 +57,18 @@ cbuffer UnitUniforms : register(b0, space1) {
     uint IntegerScale;  // sprites: round sprite pixels to whole screen pixels (never below one)
     float2 ViewportSize; // pixels, for snapping sprites to the pixel grid
     float PixelsPerUnit; // screen pixels per world unit
-    float Padding;
+    uint Rotate;         // sprites: face the direction of travel
+    uint DirectionSteps; // sprites: snap facing to this many directions; 0 = free
+    float MinTurnSpeed;  // sprites: slower than this, keep facing up (no direction to read)
+    float2 Padding;
 };
 
 struct Output {
     float4 Color : TEXCOORD0; // disc: final tint; sprites: multiplier on the palette colour
     float2 Texcoord : TEXCOORD1;
     nointerpolation uint4 Pal : TEXCOORD2; // sprites: palette bases (hair, skin, clothes, accessory)
-    nointerpolation float2 CentreUv : TEXCOORD3; // far sprites: the atlas texel holding the unit's colour
+    nointerpolation float2 CellCentre : TEXCOORD3; // sprites: atlas texel at the unit's cell centre
+    nointerpolation float2 Facing : TEXCOORD4;     // sprites: unit direction the art's "up" turns to
     float4 Position : SV_Position;
 };
 
@@ -129,7 +136,8 @@ Output main(uint id : SV_VertexID) {
 
     Output output;
     output.Pal = uint4(0, 0, 0, 0);
-    output.CentreUv = float2(0.0f, 0.0f);
+    output.CellCentre = float2(0.0f, 0.0f);
+    output.Facing = float2(0.0f, -1.0f);
     float2 world;
     // The quad's top-left in world space, which sprites snap to the pixel grid.
     float2 snapOrigin = pos;
@@ -163,14 +171,22 @@ Output main(uint id : SV_VertexID) {
         float2 offset = (QuadCorners[corner] * 2.0f - 1.0f) * halfWindow;
         world = centre + offset * texel;
         snapOrigin = centre - halfWindow * texel;
-        if (lod == 2) {
-            // Far: unit_sprite.frag draws a hard-edged circle the unit's size
-            // itself, coloured by the far art's centre texel (hair, skin or
-            // cap). Scaling the 5px circle art down would turn it into a plus.
-            output.Texcoord = offset; // in head pixels from the centre
-            output.CentreUv = cellCentre / ATLAS_SIZE;
-        } else {
-            output.Texcoord = (cellCentre + offset) / ATLAS_SIZE;
+        // unit_sprite.frag works in sprite pixels from the centre. Far draws a
+        // hard-edged circle the unit's size, coloured by the far art's centre
+        // texel (hair, skin or cap): scaling the 5px art down makes a plus.
+        output.Texcoord = offset;
+        output.CellCentre = cellCentre;
+
+        // Art faces up (-y). Turn it to the way the unit walks.
+        float speed = length(unit.vel);
+        if (Rotate != 0 && lod != 2 && speed > MinTurnSpeed) {
+            float2 dir = unit.vel / speed;
+            if (DirectionSteps > 0) {
+                float step = 6.28318530718f / float(DirectionSteps);
+                float angle = round(atan2(dir.y, dir.x) / step) * step;
+                dir = float2(cos(angle), sin(angle));
+            }
+            output.Facing = dir;
         }
     }
 

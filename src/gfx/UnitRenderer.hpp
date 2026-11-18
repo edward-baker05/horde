@@ -95,6 +95,12 @@ public:
         Lod lod = Lod::Auto;
         LodThresholds thresholds;
         bool integerScale = false;
+        // Turn near and mid sprites to face the way each unit walks, snapped
+        // to `directionSteps` directions (0 = any angle). Units slower than
+        // `minTurnSpeed` (world units per second) keep facing up.
+        bool rotate = true;
+        Uint32 directionSteps = 0;
+        float minTurnSpeed = 1.0f;
         Uint32 seed = 0;
     };
 

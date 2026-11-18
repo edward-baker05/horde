@@ -36,9 +36,12 @@ struct alignas(16) UnitDrawUniforms {
     Uint32 integerScale;
     glm::vec2 viewportSize;
     float pixelsPerUnit;
-    float padding;
+    Uint32 rotate;
+    Uint32 directionSteps;
+    float minTurnSpeed;
+    glm::vec2 padding;
 };
-static_assert(sizeof(UnitDrawUniforms) == 160);
+static_assert(sizeof(UnitDrawUniforms) == 176);
 
 // Matches HLSL cbuffer UnitSpriteUniforms in unit_sprite.frag.hlsl
 struct alignas(16) UnitSpriteUniforms {
@@ -198,6 +201,9 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
         uniforms.integerScale = options.integerScale ? 1u : 0u;
         uniforms.viewportSize = glm::vec2(static_cast<float>(width), static_cast<float>(height));
         uniforms.pixelsPerUnit = pixelsPerUnit;
+        uniforms.rotate = options.rotate ? 1u : 0u;
+        uniforms.directionSteps = options.directionSteps;
+        uniforms.minTurnSpeed = options.minTurnSpeed;
     }
     SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
 

@@ -53,7 +53,8 @@ CELL = 13
 ATLAS_COLUMNS = 8
 LODS = ["near", "mid", "far"]
 HEAD = {"near": 7, "mid": 5, "far": 5}       # head diameter in sprite pixels
-WINDOW = {"near": 11, "mid": 9, "far": 5}    # square drawn around the cell centre
+WINDOW = {"near": 13, "mid": 11, "far": 5}   # square drawn around the cell centre; big enough
+                                             # to hold the sprite at any rotation
 
 # ---------------------------------------------------------------------------
 # Roles. Index 0 is empty. Order is baked into the shader via the header.

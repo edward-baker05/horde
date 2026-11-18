@@ -6,6 +6,11 @@
 // unit.vert from its ID, turn the role into a colour from Palette, then the
 // health fade from unit.vert darkens it.
 //
+// Sprites are drawn in sprite pixels from the unit's centre (Texcoord). Each
+// screen fragment snaps to the screen-aligned sprite pixel it is in, and that
+// pixel's centre is turned by the unit's facing to find which art pixel to
+// show: rotation without tilting the pixels themselves.
+//
 // SDL_GPU fragment stage binding rules:
 //   (t[n], space2) - sampled textures, storage textures, storage buffers
 //   (s[n], space2) - samplers
@@ -27,7 +32,8 @@ struct Input {
     float4 Color : TEXCOORD0;
     float2 Texcoord : TEXCOORD1;
     nointerpolation uint4 Pal : TEXCOORD2; // hair, skin, clothes, accessory palette bases
-    nointerpolation float2 CentreUv : TEXCOORD3; // far: the atlas texel holding the unit's colour
+    nointerpolation float2 CellCentre : TEXCOORD3; // atlas texel at the unit's cell centre
+    nointerpolation float2 Facing : TEXCOORD4;     // the direction the art's "up" (-y) turns to
 };
 
 float3 roleColour(uint role, uint4 pal) {
@@ -53,14 +59,24 @@ float4 main(Input input) : SV_Target0 {
         if (dot(input.Texcoord, input.Texcoord) > 6.25f) {
             discard;
         }
-        float4 centre = Atlas.SampleLevel(AtlasSampler, input.CentreUv, 0.0f);
+        float4 centre = Atlas.SampleLevel(AtlasSampler, input.CellCentre / ATLAS_SIZE, 0.0f);
         uint farRole = (uint)round(centre.r * 255.0f);
         return float4(roleColour(farRole, input.Pal) * input.Color.rgb, input.Color.a);
     }
-    float4 texel = Atlas.Sample(AtlasSampler, input.Texcoord);
     if (SpriteMode == 0) {
-        return texel * input.Color;
+        return Atlas.Sample(AtlasSampler, input.Texcoord) * input.Color;
     }
+    // The quad's sprite-pixel grid has its lines on half-integers, so the
+    // centre of the sprite pixel this fragment is in is the nearest integer.
+    float2 cellPos = floor(input.Texcoord + 0.5f);
+    // Undo the facing. The rotation taking art-up (0,-1) to f is
+    // R = [[-f.y, -f.x], [f.x, -f.y]]; art = transpose(R) * cellPos.
+    float2 f = input.Facing;
+    float2 art = float2(-f.y * cellPos.x + f.x * cellPos.y, -f.x * cellPos.x - f.y * cellPos.y);
+    if (any(abs(art) > CELL * 0.5f - 0.01f)) {
+        discard; // outside this unit's cell: don't read the neighbour's art
+    }
+    float4 texel = Atlas.SampleLevel(AtlasSampler, (input.CellCentre + art) / ATLAS_SIZE, 0.0f);
     uint role = (uint)round(texel.r * 255.0f);
     if (role == ROLE_EMPTY || texel.a < 0.5f) {
         discard;

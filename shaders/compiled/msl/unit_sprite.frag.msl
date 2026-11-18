@@ -22,164 +22,173 @@ struct main0_in
     float2 in_var_TEXCOORD1 [[user(locn1)]];
     uint4 in_var_TEXCOORD2 [[user(locn2)]];
     float2 in_var_TEXCOORD3 [[user(locn3), flat]];
+    float2 in_var_TEXCOORD4 [[user(locn4), flat]];
 };
 
 fragment main0_out main0(main0_in in [[stage_in]], constant type_UnitSpriteUniforms& UnitSpriteUniforms [[buffer(0)]], texture2d<float> Atlas [[texture(0)]], sampler AtlasSampler [[sampler(0)]])
 {
     main0_out out = {};
-    float4 _243;
+    float4 _280;
     do
     {
-        bool _68;
+        bool _76;
         if (UnitSpriteUniforms.SpriteMode != 0u)
         {
-            _68 = UnitSpriteUniforms.Lod == 2u;
+            _76 = UnitSpriteUniforms.Lod == 2u;
         }
         else
         {
-            _68 = false;
+            _76 = false;
         }
-        if (_68)
+        if (_76)
         {
             if (dot(in.in_var_TEXCOORD1, in.in_var_TEXCOORD1) > 6.25)
             {
                 discard_fragment();
             }
-            float3 _144;
-            switch (uint(rint(Atlas.sample(AtlasSampler, in.in_var_TEXCOORD3, level(0.0)).x * 255.0)))
+            float3 _153;
+            switch (uint(rint(Atlas.sample(AtlasSampler, (in.in_var_TEXCOORD3 * float2(0.009615384973585605621337890625, 0.00366300367750227451324462890625)), level(0.0)).x * 255.0)))
             {
                 case 1u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x].xyz;
                     break;
                 }
                 case 2u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 1u].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 1u].xyz;
                     break;
                 }
                 case 3u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 2u].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 2u].xyz;
                     break;
                 }
                 case 4u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y].xyz;
                     break;
                 }
                 case 5u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y + 1u].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y + 1u].xyz;
                     break;
                 }
                 case 6u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.z].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.z].xyz;
                     break;
                 }
                 case 7u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w].xyz;
                     break;
                 }
                 case 8u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w + 1u].xyz;
+                    _153 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w + 1u].xyz;
                     break;
                 }
                 case 9u:
                 {
-                    _144 = UnitSpriteUniforms.Palette[77u].xyz;
+                    _153 = UnitSpriteUniforms.Palette[77u].xyz;
                     break;
                 }
                 default:
                 {
-                    _144 = UnitSpriteUniforms.Palette[78u].xyz;
+                    _153 = UnitSpriteUniforms.Palette[78u].xyz;
                     break;
                 }
             }
-            _243 = float4(_144 * in.in_var_TEXCOORD0.xyz, in.in_var_TEXCOORD0.w);
+            _280 = float4(_153 * in.in_var_TEXCOORD0.xyz, in.in_var_TEXCOORD0.w);
             break;
         }
-        float4 _156 = Atlas.sample(AtlasSampler, in.in_var_TEXCOORD1);
         if (UnitSpriteUniforms.SpriteMode == 0u)
         {
-            _243 = _156 * in.in_var_TEXCOORD0;
+            _280 = Atlas.sample(AtlasSampler, in.in_var_TEXCOORD1) * in.in_var_TEXCOORD0;
             break;
         }
-        uint _164 = uint(rint(_156.x * 255.0));
-        bool _170;
-        if (_164 != 0u)
-        {
-            _170 = _156.w < 0.5;
-        }
-        else
-        {
-            _170 = true;
-        }
-        if (_170)
+        float2 _171 = floor(in.in_var_TEXCOORD1 + float2(0.5));
+        float _175 = _171.x;
+        float _179 = _171.y;
+        float2 _186 = float2(((-in.in_var_TEXCOORD4.y) * _175) + (in.in_var_TEXCOORD4.x * _179), ((-in.in_var_TEXCOORD4.x) * _175) - (in.in_var_TEXCOORD4.y * _179));
+        if (any(abs(_186) > float2(6.4899997711181640625)))
         {
             discard_fragment();
         }
-        float3 _234;
-        switch (_164)
+        float4 _197 = Atlas.sample(AtlasSampler, ((in.in_var_TEXCOORD3 + _186) * float2(0.009615384973585605621337890625, 0.00366300367750227451324462890625)), level(0.0));
+        uint _201 = uint(rint(_197.x * 255.0));
+        bool _207;
+        if (_201 != 0u)
+        {
+            _207 = _197.w < 0.5;
+        }
+        else
+        {
+            _207 = true;
+        }
+        if (_207)
+        {
+            discard_fragment();
+        }
+        float3 _271;
+        switch (_201)
         {
             case 1u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x].xyz;
                 break;
             }
             case 2u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 1u].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 1u].xyz;
                 break;
             }
             case 3u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 2u].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 2u].xyz;
                 break;
             }
             case 4u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y].xyz;
                 break;
             }
             case 5u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y + 1u].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y + 1u].xyz;
                 break;
             }
             case 6u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.z].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.z].xyz;
                 break;
             }
             case 7u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w].xyz;
                 break;
             }
             case 8u:
             {
-                _234 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w + 1u].xyz;
+                _271 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w + 1u].xyz;
                 break;
             }
             case 9u:
             {
-                _234 = UnitSpriteUniforms.Palette[77u].xyz;
+                _271 = UnitSpriteUniforms.Palette[77u].xyz;
                 break;
             }
             default:
             {
-                _234 = UnitSpriteUniforms.Palette[78u].xyz;
+                _271 = UnitSpriteUniforms.Palette[78u].xyz;
                 break;
             }
         }
-        _243 = float4(_234 * in.in_var_TEXCOORD0.xyz, in.in_var_TEXCOORD0.w);
+        _280 = float4(_271 * in.in_var_TEXCOORD0.xyz, in.in_var_TEXCOORD0.w);
         break;
     } while(false);
-    out.out_var_SV_Target0 = _243;
+    out.out_var_SV_Target0 = _280;
     return out;
 }
 

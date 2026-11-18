@@ -17,7 +17,7 @@ static const uint HUMAN_HAIR_TABLE_SIZE = 82;
 static const uint HUMAN_HAIR_TABLE[82] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 10};
 // Head diameter in sprite pixels, and the square drawn around the cell centre, per LOD.
 static const float LOD_HEAD[3] = {7.0f, 5.0f, 5.0f};
-static const float LOD_WINDOW[3] = {11.0f, 9.0f, 5.0f};
+static const float LOD_WINDOW[3] = {13.0f, 11.0f, 5.0f};
 
 static const uint HUMAN_HAIR_COUNT = 11;
 static const uint HUMAN_SKIN_COUNT = 5;

@@ -516,6 +516,10 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.species = m_sprites.species;
     options.lod = m_sprites.lod;
     options.thresholds = m_sprites.thresholds;
+    options.rotate = m_sprites.rotate;
+    options.directionSteps = static_cast<Uint32>(m_sprites.directionSteps);
+    // Below a few percent of walking pace there's no clear direction to face.
+    options.minTurnSpeed = 0.05f * m_config.movement.maxSpeed;
     options.integerScale = m_sprites.integerScale;
     options.seed = m_config.flow.seed;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
@@ -560,6 +564,10 @@ void GpuCollidePhysics::debugUi() {
     }
     ImGui::EndDisabled();
     ImGui::Checkbox("Whole-pixel scale", &m_sprites.integerScale);
+    ImGui::Checkbox("Face direction of travel", &m_sprites.rotate);
+    ImGui::BeginDisabled(!m_sprites.rotate);
+    ImGui::SliderInt("Directions", &m_sprites.directionSteps, 0, 32, m_sprites.directionSteps == 0 ? "any" : "%d");
+    ImGui::EndDisabled();
     static const char* const kLodNames[] = {"near", "mid", "far"};
     ImGui::Text("Drawing %s, %.1f px per unit", kLodNames[static_cast<int>(m_renderer.lastLod())],
                 m_renderer.lastUnitPixels());
