@@ -48,16 +48,6 @@ struct alignas(16) UnitSpriteUniforms {
 };
 static_assert(sizeof(UnitSpriteUniforms) == 16 * (unit_sprites::kPaletteSize + 1));
 
-// Screen pixels a unit must span to use each sprite LOD: near art is 7 sprite
-// pixels across the head and mid art 5, so below those they would be shrunk
-// and lose pixels. Below kDotPixels even the far circle breaks up, so units
-// become solid dots. Leaving a LOD needs kHysteresis fewer pixels than
-// entering it, so zooming across a threshold doesn't flicker.
-constexpr float kNearPixels = 7.0f;
-constexpr float kMidPixels = 5.0f;
-constexpr float kDotPixels = 3.0f;
-constexpr float kHysteresis = 0.5f;
-
 } // namespace
 
 UnitRenderer::~UnitRenderer() {
@@ -199,7 +189,7 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
 
     const bool sprites = options.sprites && m_unitAtlas != nullptr;
     if (sprites) {
-        m_lod = options.lod == Lod::Auto ? pickLod(m_unitPixels) : options.lod;
+        m_lod = options.lod == Lod::Auto ? pickLod(m_unitPixels, options.thresholds) : options.lod;
         uniforms.spriteMode = 1u;
         uniforms.lod = static_cast<Uint32>(m_lod);
         uniforms.species = static_cast<Uint32>(options.species);
@@ -229,25 +219,20 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
     SDL_DrawGPUPrimitives(pass, count * 6, 1, 0, 0);
 }
 
-UnitRenderer::Lod UnitRenderer::pickLod(float unitPixels) const {
-    // Thresholds to enter each LOD from below; staying in the current one (or
-    // anything more detailed) is allowed down to kHysteresis pixels lower.
-    const auto enter = [](Lod lod) {
-        switch (lod) {
-        case Lod::Near: return kNearPixels;
-        case Lod::Mid: return kMidPixels;
-        case Lod::Far: return kDotPixels;
-        default: return 0.0f;
-        }
-    };
-    const Lod order[] = {Lod::Near, Lod::Mid, Lod::Far, Lod::Dot};
-    for (Lod lod : order) {
+UnitRenderer::Lod UnitRenderer::pickLod(float unitPixels, const LodThresholds& thresholds) const {
+    // Entering a more detailed LOD needs its full threshold; staying in the
+    // current one (or dropping to it) is allowed `hysteresis` pixels lower.
+    const auto reaches = [&](Lod lod, float pixels) {
         const bool current = static_cast<int>(m_lod) <= static_cast<int>(lod);
-        if (unitPixels >= enter(lod) - (current ? kHysteresis : 0.0f)) {
-            return lod;
-        }
+        return unitPixels >= pixels - (current ? thresholds.hysteresis : 0.0f);
+    };
+    if (reaches(Lod::Near, thresholds.nearPixels)) {
+        return Lod::Near;
     }
-    return Lod::Dot;
+    if (reaches(Lod::Mid, thresholds.midPixels)) {
+        return Lod::Mid;
+    }
+    return Lod::Far;
 }
 
 } // namespace horde::gfx

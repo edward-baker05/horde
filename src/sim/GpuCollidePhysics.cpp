@@ -515,6 +515,7 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.sprites = m_sprites.enabled;
     options.species = m_sprites.species;
     options.lod = m_sprites.lod;
+    options.thresholds = m_sprites.thresholds;
     options.integerScale = m_sprites.integerScale;
     options.seed = m_config.flow.seed;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
@@ -539,16 +540,27 @@ void GpuCollidePhysics::debugUi() {
         return;
     }
     int species = static_cast<int>(m_sprites.species);
-    if (ImGui::Combo("Crowd", &species, "Humans Aliens ")) {
+    if (ImGui::Combo("Crowd", &species, "Humans\0Aliens\0")) {
         m_sprites.species = static_cast<Renderer::Species>(species);
     }
     // Combo index 0 is Auto (-1); the rest follow Lod's values.
     int lod = static_cast<int>(m_sprites.lod) + 1;
-    if (ImGui::Combo("LOD", &lod, "Auto Near Mid Far Dot ")) {
+    if (ImGui::Combo("LOD", &lod, "Auto\0Near\0Mid\0Far\0")) {
         m_sprites.lod = static_cast<Renderer::Lod>(lod - 1);
     }
+    // Screen pixels a unit must span for each LOD; below mid it's far.
+    Renderer::LodThresholds& t = m_sprites.thresholds;
+    ImGui::BeginDisabled(m_sprites.lod != Renderer::Lod::Auto);
+    ImGui::SliderFloat("Near from", &t.nearPixels, 1.0f, 30.0f, "%.1f px");
+    ImGui::SliderFloat("Mid from", &t.midPixels, 1.0f, 30.0f, "%.1f px");
+    ImGui::SliderFloat("Hysteresis", &t.hysteresis, 0.0f, 3.0f, "%.1f px");
+    t.midPixels = std::min(t.midPixels, t.nearPixels); // mid can't start above near
+    if (ImGui::Button("Reset LOD thresholds")) {
+        t = Renderer::LodThresholds{};
+    }
+    ImGui::EndDisabled();
     ImGui::Checkbox("Whole-pixel scale", &m_sprites.integerScale);
-    static const char* const kLodNames[] = {"near", "mid", "far", "dot"};
+    static const char* const kLodNames[] = {"near", "mid", "far"};
     ImGui::Text("Drawing %s, %.1f px per unit", kLodNames[static_cast<int>(m_renderer.lastLod())],
                 m_renderer.lastUnitPixels());
 }

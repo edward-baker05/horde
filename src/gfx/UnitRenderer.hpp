@@ -35,7 +35,17 @@ public:
 
     // Sprite level of detail. Auto picks from how many screen pixels a unit
     // covers; the rest force one, for looking at the art.
-    enum class Lod : int { Auto = -1, Near = 0, Mid = 1, Far = 2, Dot = 3 };
+    enum class Lod : int { Auto = -1, Near = 0, Mid = 1, Far = 2 };
+
+    // When Auto switches LOD: a unit must span at least `nearPixels` screen
+    // pixels to draw near art and `midPixels` for mid, else far. Leaving a
+    // LOD takes `hysteresis` pixels fewer than entering it, so zooming across
+    // a threshold doesn't flicker.
+    struct LodThresholds {
+        float nearPixels = 7.0f;
+        float midPixels = 5.0f;
+        float hysteresis = 0.5f;
+    };
 
     // The level of detail the latest sprite draw used (never Auto).
     Lod lastLod() const {
@@ -83,6 +93,7 @@ public:
         bool sprites = true;
         Species species = Species::Humans;
         Lod lod = Lod::Auto;
+        LodThresholds thresholds;
         bool integerScale = false;
         Uint32 seed = 0;
     };
@@ -100,7 +111,7 @@ public:
 private:
     // Picks the sprite LOD for a unit `unitPixels` across, with hysteresis
     // so zooming across a threshold doesn't flicker between two.
-    Lod pickLod(float unitPixels) const;
+    Lod pickLod(float unitPixels, const LodThresholds& thresholds) const;
 
     SDL_GPUDevice* m_device = nullptr;
     SDL_Window* m_window = nullptr;

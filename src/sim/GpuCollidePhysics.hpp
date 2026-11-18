@@ -88,6 +88,7 @@ private:
         bool enabled = true;
         gfx::UnitRenderer::Species species = gfx::UnitRenderer::Species::Humans;
         gfx::UnitRenderer::Lod lod = gfx::UnitRenderer::Lod::Auto;
+        gfx::UnitRenderer::LodThresholds thresholds;
         bool integerScale = false;
     } m_sprites;
     GpuSpatialGrid m_grid;
