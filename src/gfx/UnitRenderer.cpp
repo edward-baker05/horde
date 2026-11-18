@@ -44,7 +44,8 @@ static_assert(sizeof(UnitDrawUniforms) == 160);
 struct alignas(16) UnitSpriteUniforms {
     glm::vec4 palette[unit_sprites::kPaletteSize];
     Uint32 spriteMode;
-    Uint32 padding[3];
+    Uint32 lod;
+    Uint32 padding[2];
 };
 static_assert(sizeof(UnitSpriteUniforms) == 16 * (unit_sprites::kPaletteSize + 1));
 
@@ -207,6 +208,7 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
             spriteUniforms.palette[i] = unit_sprites::kPalette[i];
         }
         spriteUniforms.spriteMode = 1u;
+        spriteUniforms.lod = static_cast<Uint32>(m_lod);
     }
     SDL_PushGPUFragmentUniformData(commands, 0, &spriteUniforms, sizeof(spriteUniforms));
 

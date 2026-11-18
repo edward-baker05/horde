@@ -6,9 +6,8 @@
 //   0: every unit is the same tinted atlas cell (UvRect): the flat disc.
 //   1: crowd sprites. Each unit's look - hairstyle, accessory, colours - comes
 //      from hashing its stable ID, so it costs no memory and survives the
-//      units being reordered. Lod picks the near / mid / far art. Sprite
-//      pixels never shrink below one screen pixel, so zoomed far out the far
-//      art stays a whole circle and neighbours simply overlap.
+//      units being reordered. Lod picks the near / mid / far art; far is a
+//      hard-edged circle drawn at the unit's own size in unit_sprite.frag.
 //      See tools/make_unit_atlas.py and unit_sprites.hlsli.
 //
 // SDL_GPU vertex stage binding rules:
@@ -62,6 +61,7 @@ struct Output {
     float4 Color : TEXCOORD0; // disc: final tint; sprites: multiplier on the palette colour
     float2 Texcoord : TEXCOORD1;
     nointerpolation uint4 Pal : TEXCOORD2; // sprites: palette bases (hair, skin, clothes, accessory)
+    nointerpolation float2 CentreUv : TEXCOORD3; // far sprites: the atlas texel holding the unit's colour
     float4 Position : SV_Position;
 };
 
@@ -129,6 +129,7 @@ Output main(uint id : SV_VertexID) {
 
     Output output;
     output.Pal = uint4(0, 0, 0, 0);
+    output.CentreUv = float2(0.0f, 0.0f);
     float2 world;
     // The quad's top-left in world space, which sprites snap to the pixel grid.
     float2 snapOrigin = pos;
@@ -152,21 +153,25 @@ Output main(uint id : SV_VertexID) {
         float2 cell = float2(variant % ATLAS_COLUMNS, lod * ROWS_PER_LOD + variant / ATLAS_COLUMNS) * CELL;
         float2 cellCentre = cell + CELL * 0.5f;
 
-        // The head is LOD_HEAD sprite pixels across and spans the unit - but a
-        // sprite pixel is never smaller than a screen pixel, or the art loses
-        // pixels (a 5px circle drawn 3px wide becomes a plus). Zoomed far out,
-        // heads stay whole circles and overlap their neighbours instead.
+        // The head is LOD_HEAD sprite pixels across and spans the unit, at
+        // every zoom: sprites never grow past their unit.
         float texel = UnitSize.x / LOD_HEAD[lod];
-        if (PixelsPerUnit > 0.0f) {
-            float texelPx = texel * PixelsPerUnit;
-            texelPx = max(1.0f, IntegerScale != 0 ? round(texelPx) : texelPx);
-            texel = texelPx / PixelsPerUnit;
+        if (IntegerScale != 0 && PixelsPerUnit > 0.0f) {
+            texel = max(1.0f, round(texel * PixelsPerUnit)) / PixelsPerUnit;
         }
         float halfWindow = LOD_WINDOW[lod] * 0.5f;
         float2 offset = (QuadCorners[corner] * 2.0f - 1.0f) * halfWindow;
         world = centre + offset * texel;
         snapOrigin = centre - halfWindow * texel;
-        output.Texcoord = (cellCentre + offset) / ATLAS_SIZE;
+        if (lod == 2) {
+            // Far: unit_sprite.frag draws a hard-edged circle the unit's size
+            // itself, coloured by the far art's centre texel (hair, skin or
+            // cap). Scaling the 5px circle art down would turn it into a plus.
+            output.Texcoord = offset; // in head pixels from the centre
+            output.CentreUv = cellCentre / ATLAS_SIZE;
+        } else {
+            output.Texcoord = (cellCentre + offset) / ATLAS_SIZE;
+        }
     }
 
     float4 clip = mul(ViewProjection, float4(world, 0.0f, 1.0f));

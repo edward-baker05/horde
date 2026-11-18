@@ -19,13 +19,15 @@ SamplerState AtlasSampler : register(s0, space2);
 cbuffer UnitSpriteUniforms : register(b0, space3) {
     float4 Palette[PALETTE_SIZE];
     uint SpriteMode;
-    uint3 Padding;
+    uint Lod;       // sprites: 0 near, 1 mid, 2 far
+    uint2 Padding;
 };
 
 struct Input {
     float4 Color : TEXCOORD0;
     float2 Texcoord : TEXCOORD1;
     nointerpolation uint4 Pal : TEXCOORD2; // hair, skin, clothes, accessory palette bases
+    nointerpolation float2 CentreUv : TEXCOORD3; // far: the atlas texel holding the unit's colour
 };
 
 float3 roleColour(uint role, uint4 pal) {
@@ -44,6 +46,17 @@ float3 roleColour(uint role, uint4 pal) {
 }
 
 float4 main(Input input) : SV_Target0 {
+    if (SpriteMode != 0 && Lod == 2) {
+        // Far: a hard-edged circle filling the unit, whatever its size on
+        // screen. Texcoord is in head pixels from the centre (head = 5 across);
+        // the threshold matches the 5px art exactly at 1:1 (.XXX. / XXXXX x3).
+        if (dot(input.Texcoord, input.Texcoord) > 6.25f) {
+            discard;
+        }
+        float4 centre = Atlas.SampleLevel(AtlasSampler, input.CentreUv, 0.0f);
+        uint farRole = (uint)round(centre.r * 255.0f);
+        return float4(roleColour(farRole, input.Pal) * input.Color.rgb, input.Color.a);
+    }
     float4 texel = Atlas.Sample(AtlasSampler, input.Texcoord);
     if (SpriteMode == 0) {
         return texel * input.Color;
