@@ -42,18 +42,111 @@ bool deleteSelected(EditorState& state) {
         return true;
     }
 
+    if (state.selection.isFieldRegion() && state.selection.index < state.level.fieldRegions.size()) {
+        state.beginMutation();
+        state.level.fieldRegions.erase(state.level.fieldRegions.begin() +
+                                       static_cast<std::ptrdiff_t>(state.selection.index));
+        state.selection.clear();
+        return true;
+    }
+
     return false;
 }
 
 namespace {
+
+ImVec4 toImColor(logic::Rgb color) {
+    return {static_cast<float>(color.r) / 255.0f, static_cast<float>(color.g) / 255.0f,
+            static_cast<float>(color.b) / 255.0f, 1.0f};
+}
+
+// The paint tool's mode, brush and palette.
+void drawPaintSettings(EditorState& state) {
+    PaintSettings& paint = state.paint;
+    ImGui::SeparatorText("Paint cells");
+
+    const auto modeButton = [&](const char* label, PaintMode mode) {
+        if (ImGui::RadioButton(label, paint.mode == mode)) {
+            paint.mode = mode;
+        }
+    };
+    modeButton("Paint", PaintMode::Paint);
+    ImGui::SameLine();
+    modeButton("Erase", PaintMode::Erase);
+    ImGui::SameLine();
+    modeButton("Slope", PaintMode::Slope);
+
+    if (ImGui::RadioButton("Circle", paint.shape == BrushShape::Circle)) {
+        paint.shape = BrushShape::Circle;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Square", paint.shape == BrushShape::Square)) {
+        paint.shape = BrushShape::Square;
+    }
+
+    ImGui::SliderInt("Brush", &paint.size, 1, kMaxBrushSize, "%d cells");
+    ImGui::Checkbox("Auto-smooth slopes", &paint.autoSmooth);
+
+    // Click a swatch to paint with it; double-click to change the colour,
+    // which recolours every cell already painted with it.
+    logic::WallGrid& grid = state.level.wallGrid;
+    static int editing = -1;
+    static bool editSnapshotTaken = false;
+    for (int i = 0; i < static_cast<int>(logic::kPaletteSize); ++i) {
+        if (i % 4 != 0) {
+            ImGui::SameLine();
+        }
+        ImGui::PushID(i);
+        const bool current = paint.colorIndex == i;
+        if (current) {
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 0.9f, 0.3f, 1.0f));
+        }
+        if (ImGui::ColorButton("##swatch", toImColor(grid.palette[i]),
+                               ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(36.0f, 24.0f))) {
+            paint.colorIndex = static_cast<std::uint8_t>(i);
+        }
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+            editing = i;
+            editSnapshotTaken = false;
+            ImGui::OpenPopup("##palette-edit");
+        }
+        if (current) {
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar();
+        }
+
+        if (ImGui::BeginPopup("##palette-edit")) {
+            float color[3] = {static_cast<float>(grid.palette[editing].r) / 255.0f,
+                              static_cast<float>(grid.palette[editing].g) / 255.0f,
+                              static_cast<float>(grid.palette[editing].b) / 255.0f};
+            if (ImGui::ColorPicker3("##palette-picker", color,
+                                    ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_Uint8)) {
+                // One undo step per popup, not one per frame of dragging.
+                if (!editSnapshotTaken) {
+                    state.beginMutation();
+                    editSnapshotTaken = true;
+                }
+                grid.palette[editing] = {static_cast<std::uint8_t>(color[0] * 255.0f),
+                                         static_cast<std::uint8_t>(color[1] * 255.0f),
+                                         static_cast<std::uint8_t>(color[2] * 255.0f)};
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
+    }
+
+    ImGui::TextDisabled("Right drag does the opposite. Alt-click picks a colour.");
+    ImGui::TextDisabled("Shift-click: straight line. Shift+1-8: colour. [ ]: size.");
+}
 
 void drawToolbar(EditorState& state) {
     ImGui::SetNextWindowPos(ImVec2(320.0f, 20.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(240.0f, 300.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Tools");
 
-    const Tool tools[] = {Tool::Select,   Tool::Rectangle, Tool::Triangle, Tool::Circle,
-                          Tool::Polyline, Tool::Spawn,     Tool::Exit};
+    const Tool tools[] = {Tool::Select, Tool::Rectangle, Tool::Triangle,    Tool::Circle, Tool::Polyline,
+                          Tool::Spawn,  Tool::Exit,      Tool::FieldRegion, Tool::Paint};
 
     for (int i = 0; i < static_cast<int>(std::size(tools)); ++i) {
         const Tool tool = tools[i];
@@ -79,16 +172,32 @@ void drawToolbar(EditorState& state) {
     ImGui::SeparatorText("New polyline");
     ImGui::DragFloat("Thickness", &state.newPolylineThickness, 0.25f, 1.0f, 200.0f);
 
+    ImGui::SeparatorText("New field region");
+    ImGui::DragFloat("Strength", &state.newFieldStrength, 0.05f, 0.1f, 60.0f, "%.2f /s");
+
+    drawPaintSettings(state);
+
     ImGui::End();
 }
 
-void drawLevelPanel(EditorState& state, bool& wantsExit) {
+void drawLevelPanel(EditorState& state, bool& wantsExit, bool& wantsPlay) {
     ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(280.0f, 260.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Level");
 
     if (ImGui::Button("Back to menu", ImVec2(160.0f, 0.0f))) {
         wantsExit = true;
+    }
+
+    ImGui::SeparatorText("Test play");
+
+    ImGui::InputInt("Units", &state.testUnits, 1000, 10000);
+    state.testUnits = std::clamp(state.testUnits, 0, 4'000'000);
+
+    // Plays the level as it is now, saved or not: units stream in at the green
+    // spawns and head for the red exits. Leaving returns here.
+    if (ImGui::Button("Test play", ImVec2(160.0f, 0.0f))) {
+        wantsPlay = true;
     }
 
     ImGui::SeparatorText("Bounds");
@@ -98,6 +207,7 @@ void drawLevelPanel(EditorState& state, bool& wantsExit) {
         state.beginMutation();
         state.level.size = {size[0], size[1]};
         clampAllMarkers(state.level);
+        logic::resizeWallGrid(state.level.wallGrid, state.level.size);
     }
 
     ImGui::SeparatorText("Background");
@@ -224,6 +334,40 @@ void drawInspector(EditorState& state) {
             wall.color = {static_cast<std::uint8_t>(color[0] * 255.0f), static_cast<std::uint8_t>(color[1] * 255.0f),
                           static_cast<std::uint8_t>(color[2] * 255.0f)};
         }
+    } else if (state.selection.isFieldRegion()) {
+        logic::FieldRegion& region = state.level.fieldRegions[state.selection.index];
+
+        ImGui::Text("Field region %zu", state.selection.index);
+        ImGui::TextDisabled("Units inside follow its arrow. They pass through it.");
+        ImGui::SeparatorText("Transform");
+
+        float center[2] = {region.center.x, region.center.y};
+        if (ImGui::DragFloat2("Centre", center, 0.5f)) {
+            state.beginMutation();
+            region.center = {center[0], center[1]};
+        }
+
+        float degrees = glm::degrees(region.rotation);
+        if (ImGui::DragFloat("Rotation", &degrees, 1.0f, -360.0f, 360.0f, "%.1f deg")) {
+            state.beginMutation();
+            region.rotation = glm::radians(degrees);
+        }
+        ImGui::TextDisabled("0 flows east; positive turns clockwise.");
+
+        float extents[2] = {region.halfExtents.x * 2.0f, region.halfExtents.y * 2.0f};
+        if (ImGui::DragFloat2("Width/Height", extents, 0.5f, 1.0f, 100000.0f)) {
+            state.beginMutation();
+            region.halfExtents = {std::max(extents[0], 1.0f) * 0.5f, std::max(extents[1], 1.0f) * 0.5f};
+        }
+
+        ImGui::SeparatorText("Flow");
+
+        float strength = region.strength;
+        if (ImGui::DragFloat("Strength", &strength, 0.05f, 0.1f, 60.0f, "%.2f /s")) {
+            state.beginMutation();
+            region.strength = std::max(strength, 0.1f);
+        }
+        ImGui::TextDisabled("How quickly units turn to follow the arrow.");
     } else {
         logic::Marker& marker = state.level.markers[state.selection.index];
 
@@ -284,6 +428,22 @@ void drawWallList(EditorState& state) {
         if (ImGui::Selectable(label, selected)) {
             state.selection = Selection{SelectionKind::Marker, i};
         }
+    }
+
+    ImGui::SeparatorText("Field regions");
+
+    for (std::size_t i = 0; i < state.level.fieldRegions.size(); ++i) {
+        char label[64];
+        std::snprintf(label, sizeof(label), "%zu  Field region##field%zu", i, i);
+
+        const bool selected = state.selection.isFieldRegion() && state.selection.index == i;
+        if (ImGui::Selectable(label, selected)) {
+            state.selection = Selection{SelectionKind::FieldRegion, i};
+        }
+    }
+
+    if (state.level.fieldRegions.empty()) {
+        ImGui::TextDisabled("No field regions yet.");
     }
 
     ImGui::End();
@@ -377,14 +537,23 @@ void drawFilesPanel(EditorState& state) {
         }
     }
 
+    const std::vector<std::string> notes = logic::warnings(state.level);
+    if (!notes.empty()) {
+        ImGui::SeparatorText("Warnings");
+        ImGui::TextDisabled("These don't stop saving.");
+        for (const std::string& note : notes) {
+            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f), "%s", note.c_str());
+        }
+    }
+
     ImGui::End();
 }
 
 } // namespace
 
-void drawEditorUi(EditorState& state, bool& wantsExit) {
+void drawEditorUi(EditorState& state, bool& wantsExit, bool& wantsPlay) {
     drawToolbar(state);
-    drawLevelPanel(state, wantsExit);
+    drawLevelPanel(state, wantsExit, wantsPlay);
     drawInspector(state);
     drawWallList(state);
     drawFilesPanel(state);

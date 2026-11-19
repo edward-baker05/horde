@@ -1,0 +1,53 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_RWStructuredBuffer_v2uint
+{
+    uint2 _m0[1];
+};
+
+struct type_RWStructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_ReorderParams
+{
+    uint UnitCount;
+    uint Stride;
+    uint RenumberKeys;
+    uint Padding;
+};
+
+kernel void main0(constant type_ReorderParams& ReorderParams [[buffer(0)]], device type_StructuredBuffer_uint& Source [[buffer(1)]], device type_RWStructuredBuffer_v2uint& SortedKeys [[buffer(2)]], device type_RWStructuredBuffer_uint& Target [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= ReorderParams.UnitCount)
+        {
+            break;
+        }
+        uint2 _44 = SortedKeys._m0[gl_GlobalInvocationID.x];
+        uint _48 = _44.y * ReorderParams.Stride;
+        uint _49 = gl_GlobalInvocationID.x * ReorderParams.Stride;
+        for (uint _51 = 0u; _51 < ReorderParams.Stride; )
+        {
+            Target._m0[_49 + _51] = Source._m0[_48 + _51];
+            _51++;
+            continue;
+        }
+        if (ReorderParams.RenumberKeys != 0u)
+        {
+            SortedKeys._m0[gl_GlobalInvocationID.x] = uint2(_44.x, gl_GlobalInvocationID.x);
+        }
+        break;
+    } while(false);
+}
+

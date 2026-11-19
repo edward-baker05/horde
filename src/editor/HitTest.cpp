@@ -66,6 +66,10 @@ bool hitTestMarker(const logic::Level& level, const logic::Marker& marker, glm::
     return std::abs(world.x - center.x) <= size.x * 0.5f && std::abs(world.y - center.y) <= size.y * 0.5f;
 }
 
+bool hitTestFieldRegion(const logic::FieldRegion& region, glm::vec2 world) {
+    return hitTestWall(logic::fieldRegionFrame(region), world);
+}
+
 Selection pick(const logic::Level& level, glm::vec2 world) {
     // Walls first, topmost down, so what you click is what you see on top.
     for (std::size_t i = level.walls.size(); i-- > 0;) {
@@ -77,6 +81,12 @@ Selection pick(const logic::Level& level, glm::vec2 world) {
     for (std::size_t i = level.markers.size(); i-- > 0;) {
         if (hitTestMarker(level, level.markers[i], world)) {
             return Selection{SelectionKind::Marker, i};
+        }
+    }
+
+    for (std::size_t i = level.fieldRegions.size(); i-- > 0;) {
+        if (hitTestFieldRegion(level.fieldRegions[i], world)) {
+            return Selection{SelectionKind::FieldRegion, i};
         }
     }
 

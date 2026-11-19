@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
+#include <variant>
 
 #include "editor/EditorUi.hpp"
 #include "editor/HitTest.hpp"
@@ -11,7 +13,9 @@
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "logic/LevelGeometry.hpp"
 #include "logic/LevelValidation.hpp"
+#include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
 
 namespace horde::scene {
@@ -67,6 +71,20 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         m_cursorWorld = mouseWorld(event.motion.x, event.motion.y);
     }
 
+    if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard && m_state.tool == editor::Tool::Paint) {
+        // Shift and a number picks a palette colour; without shift, numbers
+        // still switch tools.
+        if ((event.key.mod & SDL_KMOD_SHIFT) != 0 && event.key.key >= SDLK_1 && event.key.key <= SDLK_8) {
+            m_state.paint.colorIndex = static_cast<std::uint8_t>(event.key.key - SDLK_1);
+            return true;
+        }
+        if (event.key.key == SDLK_LEFTBRACKET || event.key.key == SDLK_RIGHTBRACKET) {
+            const int step = event.key.key == SDLK_LEFTBRACKET ? -1 : 1;
+            m_state.paint.size = std::clamp(m_state.paint.size + step, 1, editor::kMaxBrushSize);
+            return true;
+        }
+    }
+
     if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard) {
         switch (event.key.key) {
             case SDLK_1:
@@ -90,6 +108,12 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
             case SDLK_7:
                 m_state.tool = editor::Tool::Exit;
                 return true;
+            case SDLK_8:
+                m_state.tool = editor::Tool::FieldRegion;
+                return true;
+            case SDLK_9:
+                m_state.tool = editor::Tool::Paint;
+                return true;
 
             case SDLK_DELETE:
             case SDLK_BACKSPACE:
@@ -109,6 +133,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 // committing a partial one.
                 m_draft.clear();
                 m_placement.active = false;
+                m_painting = false;
                 m_state.tool = editor::Tool::Select;
                 return true;
 
@@ -132,6 +157,14 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
 
             default:
                 break;
+        }
+    }
+
+    // A stroke already under way keeps going even over a panel, so releasing
+    // the button there still ends it.
+    if (m_state.tool == editor::Tool::Paint && (m_painting || !io.WantCaptureMouse)) {
+        if (handlePaintEvent(event)) {
+            return true;
         }
     }
 
@@ -219,11 +252,19 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     break;
                 }
                 m_placement.active = false;
+                const glm::vec2 end = editor::snapPosition(m_cursorWorld, m_state.snap);
+
+                if (m_state.tool == editor::Tool::FieldRegion) {
+                    logic::FieldRegion region;
+                    if (editor::makeFieldRegionFromDrag(m_placement.start, end, m_state.newFieldStrength, region)) {
+                        m_state.beginMutation();
+                        m_state.level.fieldRegions.push_back(region);
+                    }
+                    return true;
+                }
 
                 logic::Wall wall;
-                if (editor::makeWallFromDrag(m_state.tool, m_placement.start,
-                                             editor::snapPosition(m_cursorWorld, m_state.snap), m_state.newWallColor,
-                                             wall)) {
+                if (editor::makeWallFromDrag(m_state.tool, m_placement.start, end, m_state.newWallColor, wall)) {
                     m_state.beginMutation();
                     m_state.level.walls.push_back(std::move(wall));
                 }
@@ -248,6 +289,21 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     if (m_activeHandle.kind == editor::HandleKind::Rotate) {
                         wall.rotation = editor::snapRotation(wall.rotation, m_state.snap);
                     }
+                    return true;
+                }
+                if (m_activeHandle.kind != editor::HandleKind::None && m_state.selection.isFieldRegion()) {
+                    // Drag a rectangle with the region's transform, then copy
+                    // the result back: the same grips and maths as a wall.
+                    logic::FieldRegion& region = m_state.level.fieldRegions[m_state.selection.index];
+                    logic::Wall frame = logic::fieldRegionFrame(region);
+                    const glm::vec2 target = m_activeHandle.kind == editor::HandleKind::ResizeCorner
+                                                 ? editor::snapPosition(m_cursorWorld, m_state.snap)
+                                                 : m_cursorWorld;
+                    editor::applyHandleDrag(frame, m_activeHandle, target, m_rotationGrabOffset);
+                    region.rotation = m_activeHandle.kind == editor::HandleKind::Rotate
+                                          ? editor::snapRotation(frame.rotation, m_state.snap)
+                                          : frame.rotation;
+                    region.halfExtents = std::get<logic::RectangleShape>(frame.shape).halfExtents;
                     return true;
                 }
                 if (m_markerDrag != 0 && m_state.selection.isMarker()) {
@@ -275,6 +331,11 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                         editor::snapPosition(m_cursorWorld - m_dragGrabOffset, m_state.snap);
                     return true;
                 }
+                if (m_draggingBody && m_state.selection.isFieldRegion()) {
+                    m_state.level.fieldRegions[m_state.selection.index].center =
+                        editor::snapPosition(m_cursorWorld - m_dragGrabOffset, m_state.snap);
+                    return true;
+                }
                 m_state.hovered = editor::pick(m_state.level, m_cursorWorld);
                 return false;
             }
@@ -295,6 +356,21 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                         if (handle.kind == editor::HandleKind::Rotate) {
                             const glm::vec2 d = m_cursorWorld - wall.center;
                             m_rotationGrabOffset = std::atan2(d.y, d.x) - wall.rotation;
+                        }
+                        return true;
+                    }
+                }
+
+                if (m_state.selection.isFieldRegion()) {
+                    const logic::Wall frame =
+                        logic::fieldRegionFrame(m_state.level.fieldRegions[m_state.selection.index]);
+                    const editor::Handle handle = editor::pickHandle(frame, m_cursorWorld, handlePickRadius());
+                    if (handle.kind != editor::HandleKind::None) {
+                        m_state.beginMutation();
+                        m_activeHandle = handle;
+                        if (handle.kind == editor::HandleKind::Rotate) {
+                            const glm::vec2 d = m_cursorWorld - frame.center;
+                            m_rotationGrabOffset = std::atan2(d.y, d.x) - frame.rotation;
                         }
                         return true;
                     }
@@ -328,6 +404,11 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                     m_state.beginMutation();
                     m_draggingBody = true;
                     m_dragGrabOffset = m_cursorWorld - m_state.level.walls[m_state.selection.index].center;
+                }
+                if (m_state.selection.isFieldRegion()) {
+                    m_state.beginMutation();
+                    m_draggingBody = true;
+                    m_dragGrabOffset = m_cursorWorld - m_state.level.fieldRegions[m_state.selection.index].center;
                 }
                 if (m_state.selection.isMarker()) {
                     const logic::Marker& marker = m_state.level.markers[m_state.selection.index];
@@ -368,15 +449,158 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
     return false;
 }
 
+bool EditorScene::handlePaintEvent(const SDL_Event& event) {
+    logic::WallGrid& grid = m_state.level.wallGrid;
+    const editor::PaintSettings& paint = m_state.paint;
+
+    switch (event.type) {
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            const std::uint8_t button = event.button.button;
+            if (m_painting || (button != SDL_BUTTON_LEFT && button != SDL_BUTTON_RIGHT)) {
+                break;
+            }
+            const SDL_Keymod mod = SDL_GetModState();
+
+            // Alt-click is an eyedropper: it picks up the colour under the
+            // cursor and paints nothing.
+            if (button == SDL_BUTTON_LEFT && (mod & SDL_KMOD_ALT) != 0) {
+                const logic::Cell cell = grid.at(editor::cellAt(m_cursorWorld));
+                if (!cell.empty()) {
+                    m_state.paint.colorIndex = cell.colorIndex();
+                }
+                return true;
+            }
+
+            // Slope mode's left click turns the one cell under the cursor to
+            // the next slope, rather than stamping the brush.
+            if (button == SDL_BUTTON_LEFT && paint.mode == editor::PaintMode::Slope) {
+                const glm::ivec2 cell = editor::cellAt(m_cursorWorld);
+                if (grid.contains(cell)) {
+                    m_state.beginMutation();
+                    grid.set(cell, logic::Cell::make(editor::nextSlope(grid.at(cell).shape()), paint.colorIndex));
+                }
+                return true;
+            }
+
+            const bool erase = (paint.mode == editor::PaintMode::Erase) == (button == SDL_BUTTON_LEFT);
+            m_paintValue = erase ? logic::Cell{} : logic::Cell::make(logic::CellShape::Full, paint.colorIndex);
+            m_paintButton = button;
+            m_painting = true;
+            m_strokeBox = editor::CellBox{};
+
+            // Snapshot once, at the start of the stroke, so it undoes whole.
+            m_state.beginMutation();
+            if ((mod & SDL_KMOD_SHIFT) != 0 && m_hasLastStamp) {
+                editor::stampLine(grid, m_lastStamp, m_cursorWorld, paint, m_paintValue, m_strokeBox);
+            } else {
+                editor::stampBrush(grid, m_cursorWorld, paint, m_paintValue, m_strokeBox);
+            }
+            m_lastStamp = m_cursorWorld;
+            m_hasLastStamp = true;
+            return true;
+        }
+
+        case SDL_EVENT_MOUSE_MOTION:
+            if (!m_painting) {
+                return false;
+            }
+            editor::stampLine(grid, m_lastStamp, m_cursorWorld, paint, m_paintValue, m_strokeBox);
+            m_lastStamp = m_cursorWorld;
+            return true;
+
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (!m_painting || event.button.button != m_paintButton) {
+                break;
+            }
+            m_painting = false;
+            // Smoothing fills notches, so it follows painting only: after an
+            // erase it would put back some of what was just removed.
+            if (!m_paintValue.empty() && paint.autoSmooth) {
+                editor::autoSmooth(grid, m_strokeBox, paint.colorIndex);
+            }
+            return true;
+
+        default:
+            break;
+    }
+    return false;
+}
+
+void EditorScene::renderPaintOverlay(gfx::SpriteBatch& batch) {
+    SDL_GPUTexture* atlas = m_services->atlas->handle();
+    const logic::WallGrid& grid = m_state.level.wallGrid;
+    const float zoom = m_camera.zoom();
+
+    // Cell lines, only once they are far enough apart on screen to help.
+    if (logic::kCellSize * zoom >= 6.0f) {
+        const glm::vec2 a = m_camera.screenToWorld({0.0f, 0.0f});
+        const glm::vec2 b = m_camera.screenToWorld(m_camera.viewport());
+        const glm::vec2 levelMax = glm::vec2(grid.dim) * logic::kCellSize;
+        const glm::vec2 lo = glm::max(glm::min(a, b), glm::vec2(0.0f));
+        const glm::vec2 hi = glm::min(glm::max(a, b), levelMax);
+        const glm::ivec2 first = glm::ivec2(glm::ceil(lo / logic::kCellSize));
+        const glm::ivec2 last = glm::ivec2(glm::floor(hi / logic::kCellSize));
+        const float width = 1.0f / zoom;
+        const glm::vec4 lineColor{1.0f, 1.0f, 1.0f, 0.06f};
+
+        for (int x = first.x; x <= last.x; ++x) {
+            const float wx = static_cast<float>(x) * logic::kCellSize;
+            gfx::drawCentered(batch, atlas, {wx, (lo.y + hi.y) * 0.5f}, {width, hi.y - lo.y}, 0.0f, gfx::cellSolid(),
+                              lineColor);
+        }
+        for (int y = first.y; y <= last.y; ++y) {
+            const float wy = static_cast<float>(y) * logic::kCellSize;
+            gfx::drawCentered(batch, atlas, {(lo.x + hi.x) * 0.5f, wy}, {hi.x - lo.x, width}, 0.0f, gfx::cellSolid(),
+                              lineColor);
+        }
+    }
+
+    // What the brush covers here: the next slope for slope mode, otherwise
+    // every cell under the brush, in the paint colour or red for erasing.
+    glm::vec4 paintColor = gfx::toFloatColor(grid.palette[m_state.paint.colorIndex]);
+    paintColor.a = 0.45f;
+
+    if (m_state.paint.mode == editor::PaintMode::Slope && !m_painting) {
+        const glm::ivec2 cell = editor::cellAt(m_cursorWorld);
+        if (grid.contains(cell)) {
+            const glm::vec2 centre = (glm::vec2(cell) + 0.5f) * logic::kCellSize;
+            gfx::drawCentered(batch, atlas, centre, glm::vec2(logic::kCellSize), 0.0f, gfx::cellSquare(),
+                              {1.0f, 1.0f, 1.0f, 0.5f});
+            const logic::CellShape next = editor::nextSlope(grid.at(cell).shape());
+            if (next != logic::CellShape::Empty) {
+                gfx::renderSlope(cell, next, batch, atlas, paintColor);
+            }
+        }
+        return;
+    }
+
+    const bool erase = m_painting ? m_paintValue.empty() : m_state.paint.mode == editor::PaintMode::Erase;
+    const glm::vec4 color = erase ? glm::vec4{1.0f, 0.3f, 0.25f, 0.35f} : paintColor;
+    for (const glm::ivec2& cell : editor::brushCells(grid, m_cursorWorld, m_state.paint)) {
+        gfx::drawCentered(batch, atlas, (glm::vec2(cell) + 0.5f) * logic::kCellSize, glm::vec2(logic::kCellSize), 0.0f,
+                          gfx::cellSolid(), color);
+    }
+}
+
 void EditorScene::render(gfx::SpriteBatch& batch) {
     SDL_GPUTexture* atlas = m_services->atlas->handle();
-    gfx::renderLevel(m_state.level, batch, atlas);
+
+    const logic::WallGrid& grid = m_state.level.wallGrid;
+    if (grid.dim != m_gridPiecesDim || grid.cells != m_gridPiecesCells) {
+        m_gridPieces = logic::mergeWallGrid(grid, true);
+        m_gridPiecesCells = grid.cells;
+        m_gridPiecesDim = grid.dim;
+    }
+    gfx::renderLevel(m_state.level, batch, atlas, true, &m_gridPieces);
 
     // Redraw the hovered and selected walls tinted, on top of the level. There
     // is no depth test, so drawing after is what puts them on top.
     const auto highlight = [&](const editor::Selection& selection, glm::vec4 tint) {
         if (selection.isWall() && selection.index < m_state.level.walls.size()) {
             gfx::renderWall(m_state.level.walls[selection.index], batch, atlas, tint);
+        }
+        if (selection.isFieldRegion() && selection.index < m_state.level.fieldRegions.size()) {
+            gfx::renderFieldRegion(m_state.level.fieldRegions[selection.index], batch, atlas, tint);
         }
     };
 
@@ -387,7 +611,15 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
 
     // A translucent preview of what the current drag would produce, so the
     // result is visible before the button is released.
-    if (m_placement.active) {
+    if (m_placement.active && m_state.tool == editor::Tool::FieldRegion) {
+        logic::FieldRegion preview;
+        if (editor::makeFieldRegionFromDrag(m_placement.start, m_placement.current, m_state.newFieldStrength,
+                                            preview)) {
+            glm::vec4 tint = gfx::fieldRegionColor();
+            tint.a = 0.35f;
+            gfx::renderFieldRegion(preview, batch, atlas, tint);
+        }
+    } else if (m_placement.active) {
         logic::Wall preview;
         if (editor::makeWallFromDrag(m_state.tool, m_placement.start, m_placement.current, m_state.newWallColor,
                                      preview)) {
@@ -419,10 +651,21 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
         }
     }
 
-    // The grips on the selected wall, drawn last so nothing covers them.
+    if (m_state.tool == editor::Tool::Paint) {
+        renderPaintOverlay(batch);
+    }
+
+    // The grips on the selected wall or field region, drawn last so nothing
+    // covers them.
+    std::optional<logic::Wall> gripped;
     if (m_state.selection.isWall() && m_state.selection.index < m_state.level.walls.size()) {
+        gripped = m_state.level.walls[m_state.selection.index];
+    } else if (m_state.selection.isFieldRegion() && m_state.selection.index < m_state.level.fieldRegions.size()) {
+        gripped = logic::fieldRegionFrame(m_state.level.fieldRegions[m_state.selection.index]);
+    }
+    if (gripped) {
         const float size = handleWorldSize();
-        for (const editor::Handle& handle : editor::wallHandles(m_state.level.walls[m_state.selection.index])) {
+        for (const editor::Handle& handle : editor::wallHandles(*gripped)) {
             const glm::vec4 uv = handle.kind == editor::HandleKind::Rotate ? gfx::cellDisc() : gfx::cellSolid();
             const glm::vec4 color = handle.kind == editor::HandleKind::Rotate ? glm::vec4{0.4f, 0.8f, 1.0f, 1.0f}
                                                                               : glm::vec4{1.0f, 0.9f, 0.3f, 1.0f};
@@ -446,10 +689,20 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
 
 void EditorScene::debugUi() {
     bool wantsExit = false;
-    editor::drawEditorUi(m_state, wantsExit);
+    bool wantsPlay = false;
+    editor::drawEditorUi(m_state, wantsExit, wantsPlay);
 
     if (wantsExit) {
         m_services->scenes->pop();
+    } else if (wantsPlay) {
+        // Over the editor, so leaving the level comes straight back here.
+        LevelOptions options;
+        options.level = m_state.level;
+        options.physics = m_state.testPhysics;
+        options.unitCount = static_cast<std::uint32_t>(m_state.testUnits);
+        options.spawn = sim::SpawnPattern::Markers;
+        options.fitCamera = true;
+        m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
     }
 }
 

@@ -16,6 +16,22 @@ namespace horde::scene {
 
 class SceneStack;
 
+// Where the time in a frame goes, averaged over the last half second (with the
+// worst frame alongside), so scenes can show what a frame actually costs even
+// when a frame cap hides it from the frame rate. Filled in by App.
+struct FrameStats {
+    float frameMs = 0.0f;      // frame start to next frame start: 1000 / fps
+    float frameMaxMs = 0.0f;
+    float updateMs = 0.0f;     // CPU: the scene's update(), i.e. CPU-side physics
+    float recordMs = 0.0f;     // CPU: building and submitting the frame's GPU work, waits excluded
+    float simGpuMs = 0.0f;     // GPU: the scene's compute() work alone, i.e. GPU-side physics
+    float simGpuMaxMs = 0.0f;
+    float waitMs = 0.0f;       // blocked acquiring the next image or presenting: the display, a frame cap,
+                               // or a GPU still busy with earlier frames
+    float otherMs = 0.0f;      // the rest: events, ImGui, scene transitions
+    bool simGpuMeasured = false;
+};
+
 // Everything a scene is allowed to reach for. Passed by reference so scenes
 // stay testable and never reach back into App directly.
 struct Services {
@@ -24,6 +40,12 @@ struct Services {
     gfx::Texture* atlas = nullptr; // shared sprite atlas
     SDL_Window* window = nullptr;
     SceneStack* scenes = nullptr;
+    const FrameStats* frameStats = nullptr;
+    // When set, App submits the scene's compute work on a command buffer of
+    // its own and times it into FrameStats::simGpuMs. While playing that is
+    // done off the main thread with fences, costing the GPU nothing; a
+    // benchmark waits for the work instead, to isolate it exactly.
+    bool* measureSimGpu = nullptr;
 };
 
 // A distinct view of the game: the level, the tech tree, the main menu.
@@ -62,6 +84,13 @@ public:
     // Queue sprites for this frame. The batch has already been begun.
     virtual void render(gfx::SpriteBatch& batch) {
         (void)batch;
+    }
+
+    // Direct drawing into the render pass (e.g. custom pipelines / GPU instancing).
+    // Called after SpriteBatch has flushed its draws.
+    virtual void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) {
+        (void)commands;
+        (void)pass;
     }
 
     // Dear ImGui calls for developer tooling. Game-facing UI belongs in

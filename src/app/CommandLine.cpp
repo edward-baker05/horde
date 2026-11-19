@@ -1,0 +1,325 @@
+#include "app/CommandLine.hpp"
+
+#include <charconv>
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <string_view>
+
+#include "scene/Presets.hpp"
+#include "sim/PhysicsRegistry.hpp"
+
+namespace horde::app {
+
+namespace {
+
+void printUsage() {
+    std::printf(
+        "usage: horde [options]\n"
+        "\n"
+        "With no options the game starts at the main menu.\n"
+        "\n"
+        "Level setup (boots straight into a level when any is given):\n"
+        "  --preset NAME      a test setup from assets/presets (see --list-presets); flags\n"
+        "                     after it override its settings\n"
+        "  --physics NAME     physics system (see --list-physics), default %s\n"
+        "  --units N          number of units, default 10000\n"
+        "  --spawn PATTERN    markers | random | grid | column, default markers (random under --bench)\n"
+        "  --spawn-rate N     markers: units entering per second, default 1000; 0 = all at once\n"
+        "  --physics-rate HZ  physics steps per second, 60 or 120 (default 60; 0 = once per frame,\n"
+        "                     the default under --bench so each frame is one step)\n"
+        "  --no-respawn       units stop at the exit instead of re-entering at a spawn\n"
+        "  --max-hp N         hit points units start with, a whole number, default 30\n"
+        "  --exit-damage F    hit points lost each time a unit reaches an exit, default 1.0\n"
+        "  --seed N           spawn seed, default 1\n"
+        "  --level PATH       level file, default the built-in level\n"
+        "  --level-size WxH   the built-in level at another size, e.g. 8000x8000\n"
+        "  --collision-iterations N   relaxation passes per frame, default 4\n"
+        "  --solver NAME      how a Jacobi pass combines a unit's overlaps: relaxed (sum x\n"
+        "                     relaxation) | average (mean of the overlaps) | chebyshev (relaxed,\n"
+        "                     accelerated by Chebyshev semi-iteration, the default)\n"
+        "  --relaxation F     relaxed and chebyshev: fraction of each pass's correction applied, default 0.5\n"
+        "  --omega F          average solver: over-relaxation on the mean, 1 (plain) to 2, default 1\n"
+        "  --rho F            chebyshev: estimated spectral radius, 0 to 1 (exclusive), default 0.95\n"
+        "  --chebyshev-delay N   chebyshev: plain passes before accelerating, at least 2, default 2\n"
+        "  --congestion START,STOP   slow units down as the crowd ahead goes from START to STOP\n"
+        "                     units per cell (hex packing ~1.15), e.g. 0.7,1.0; default off\n"
+        "  --smoothing F      blend velocity toward touching neighbours' mean each step, 0-1, default 1\n"
+        "  --reorder on|off   reorder units by grid cell every step, so neighbours sit together in\n"
+        "                     memory, default on\n"
+        "  --speed F          unit speed toward the exit, default 60\n"
+        "\n"
+        "Benchmarking:\n"
+        "  --bench            run headless-style: time the level, write results, quit\n"
+        "  --warmup S         seconds to run before measuring, default 2\n"
+        "  --duration S       seconds to measure, default 10\n"
+        "  --fixed-dt S       simulation step per frame, default 1/60; 0 = real time\n"
+        "  --out FILE         write the JSON summary here\n"
+        "  --frames-out FILE  write per-frame timings as CSV here\n"
+        "  --units-out FILE   write every unit's final position and velocity as CSV here\n"
+        "  --no-gpu-sync      don't time the physics' GPU work separately each frame\n"
+        "\n"
+        "Window and device:\n"
+        "  --width W --height H   window size, default 1600x900\n"
+        "  --vsync / --no-vsync   default on, off under --bench\n"
+        "  --gpu-debug / --no-gpu-debug   GPU validation, default on, off under --bench\n"
+        "  --low-power-gpu    prefer an integrated GPU, if the machine has one\n"
+        "\n"
+        "  --list-physics     print the registered physics systems and exit\n"
+        "  --list-presets     print the presets in assets/presets and exit\n"
+        "  --help             print this and exit\n",
+        sim::kDefaultPhysics);
+}
+
+template <typename T>
+bool parseNumber(std::string_view text, T& out) {
+    const char* end = text.data() + text.size();
+    auto [ptr, ec] = std::from_chars(text.data(), end, out);
+    return ec == std::errc{} && ptr == end;
+}
+
+} // namespace
+
+ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
+    scene::LevelOptions level;
+    bench::BenchConfig benchConfig;
+    bool bench = false;
+    bool wantsLevel = false;
+    bool spawnGiven = false;
+    bool physicsRateGiven = false;
+    int vsync = -1; // -1 = not given
+    int gpuDebug = -1;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+
+        // Flags taking a value read it from the next argument.
+        const auto value = [&](std::string_view& out) {
+            if (i + 1 >= argc) {
+                std::fprintf(stderr, "horde: %s needs a value\n", argv[i]);
+                return false;
+            }
+            out = argv[++i];
+            return true;
+        };
+        const auto bad = [&](std::string_view text) {
+            std::fprintf(stderr, "horde: bad value '%.*s' for %.*s\n", static_cast<int>(text.size()), text.data(),
+                         static_cast<int>(arg.size()), arg.data());
+            return ParseResult::Error;
+        };
+
+        std::string_view v;
+
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return ParseResult::Exit;
+        } else if (arg == "--list-presets") {
+            for (const std::filesystem::path& path : scene::listPresets()) {
+                scene::Preset preset;
+                std::string error;
+                const std::string name = scene::presetName(path);
+                if (scene::loadPreset(name, scene::LevelOptions{}, preset, error)) {
+                    std::printf("%-24s %s\n", name.c_str(), preset.description.c_str());
+                } else {
+                    std::printf("%-24s (broken: %s)\n", name.c_str(), error.c_str());
+                }
+            }
+            return ParseResult::Exit;
+        } else if (arg == "--preset") {
+            // Applies where it appears: flags after it override its settings.
+            if (!value(v)) return ParseResult::Error;
+            scene::Preset preset;
+            std::string error;
+            if (!scene::loadPreset(std::string(v), level, preset, error)) {
+                std::fprintf(stderr, "horde: %s\n", error.c_str());
+                return ParseResult::Error;
+            }
+            level = std::move(preset.options);
+            spawnGiven = spawnGiven || preset.setsSpawn;
+            physicsRateGiven = physicsRateGiven || preset.setsPhysicsRate;
+            wantsLevel = true;
+        } else if (arg == "--list-physics") {
+            for (const std::string& name : sim::physicsNames()) {
+                std::printf("%-12s %s\n", name.c_str(), sim::physicsDescription(name));
+            }
+            return ParseResult::Exit;
+        } else if (arg == "--bench") {
+            bench = true;
+        } else if (arg == "--physics") {
+            if (!value(v)) return ParseResult::Error;
+            level.physics = std::string(v);
+            if (sim::createPhysics(level.physics) == nullptr) {
+                std::fprintf(stderr, "horde: unknown physics '%s'. Known:", level.physics.c_str());
+                for (const std::string& name : sim::physicsNames()) {
+                    std::fprintf(stderr, " %s", name.c_str());
+                }
+                std::fprintf(stderr, "\n");
+                return ParseResult::Error;
+            }
+            wantsLevel = true;
+        } else if (arg == "--units") {
+            if (!value(v) || !parseNumber(v, level.unitCount)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--spawn") {
+            if (!value(v) || !sim::parseSpawnPattern(std::string(v), level.spawn)) return bad(v);
+            spawnGiven = true;
+            wantsLevel = true;
+        } else if (arg == "--physics-rate") {
+            if (!value(v) || !parseNumber(v, level.physicsRate) ||
+                (level.physicsRate != 0.0f && level.physicsRate != 60.0f && level.physicsRate != 120.0f)) {
+                return bad(v);
+            }
+            physicsRateGiven = true;
+            wantsLevel = true;
+        } else if (arg == "--spawn-rate") {
+            if (!value(v) || !parseNumber(v, level.spawnRate) || level.spawnRate < 0) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--max-hp") {
+            if (!value(v) || !parseNumber(v, level.health.maxHp) || level.health.maxHp == 0) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--exit-damage") {
+            if (!value(v) || !parseNumber(v, level.health.exitDamage) || level.health.exitDamage < 0) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--no-respawn") {
+            level.respawnAtExit = false;
+            wantsLevel = true;
+        } else if (arg == "--seed") {
+            if (!value(v) || !parseNumber(v, level.seed)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--level") {
+            if (!value(v)) return ParseResult::Error;
+            level.levelPath = std::filesystem::path(v);
+            wantsLevel = true;
+        } else if (arg == "--level-size") {
+            if (!value(v)) return ParseResult::Error;
+            const std::size_t x = v.find('x');
+            glm::vec2 size{0.0f};
+            if (x == std::string_view::npos || !parseNumber(v.substr(0, x), size.x) ||
+                !parseNumber(v.substr(x + 1), size.y) || size.x < 50.0f || size.y < 50.0f) {
+                return bad(v);
+            }
+            // The default level, its markers stretched along the new edges.
+            logic::Level sized = logic::makeDefaultLevel();
+            sized.size = size;
+            for (logic::Marker& marker : sized.markers) {
+                marker.offset = 0.0f;
+                marker.length = logic::edgeLength(sized, marker.edge);
+            }
+            level.level = sized;
+            wantsLevel = true;
+        } else if (arg == "--collision-iterations") {
+            if (!value(v) || !parseNumber(v, level.collision.iterations)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--relaxation") {
+            if (!value(v) || !parseNumber(v, level.collision.relaxation) || level.collision.relaxation <= 0) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--speed") {
+            if (!value(v) || !parseNumber(v, level.maxSpeed) || level.maxSpeed < 0) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--solver") {
+            if (!value(v) || !sim::parseSolver(std::string(v), level.collision.solver)) return bad(v);
+            wantsLevel = true;
+        } else if (arg == "--omega") {
+            if (!value(v) || !parseNumber(v, level.collision.averageOmega) || level.collision.averageOmega <= 0 ||
+                level.collision.averageOmega > 2.0f) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--rho") {
+            if (!value(v) || !parseNumber(v, level.collision.chebyshevRho) || level.collision.chebyshevRho <= 0 ||
+                level.collision.chebyshevRho >= 1.0f) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--chebyshev-delay") {
+            if (!value(v) || !parseNumber(v, level.collision.chebyshevDelay) ||
+                level.collision.chebyshevDelay < sim::kMinChebyshevDelay) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--congestion") {
+            const auto comma = value(v) ? v.find(',') : std::string_view::npos;
+            if (comma == std::string_view::npos ||
+                !parseNumber(v.substr(0, comma), level.collision.congestionStart) ||
+                !parseNumber(v.substr(comma + 1), level.collision.congestionStop) ||
+                level.collision.congestionStart < 0 || level.collision.congestionStop <= level.collision.congestionStart) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--smoothing") {
+            if (!value(v) || !parseNumber(v, level.collision.velocitySmoothing) ||
+                level.collision.velocitySmoothing < 0 || level.collision.velocitySmoothing > 1.0f) {
+                return bad(v);
+            }
+            wantsLevel = true;
+        } else if (arg == "--reorder") {
+            if (!value(v) || (v != "on" && v != "off")) return bad(v);
+            level.collision.reorderUnits = v == "on";
+            wantsLevel = true;
+        } else if (arg == "--low-power-gpu") {
+            config.lowPowerGpu = true;
+        } else if (arg == "--warmup") {
+            if (!value(v) || !parseNumber(v, benchConfig.warmupSeconds) || benchConfig.warmupSeconds < 0) return bad(v);
+        } else if (arg == "--duration") {
+            if (!value(v) || !parseNumber(v, benchConfig.durationSeconds) || benchConfig.durationSeconds <= 0) {
+                return bad(v);
+            }
+        } else if (arg == "--fixed-dt") {
+            if (!value(v) || !parseNumber(v, benchConfig.fixedDt) || benchConfig.fixedDt < 0) return bad(v);
+        } else if (arg == "--out") {
+            if (!value(v)) return ParseResult::Error;
+            benchConfig.outPath = std::filesystem::path(v);
+        } else if (arg == "--frames-out") {
+            if (!value(v)) return ParseResult::Error;
+            benchConfig.framesPath = std::filesystem::path(v);
+        } else if (arg == "--units-out") {
+            if (!value(v)) return ParseResult::Error;
+            benchConfig.unitsPath = std::filesystem::path(v);
+        } else if (arg == "--no-gpu-sync") {
+            benchConfig.syncGpu = false;
+        } else if (arg == "--width") {
+            if (!value(v) || !parseNumber(v, config.width) || config.width <= 0) return bad(v);
+        } else if (arg == "--height") {
+            if (!value(v) || !parseNumber(v, config.height) || config.height <= 0) return bad(v);
+        } else if (arg == "--vsync") {
+            vsync = 1;
+        } else if (arg == "--no-vsync") {
+            vsync = 0;
+        } else if (arg == "--gpu-debug") {
+            gpuDebug = 1;
+        } else if (arg == "--no-gpu-debug") {
+            gpuDebug = 0;
+        } else {
+            std::fprintf(stderr, "horde: unknown option '%s' (try --help)\n", argv[i]);
+            return ParseResult::Error;
+        }
+    }
+
+    if (bench) {
+        // Benchmarks measure the uncapped frame rate, without the validation
+        // layer's overhead, from a spread-out start — unless told otherwise.
+        config.vsync = false;
+        config.gpuDebug = false;
+        if (!spawnGiven) {
+            level.spawn = sim::SpawnPattern::Random;
+        }
+        // One physics step per frame, so per-frame timings are per-step costs.
+        if (!physicsRateGiven) {
+            level.physicsRate = 0.0f;
+        }
+        level.fitCamera = true;
+        benchConfig.level = level;
+        config.bench = benchConfig;
+    } else if (wantsLevel) {
+        config.startLevel = level;
+    }
+
+    if (vsync != -1) config.vsync = vsync == 1;
+    if (gpuDebug != -1) config.gpuDebug = gpuDebug == 1;
+
+    return ParseResult::Run;
+}
+
+} // namespace horde::app

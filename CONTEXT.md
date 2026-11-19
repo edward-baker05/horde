@@ -12,9 +12,8 @@ unit of authoring, and what a level file contains exactly one of.
 _Avoid_: map, arena, stage
 
 **Background**:
-The coloured surface filling a level's bounds, beneath everything else. The
-only element of a level that units do not collide with, and the only one there
-is exactly one of.
+The coloured surface filling a level's bounds, beneath everything else. Units
+do not collide with it, and it is the only element there is exactly one of.
 _Avoid_: floor, backdrop, ground
 
 **Wall**:
@@ -25,6 +24,26 @@ _Avoid_: obstacle, collider, barrier, polygon
 **Wall kind**:
 Which geometry a wall has: rectangle, isoceles triangle, circle, or polyline.
 _Avoid_: shape type, primitive
+
+**Wall grid**:
+The level overlaid with square cells one unit across, any of which may be
+painted solid. Painted cells are walls: units collide with them. Every level
+has exactly one wall grid, though it may be empty.
+_Avoid_: tilemap, tiles, voxels
+
+**Cell**:
+One square of the wall grid: empty, full, or a slope, and when not empty, one
+of its palette's colours.
+_Avoid_: tile, pixel, block
+
+**Slope**:
+A cell solid on one side of its diagonal, giving a 45° surface.
+_Avoid_: ramp, diagonal, half-tile
+
+**Palette**:
+The eight colours a level's wall grid can use. Cells refer to an entry rather
+than holding a colour, so editing an entry recolours every cell that uses it.
+_Avoid_: swatches, colour table
 
 **Polyline**:
 A wall kind consisting of an ordered run of points joined by straight segments
@@ -40,6 +59,13 @@ _Avoid_: spawner, entrance, start point
 A marker on a level's edge which units leave the level through. Not a wall.
 Any exit is a valid destination for units from any spawn.
 _Avoid_: goal, end point, sink
+
+**Field region**:
+A box placed inside a level that units follow in one direction while inside
+it, in place of heading for an exit, so the horde is steered around walls
+rather than into them. Not a wall: units pass through it. Its rotation sets
+the direction of the flow.
+_Avoid_: flow field, vector field, zone, current
 
 **Marker**:
 A spawn or an exit. Markers lie flat against a level edge, may be stretched

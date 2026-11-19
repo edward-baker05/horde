@@ -60,6 +60,10 @@ function(horde_add_shaders TARGET)
         return()
     endif()
 
+    # Shared code included by several shaders. Every shader depends on all of
+    # them: a few needless recompiles beat a stale shader.
+    file(GLOB shader_includes CONFIGURE_DEPENDS "${HORDE_SHADER_SOURCE_DIR}/*.hlsli")
+
     set(compiled_shaders "")
 
     foreach(source IN LISTS shader_sources)
@@ -74,8 +78,10 @@ function(horde_add_shaders TARGET)
             add_custom_command(
                 OUTPUT "${output}"
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${HORDE_SHADER_OUTPUT_DIR}/${format}"
-                COMMAND "${HORDE_SHADERCROSS}" "${source}" -o "${output}"
-                DEPENDS "${source}" # This absolutely has the potential to break, edits to .hlsli files won't trigger recompilation - TODO 
+                # shadercross compiles from an in-memory copy, so relative
+                # #includes need the source directory spelled out.
+                COMMAND "${HORDE_SHADERCROSS}" "${source}" -I "${HORDE_SHADER_SOURCE_DIR}" -o "${output}"
+                DEPENDS "${source}" ${shader_includes}
                 COMMENT "shadercross ${stem} -> ${format}"
                 VERBATIM)
 

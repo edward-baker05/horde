@@ -1,0 +1,163 @@
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+template<typename T, size_t Num>
+struct spvUnsafeArray
+{
+    T elements[Num ? Num : 1];
+    
+    thread T& operator [] (size_t pos) thread
+    {
+        return elements[pos];
+    }
+    constexpr const thread T& operator [] (size_t pos) const thread
+    {
+        return elements[pos];
+    }
+    
+    device T& operator [] (size_t pos) device
+    {
+        return elements[pos];
+    }
+    constexpr const device T& operator [] (size_t pos) const device
+    {
+        return elements[pos];
+    }
+    
+    constexpr const constant T& operator [] (size_t pos) const constant
+    {
+        return elements[pos];
+    }
+    
+    threadgroup T& operator [] (size_t pos) threadgroup
+    {
+        return elements[pos];
+    }
+    constexpr const threadgroup T& operator [] (size_t pos) const threadgroup
+    {
+        return elements[pos];
+    }
+};
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_StructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_StructuredBuffer_v2float
+{
+    float2 _m0[1];
+};
+
+struct type_StructuredBuffer_float
+{
+    float _m0[1];
+};
+
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_UnitUniforms
+{
+    float4x4 ViewProjection;
+    float4 UvRect;
+    float4 Color;
+    float2 UnitSize;
+    float Alpha;
+    float MaxJump;
+    float InvMaxHealth;
+    uint HasIds;
+    uint HasSlots;
+    float Padding;
+};
+
+constant spvUnsafeArray<uint, 6> _76 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
+constant spvUnsafeArray<float2, 4> _77 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
+
+struct main0_out
+{
+    float4 out_var_TEXCOORD0 [[user(locn0)]];
+    float2 out_var_TEXCOORD1 [[user(locn1)]];
+    float4 gl_Position [[position]];
+};
+
+vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], const device type_StructuredBuffer_UnitData& Units [[buffer(1)]], const device type_StructuredBuffer_v2float& PrevPos [[buffer(2)]], const device type_StructuredBuffer_float& Health [[buffer(3)]], const device type_StructuredBuffer_uint& Ids [[buffer(4)]], const device type_StructuredBuffer_uint& Slots [[buffer(5)]], uint gl_VertexIndex [[vertex_id]])
+{
+    main0_out out = {};
+    uint _83 = gl_VertexIndex / 6u;
+    uint _92;
+    if (UnitUniforms.HasSlots != 0u)
+    {
+        _92 = Slots._m0[_83];
+    }
+    else
+    {
+        _92 = _83;
+    }
+    uint _93 = gl_VertexIndex % 6u;
+    spvUnsafeArray<float2, 4> _110 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
+    spvUnsafeArray<float2, 4> _81 = _110;
+    float2 _121;
+    if (Units._m0[_92].pos.x < (-100000001504746621987668885504.0))
+    {
+        _121 = float2(0.0);
+    }
+    else
+    {
+        _121 = _77[_76[_93]] * UnitUniforms.UnitSize;
+    }
+    float2 _138;
+    if (UnitUniforms.MaxJump > 0.0)
+    {
+        float2 _137;
+        if (distance(PrevPos._m0[_92], Units._m0[_92].pos) <= UnitUniforms.MaxJump)
+        {
+            _137 = mix(PrevPos._m0[_92], Units._m0[_92].pos, float2(UnitUniforms.Alpha));
+        }
+        else
+        {
+            _137 = Units._m0[_92].pos;
+        }
+        _138 = _137;
+    }
+    else
+    {
+        _138 = Units._m0[_92].pos;
+    }
+    float _158;
+    if (UnitUniforms.InvMaxHealth > 0.0)
+    {
+        _158 = fast::clamp(Health._m0[_92] * UnitUniforms.InvMaxHealth, 0.0, 1.0);
+    }
+    else
+    {
+        _158 = 1.0;
+    }
+    uint _177;
+    if (UnitUniforms.HasIds != 0u)
+    {
+        _177 = Ids._m0[_92];
+    }
+    else
+    {
+        _177 = _92;
+    }
+    out.out_var_TEXCOORD0 = select(float4(UnitUniforms.Color.xyz * _158, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_177 == 0u));
+    out.out_var_TEXCOORD1 = _81[_76[_93]];
+    out.gl_Position = UnitUniforms.ViewProjection * float4(_138 + _121, 0.0, 1.0);
+    return out;
+}
+

@@ -174,3 +174,244 @@ Fedora / Nobara system packages:
 sudo dnf install -y cmake ninja-build gcc-c++ git \
   SDL3-devel SDL3_image-devel glm-devel vulkan-loader-devel vulkan-headers
 ```
+
+---
+
+## Test presets
+
+A preset is a saved test setup (level, unit count, spawn rate, solver,
+collision settings, speed) in `assets/presets/<name>.preset.json`. Share one by
+committing the file; anyone with the build can then run it.
+
+| Preset | Setup |
+| --- | --- |
+| `big-world-1m-chebyshev-60hz-10` | big world test level, 1M units, 50k/s spawn, chebyshev solver (relaxation 0.5, rho 0.95, delay 2), 60 Hz, 10 passes, congestion 1.0-1.2, smoothing 1.0, speed 200 |
+| `big-world-1m-chebyshev-120hz-10` | the same at 120 Hz |
+| `big-world-1m-chebyshev-120hz-16` | the same at 120 Hz, 16 passes |
+| `big-world-1m-relaxed-120hz` | big world test level, 1M units, 50k/s spawn, relaxed solver, 120 Hz, 16 passes, relaxation 0.5, velocity smoothing 1.0, speed 200 |
+
+**To try one:** start the game and click it under *Presets* in the main menu, or
+
+```powershell
+.\build\windows\bin\Release\horde.exe --preset big-world-1m-chebyshev-60hz-10
+```
+
+The Level panel's *Frame cost* section shows what each frame costs (physics
+GPU and CPU time, and the frame rate it could reach uncapped), which is the
+number to compare between presets and machines. Its *Preset* dropdown loads
+another preset into "Restart with". Settings can be tweaked there before
+pressing *Restart level*.
+
+**To benchmark one** (results land in `bench_results/`):
+
+```sh
+python tools/bench.py --preset big-world-1m-chebyshev-60hz-10,big-world-1m-chebyshev-120hz-10
+horde --bench --preset big-world-1m-chebyshev-60hz-10 --duration 20 --out result.json
+```
+
+With `--preset`, only flags you pass yourself override the preset.
+`horde --list-presets` lists them.
+
+**To add one,** copy an existing file and change it. Every key is optional;
+anything left out uses the game's default. Unknown keys are an error, so a
+typo fails loudly instead of quietly testing the default. The keys are:
+`description`, `level`, `physics`, `units`, `spawn`, `spawnRate`,
+`respawnAtExit`, `speed`, `physicsRate`, `maxHp`, `exitDamage`, `solver`, `collisionIterations`, `relaxation`, `omega`, `rho`, `chebyshevDelay`, `reorder` and `seed`. `src/scene/Presets.hpp` says what each takes.
+
+## Benchmarking physics
+
+`tools/bench.py` builds the release config, then runs the game once per
+physics system and unit count. Each run boots straight into a level, warms up,
+times a fixed number of seconds and quits. Results go to
+`bench_results/<timestamp>/` (git-ignored): `summary.md`, `summary.csv`,
+one JSON per run in `runs/`, and the game's output in `logs/`.
+
+```sh
+python tools/bench.py                                  # every system x 1k, 10k, 100k
+python tools/bench.py --physics gpu-collide --units 1k,10k,100k,1m --repeats 3
+python tools/bench.py --no-build --duration 5 --frames # reuse the build, keep per-frame CSVs
+python tools/bench.py --physics gpu-collide --collision-iterations 8 --relaxation 0.8
+python tools/bench.py --physics gpu-collide --level assets/levels/bench_walls.level.json
+python tools/bench.py --physics gpu-collide --collision-iterations 1 --low-power-gpu   # on the integrated GPU
+python tools/bench.py --level-size 8000x8000 --units 1m,4m   # room for a million units
+python tools/bench.py --physics gpu-collide --solver relaxed,average   # compare solvers
+python tools/bench.py --physics gpu-collide --solver average --omega 1,1.5,2   # sweep over-relaxation
+python tools/bench.py --physics gpu-collide --solver chebyshev --rho 0.8,0.9,0.95   # sweep Chebyshev's rho
+python tools/bench.py --physics gpu-collide --reorder on,off --units 100k,1m   # units sorted by cell or not
+python tools/bench.py --physics gpu-collide --gpu-driver direct3d12,vulkan   # compare GPU backends
+python tools/bench.py --exe saved/horde.exe --preset big-world-1m-chebyshev-60hz-10   # benchmark a saved build
+python tools/bench.py --help
+```
+
+`assets/levels/bench_walls.level.json` uses every wall kind (regenerate it with
+`python tools/make_bench_level.py`, or edit it in the level editor).
+`--low-power-gpu` runs on the integrated GPU if the machine has one, which is
+the quickest way to check that a change still scales down.
+
+If `cmake` is not on `PATH`, the script looks for CLion's and Visual Studio's
+bundled copies, or uses `HORDE_CMAKE`.
+
+What the columns mean:
+
+| Column | Measures |
+| --- | --- |
+| fps, frame ms, p99 ms | whole frames, start to start. Can't go above a display or driver frame cap |
+| cpu sim ms | the scene's `update()`: CPU-side physics |
+| gpu sim ms | the scene's `compute()` work on its own command buffer, waited on: GPU-side physics |
+| sim ms | cpu + gpu sim: what the physics system costs per frame |
+| overlap %, penetration | collision quality at the end of the run: share of units overlapping another, and mean overlap depth as a fraction of a unit's diameter |
+| in walls % | share of units overlapping a wall at the end of the run |
+
+Benchmarks run with vsync and GPU validation off, a fixed 1/60 s simulation
+step and a seeded random spawn, so runs with the same settings are comparable.
+If the summary says the frame rate looks capped, a driver limiter (NVIDIA frame
+cap, G-Sync/Reflex) is still syncing frames: compare by *sim ms*, or lift the
+cap.
+
+The game takes the same options directly, for a single run or to play a given
+setup:
+
+```sh
+horde --list-physics
+horde --bench --physics gpu-collide --units 100000 --duration 10 --out result.json
+horde --physics gpu-collide --units 5000  # boots straight into that level, playable
+horde --level assets/levels/bench_walls.level.json --collision-iterations 1 --units 50000
+```
+
+### Spawns and exits
+
+In normal play and editor test play, units stream in at the level's green
+spawn markers (`--spawn markers`, the game's default) and steer straight for
+the nearest point of the nearest red exit, sliding along walls on the way.
+A unit that reaches an exit re-enters at a random spawn, which keeps a steady
+flow going. Benchmarks keep `--spawn random` unless told otherwise, so units
+start spread over the level and flow from there.
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `--spawn markers\|random\|grid\|column` | markers (random under `--bench`) | where units start |
+| `--spawn-rate N` | 1000 | markers: units entering per second; 0 brings them all in at once |
+| `--no-respawn` | off | units stop at the exit instead of re-entering |
+| `--units-out FILE` | | bench: write every unit's final position as CSV |
+
+Streaming, exit steering and respawning are `gpu-collide`'s. Other systems get
+every unit placed at the spawns up front and head for the first exit's centre.
+Up to 8 spawns and 8 exits are used.
+
+### Field regions
+
+A field region is a translucent blue box with an arrow, placed in the editor
+with tool 8 (*Field region*). While a unit's centre is inside one, it stops
+heading for the exit and turns to follow the arrow at full speed, until it
+leaves; *strength* is how quickly it turns, per second (the normal steering
+rate is 4). So a few regions in front of a wall steer the horde around it
+instead of into it. Rotate the box to aim the arrow (0 points east). Units
+pass through regions; overlapping ones add up as direction x strength. Only
+`gpu-collide` applies them, up to 32 per level. The level's debug panel has
+*Show field regions* to hide them while playing; hidden regions still apply.
+
+### Explosions
+
+A debug tool in the level's panel, under *Explosion*. Tick *Armed*, then
+right-click to set one off at the cursor; a faint circle shows its radius.
+*Strength* is how far, in world units, a unit at the centre is moved in all;
+negative pulls units in (suction, or a gravity bomb with a long *duration*),
+stopping at the centre rather than overshooting it. The push is spread over
+*duration* seconds (0: one step) and fades toward the edge as *falloff* says:
+constant (1), linear (1 - t) or quadratic ((1 - t)^2), where t is the distance
+over the radius. *Decay* uses the same three curves over time instead (t is
+the time over the duration): constant spreads the blast evenly, linear and
+quadratic put more of it at the start and let it die down.
+
+By default units are shoved: velocity is still capped at the unit speed, so
+they walk on as soon as it ends. Tick *Fling* and *strength* becomes a launch
+speed (world units per second) instead: units fly off past the unit speed and
+slow down under *fling drag* (per second; 3 loses about 95% in a second), or
+sooner when they hit a wall or a crowd, which soaks the fling up. Either way,
+pushed or pulled, a unit moving faster than a radius a step is swept along its
+path in radius-sized hops and stops at the first wall in the way, so even thin
+walls aren't tunnelled through. The sweep reaches 32 diameters, so no step
+moves a unit further than that: a stronger shove lasts a few steps longer
+instead, and fling speed is capped there. Only
+`gpu-collide` supports them, up to 8 at once. Red circles push, blue pull.
+
+### Physics rate
+
+Physics steps at a fixed rate, independent of the frame rate: 60 Hz by
+default, or 120 Hz. Drawing blends each unit between its last two steps, so
+motion stays smooth at 240 fps. A frame runs zero, one or more steps as time
+demands (at most 4, after which the simulation slows rather than falling
+further behind). Switch it live with the *Physics rate* buttons in the
+level panel, or `--physics-rate 60|120`.
+
+At a 240 fps cap, physics GPU time per frame on an RTX 5080:
+
+| | every frame | 120 Hz | 60 Hz |
+| --- | --- | --- | --- |
+| 100k units | 0.37 ms | 0.21 ms | 0.12 ms |
+| 1M units (8000x8000) | 1.87 ms | 0.97 ms | 0.49 ms |
+
+Those are averages. A frame that runs a step still pays the full step, so the
+panel's *worst* figures don't drop. Benchmarks default to `--physics-rate 0`
+(one step per frame, at `--fixed-dt`), so their per-frame numbers are
+per-step costs. Pass `--physics-rate 60 --fixed-dt 0` to measure real-time
+play instead.
+
+### Collision settings
+
+`gpu-collide` (the default) collides units with each other and with walls,
+finding neighbours with a counting-sort grid.
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `--collision-iterations N` | 4 | relaxation passes per frame: the main cost and quality knob |
+| `--solver relaxed\|average\|chebyshev` | chebyshev | how a Jacobi pass combines a unit's overlaps: their sum times the relaxation, their average, or relaxed passes accelerated by Chebyshev semi-iteration |
+| `--relaxation F` | 0.5 | relaxed and chebyshev solvers: fraction of each pass's correction applied |
+| `--omega F` | 1 | average solver: over-relaxation on the mean, 1 (plain average) to 2 (fastest measured) |
+| `--rho F` | 0.95 | chebyshev solver: estimated spectral radius, 0 to 1; higher extrapolates harder |
+| `--chebyshev-delay N` | 2 | chebyshev solver: plain relaxed passes before extrapolating, at least 2 (1 bounced units off walls) |
+| `--congestion START,STOP` | off | slow units down as the crowd two cells ahead goes from START to STOP units per cell (hex packing ~1.15); calmer, denser-proof crowds, slower flow (`docs/gpu-optimisation-overnight.md`) |
+| `--smoothing F` | 1 | one extra pass blending each unit's velocity toward its touching neighbours' mean, 0-1: stops dense crowds boiling and mixing; 0.5 is enough |
+| `--reorder on\|off` | on | reorder units by grid cell every step so neighbours sit together in memory: 2-15x less GPU time, the same collisions |
+
+The level's debug panel has the same controls, applied on *Restart level*. Measurements and the reasoning are
+in `docs/adr/0004-wall-collisions-and-broadphases.md`.
+
+### Test play from the level editor
+
+The editor's Level panel has a *Test play* section. Pick a physics system and
+unit count, then press *Test play* to run the level as it stands (saved or not)
+with units spawned at random outside the walls. *Back* returns to the editor.
+
+### Editing shaders
+
+Shaders are HLSL in `shaders/src/`. Shared code lives in `.hlsli` includes.
+After editing one, recompile into `shaders/compiled/` and commit both:
+
+```sh
+tools/compile_shaders.sh                    # all, using tools/bin/shadercross
+tools/compile_shaders.sh unit_collide.comp  # just one
+```
+
+Units are discs one unit size (5) across. Above roughly 180k units the default
+2000x2000 level physically can't hold them without overlap, so expect overlap %
+to climb there whatever the system.
+
+### Adding a physics system
+
+GPU systems can reuse the stages `gpu-collide` is built from:
+`sim::GpuSpatialGrid` (neighbour lookup by counting sort), `sim::GpuUnitCollisions`
+(unit-unit and unit-wall separation) and `sim::GpuWalls` (a level's walls on the
+GPU). `SimConfig::walls` hands every system the level's walls already flattened
+and binned. See `docs/adr/0003-swappable-staged-unit-physics.md` and
+`docs/adr/0004-wall-collisions-and-broadphases.md`.
+
+1. Implement `sim::PhysicsSystem` (`src/sim/PhysicsSystem.hpp`) in
+   `src/sim/<Name>.cpp`. Draw through `gfx::UnitRenderer` so every system pays
+   the same rendering cost.
+2. Add the `.cpp` to `CMakeLists.txt`.
+3. Add one line to the table in `src/sim/PhysicsRegistry.cpp`.
+
+It then shows up in `--list-physics`, in `tools/bench.py --physics all`, and in
+the level's debug panel, which can restart the level with any system and unit
+count.

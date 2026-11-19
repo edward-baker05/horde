@@ -5,8 +5,11 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
+#include "bench/Benchmark.hpp"
 #include "gfx/GpuContext.hpp"
+#include "gfx/GpuTimer.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
@@ -21,6 +24,11 @@ struct AppConfig {
     int height = 900;
     bool vsync = true;
     bool gpuDebug = true;
+    bool lowPowerGpu = false;
+    // Boot straight into this level instead of stopping at the menu.
+    std::optional<scene::LevelOptions> startLevel;
+    // Run one benchmark and quit. See bench/Benchmark.hpp.
+    std::optional<bench::BenchConfig> bench;
 };
 
 // Owns the window, the GPU device and the frame loop, and drives the scene
@@ -41,6 +49,7 @@ private:
     void pumpEvents();
     void update(float deltaTime);
     void render();
+    int finishBenchmark();
 
     AppConfig m_config;
     SDL_Window* m_window = nullptr;
@@ -53,6 +62,32 @@ private:
 
     bool m_running = false;
     Uint64 m_lastTicks = 0;
+
+    // Benchmark mode only.
+    std::optional<bench::Recorder> m_recorder;
+    const char* m_presentMode = "vsync";
+    Uint64 m_lastUpdateNs = 0;
+    Uint64 m_lastRenderNs = 0;
+    Uint64 m_lastAcquireNs = 0;
+    Uint64 m_lastGpuNs = 0;
+    Uint64 m_lastPresentNs = 0;
+    Uint64 m_lastSceneUpdateNs = 0;
+    bool m_haveFrame = false;
+
+    // Rolling frame cost, published to scenes through Services::frameStats.
+    void accumulateStats(Uint64 frameNs);
+    scene::FrameStats m_stats;
+    bool m_measureSimGpu = true;
+    bool m_haveStats = false;
+    // GPU physics timing while playing: fences polled off the main thread, so
+    // measuring costs the GPU nothing. Benchmarks wait for the work instead
+    // (see render()), which isolates it exactly.
+    gfx::GpuTimer m_gpuTimer;
+    std::vector<Uint64> m_gpuSamples;
+    struct {
+        Uint64 frames = 0, total = 0, frame = 0, frameMax = 0, update = 0, record = 0, gpu = 0, gpuMax = 0,
+               gpuSamples = 0, wait = 0;
+    } m_statsWindow;
 };
 
 } // namespace horde::app

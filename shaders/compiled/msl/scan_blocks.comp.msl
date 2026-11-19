@@ -1,0 +1,118 @@
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+template<typename T, size_t Num>
+struct spvUnsafeArray
+{
+    T elements[Num ? Num : 1];
+    
+    thread T& operator [] (size_t pos) thread
+    {
+        return elements[pos];
+    }
+    constexpr const thread T& operator [] (size_t pos) const thread
+    {
+        return elements[pos];
+    }
+    
+    device T& operator [] (size_t pos) device
+    {
+        return elements[pos];
+    }
+    constexpr const device T& operator [] (size_t pos) const device
+    {
+        return elements[pos];
+    }
+    
+    constexpr const constant T& operator [] (size_t pos) const constant
+    {
+        return elements[pos];
+    }
+    
+    threadgroup T& operator [] (size_t pos) threadgroup
+    {
+        return elements[pos];
+    }
+    constexpr const threadgroup T& operator [] (size_t pos) const threadgroup
+    {
+        return elements[pos];
+    }
+};
+
+struct type_RWStructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_ScanParams
+{
+    uint Count;
+    packed_uint3 Padding;
+};
+
+kernel void main0(constant type_ScanParams& ScanParams [[buffer(0)]], device type_RWStructuredBuffer_uint& Data [[buffer(1)]], device type_RWStructuredBuffer_uint& BlockSums [[buffer(2)]], uint3 gl_WorkGroupID [[threadgroup_position_in_grid]], uint3 gl_LocalInvocationID [[thread_position_in_threadgroup]])
+{
+    threadgroup spvUnsafeArray<spvUnsafeArray<uint, 256>, 2> Partial;
+    uint _41 = (gl_WorkGroupID.x * 512u) + (gl_LocalInvocationID.x * 2u);
+    uint _42 = _41 + 1u;
+    bool _45 = _41 < ScanParams.Count;
+    uint _51;
+    if (_45)
+    {
+        _51 = Data._m0[_41];
+    }
+    else
+    {
+        _51 = 0u;
+    }
+    bool _52 = _42 < ScanParams.Count;
+    uint _58;
+    if (_52)
+    {
+        _58 = Data._m0[_42];
+    }
+    else
+    {
+        _58 = 0u;
+    }
+    uint _59 = _51 + _58;
+    Partial[0][gl_LocalInvocationID.x] = _59;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    uint _62;
+    _62 = 0u;
+    uint _63;
+    for (uint _65 = 1u; _65 < 256u; _62 = _63, _65 = _65 << 1u)
+    {
+        uint _79;
+        if (gl_LocalInvocationID.x >= _65)
+        {
+            _79 = Partial[_62][gl_LocalInvocationID.x] + Partial[_62][gl_LocalInvocationID.x - _65];
+        }
+        else
+        {
+            _79 = Partial[_62][gl_LocalInvocationID.x];
+        }
+        _63 = 1u - _62;
+        Partial[_63][gl_LocalInvocationID.x] = _79;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    uint _83 = Partial[_62][gl_LocalInvocationID.x] - _59;
+    if (_45)
+    {
+        Data._m0[_41] = _83;
+    }
+    if (_52)
+    {
+        Data._m0[_42] = _83 + _51;
+    }
+    if (gl_LocalInvocationID.x == 255u)
+    {
+        BlockSums._m0[gl_WorkGroupID.x] = Partial[_62][gl_LocalInvocationID.x];
+    }
+}
+

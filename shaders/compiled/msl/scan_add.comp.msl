@@ -1,0 +1,29 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_RWStructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_ScanParams
+{
+    uint Count;
+    packed_uint3 Padding;
+};
+
+kernel void main0(constant type_ScanParams& ScanParams [[buffer(0)]], device type_StructuredBuffer_uint& BlockOffsets [[buffer(1)]], device type_RWStructuredBuffer_uint& Data [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (gl_GlobalInvocationID.x < ScanParams.Count)
+    {
+        Data._m0[gl_GlobalInvocationID.x] += BlockOffsets._m0[gl_GlobalInvocationID.x / 512u];
+    }
+}
+

@@ -17,8 +17,12 @@ bool hitTestWall(const logic::Wall& wall, glm::vec2 world);
 // True if `world` lies inside this marker's band.
 bool hitTestMarker(const logic::Level& level, const logic::Marker& marker, glm::vec2 world);
 
+// True if `world` lies inside this field region.
+bool hitTestFieldRegion(const logic::FieldRegion& region, glm::vec2 world);
+
 // What the cursor is over: the topmost wall (highest index, since a later index
-// draws on top), else a marker, else nothing.
+// draws on top), else a marker, else a field region (drawn beneath both), else
+// nothing.
 Selection pick(const logic::Level& level, glm::vec2 world);
 
 } // namespace horde::editor

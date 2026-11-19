@@ -1,0 +1,173 @@
+#include <algorithm>
+#include <cmath>
+#include <random>
+
+#include "sim/PhysicsSystem.hpp"
+#include "sim/WallColliders.hpp"
+
+namespace horde::sim {
+
+bool parseSpawnPattern(const std::string& text, SpawnPattern& out) {
+    if (text == "column") {
+        out = SpawnPattern::Column;
+    } else if (text == "random") {
+        out = SpawnPattern::Random;
+    } else if (text == "grid") {
+        out = SpawnPattern::Grid;
+    } else if (text == "markers") {
+        out = SpawnPattern::Markers;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+bool parseSolver(const std::string& text, CollisionSolver& out) {
+    if (text == "relaxed") {
+        out = CollisionSolver::Relaxed;
+    } else if (text == "average") {
+        out = CollisionSolver::Average;
+    } else if (text == "chebyshev") {
+        out = CollisionSolver::Chebyshev;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+const char* solverName(CollisionSolver solver) {
+    switch (solver) {
+        case CollisionSolver::Relaxed:
+            return "relaxed";
+        case CollisionSolver::Average:
+            return "average";
+        case CollisionSolver::Chebyshev:
+            return "chebyshev";
+    }
+    return "?";
+}
+
+const char* falloffName(ExplosionFalloff falloff) {
+    switch (falloff) {
+        case ExplosionFalloff::Constant:
+            return "constant";
+        case ExplosionFalloff::Linear:
+            return "linear";
+        case ExplosionFalloff::Quadratic:
+            return "quadratic";
+    }
+    return "?";
+}
+
+const char* spawnPatternName(SpawnPattern pattern) {
+    switch (pattern) {
+        case SpawnPattern::Column:
+            return "column";
+        case SpawnPattern::Random:
+            return "random";
+        case SpawnPattern::Grid:
+            return "grid";
+        case SpawnPattern::Markers:
+            return "markers";
+    }
+    return "?";
+}
+
+std::vector<BaseUnitData> spawnInAreas(std::uint32_t count, const std::vector<MarkerArea>& areas, glm::vec2 worldSize,
+                                       float unitSize, std::mt19937& rng, const WallColliders* walls) {
+    std::vector<BaseUnitData> units(count);
+    if (areas.empty()) {
+        return units;
+    }
+
+    const float radius = unitSize * 0.5f;
+    const glm::vec2 maxP = glm::max(worldSize - glm::vec2(unitSize), glm::vec2(0.0f));
+    const bool hasWalls = walls != nullptr && !walls->empty();
+    std::uniform_int_distribution<std::size_t> pick(0, areas.size() - 1);
+    std::uniform_real_distribution<float> along(-1.0f, 1.0f);
+
+    for (BaseUnitData& unit : units) {
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            const MarkerArea& area = areas[pick(rng)];
+            const glm::vec2 centre = area.center + glm::vec2(along(rng), along(rng)) * area.halfSize;
+            unit.pos = glm::clamp(centre - radius, glm::vec2(0.0f), maxP);
+
+            float distance = 0.0f;
+            glm::vec2 normal;
+            if (!hasWalls || !walls->nearest(unit.pos + radius, distance, normal) || distance >= radius) {
+                break;
+            }
+        }
+    }
+    return units;
+}
+
+std::vector<BaseUnitData> spawnUnits(SpawnPattern pattern, std::uint32_t count, glm::vec2 worldSize, float unitSize,
+                                     std::uint32_t seed, const WallColliders* walls) {
+    std::vector<BaseUnitData> units(count);
+    const glm::vec2 maxP = glm::max(worldSize - glm::vec2(unitSize), glm::vec2(0.0f));
+    const float radius = unitSize * 0.5f;
+    const bool hasWalls = walls != nullptr && !walls->empty();
+
+    // Whether a unit at top-left `pos` would overlap a wall.
+    const auto blocked = [&](glm::vec2 pos) {
+        float distance = 0.0f;
+        glm::vec2 normal;
+        return hasWalls && walls->nearest(pos + radius, distance, normal) && distance < radius;
+    };
+
+    switch (pattern) {
+        case SpawnPattern::Column: {
+            const int height = std::max(1, static_cast<int>(worldSize.y));
+            for (std::uint32_t i = 0; i < count; ++i) {
+                const int n = static_cast<int>(i);
+                units[i].pos = glm::vec2(n * 25 / height + worldSize.x * 0.5f, n * 5 % height);
+            }
+            break;
+        }
+        case SpawnPattern::Random: {
+            std::mt19937 rng(seed);
+            std::uniform_real_distribution<float> x(0.0f, maxP.x);
+            std::uniform_real_distribution<float> y(0.0f, maxP.y);
+            for (BaseUnitData& unit : units) {
+                // A few retries is plenty unless walls cover most of the level;
+                // whatever is still blocked is pushed out below.
+                unit.pos = glm::vec2(x(rng), y(rng));
+                for (int attempt = 0; attempt < 16 && blocked(unit.pos); ++attempt) {
+                    unit.pos = glm::vec2(x(rng), y(rng));
+                }
+            }
+            break;
+        }
+        case SpawnPattern::Markers:
+            // Needs the level's markers: LevelScene uses spawnInAreas instead.
+            break;
+        case SpawnPattern::Grid: {
+            // Square-ish lattice with the level's aspect ratio.
+            const float aspect = worldSize.x / std::max(worldSize.y, 1.0f);
+            const auto cols = static_cast<std::uint32_t>(
+                std::max(1.0, std::ceil(std::sqrt(static_cast<double>(count) * aspect))));
+            const std::uint32_t rows = std::max(1u, (count + cols - 1) / cols);
+            const glm::vec2 step = maxP / glm::vec2(static_cast<float>(cols), static_cast<float>(rows));
+            for (std::uint32_t i = 0; i < count; ++i) {
+                units[i].pos = glm::vec2(static_cast<float>(i % cols), static_cast<float>(i / cols)) * step;
+            }
+            break;
+        }
+    }
+
+    if (hasWalls) {
+        for (BaseUnitData& unit : units) {
+            if (blocked(unit.pos)) {
+                // Twice: a push out of one wall can land in a neighbour.
+                for (int pass = 0; pass < 2; ++pass) {
+                    unit.pos = glm::clamp(walls->resolve(unit.pos + radius, radius) - radius, glm::vec2(0.0f), maxP);
+                }
+            }
+        }
+    }
+
+    return units;
+}
+
+} // namespace horde::sim

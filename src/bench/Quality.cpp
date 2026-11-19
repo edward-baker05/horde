@@ -1,0 +1,147 @@
+#include "bench/Quality.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <numbers>
+
+#include "sim/WallColliders.hpp"
+
+namespace horde::bench {
+
+bool writeUnitsCsv(const std::vector<BaseUnitData>& units, float diameter, const std::filesystem::path& path) {
+    std::error_code ec;
+    if (path.has_parent_path()) {
+        std::filesystem::create_directories(path.parent_path(), ec);
+    }
+    std::ofstream out(path);
+    out << "x,y,vx,vy\n";
+    const float radius = diameter * 0.5f;
+    for (const BaseUnitData& u : units) {
+        out << u.pos.x + radius << ',' << u.pos.y + radius << ',' << u.vel.x << ',' << u.vel.y << '\n';
+    }
+    return static_cast<bool>(out);
+}
+
+CollisionQuality measureCollisions(const std::vector<BaseUnitData>& units, float diameter, glm::vec2 worldSize,
+                                   const sim::WallColliders* walls) {
+    CollisionQuality q;
+    q.measured = true;
+
+    if (walls != nullptr && !walls->empty()) {
+        const float radius = diameter * 0.5f;
+        double sum = 0.0;
+        for (const BaseUnitData& u : units) {
+            float distance = 0.0f;
+            glm::vec2 normal;
+            if (walls->nearest(u.pos + radius, distance, normal) && distance < radius - 0.01f * diameter) {
+                ++q.unitsInWalls;
+                sum += (radius - distance) / diameter;
+            }
+        }
+        q.meanWallPenetration = q.unitsInWalls ? sum / q.unitsInWalls : 0.0;
+    }
+
+    const auto count = static_cast<std::uint32_t>(units.size());
+    const double area = static_cast<double>(worldSize.x) * worldSize.y;
+    q.density = area > 0.0 ? count * std::numbers::pi * 0.25 * diameter * diameter / area : 0.0;
+    if (count < 2 || diameter <= 0.0f) {
+        return q;
+    }
+
+    // Counting sort of unit indices into one-diameter cells.
+    const int cols = std::max(1, static_cast<int>(std::ceil(worldSize.x / diameter)));
+    const int rows = std::max(1, static_cast<int>(std::ceil(worldSize.y / diameter)));
+    const auto cellOf = [&](glm::vec2 p) {
+        const int x = std::clamp(static_cast<int>(p.x / diameter), 0, cols - 1);
+        const int y = std::clamp(static_cast<int>(p.y / diameter), 0, rows - 1);
+        return x + y * cols;
+    };
+
+    std::vector<std::uint32_t> start(static_cast<std::size_t>(cols) * rows + 1, 0);
+    for (const BaseUnitData& u : units) {
+        ++start[cellOf(u.pos) + 1];
+    }
+    for (std::size_t i = 1; i < start.size(); ++i) {
+        start[i] += start[i - 1];
+    }
+    std::vector<std::uint32_t> order(count);
+    std::vector<std::uint32_t> fill(start.begin(), start.end() - 1);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        order[fill[cellOf(units[i].pos)]++] = i;
+    }
+
+    const float tolerance = 0.01f * diameter;
+    const float limitSq = (diameter - tolerance) * (diameter - tolerance);
+    std::vector<bool> overlapping(count, false);
+    double penetrationSum = 0.0;
+
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const glm::vec2 p = units[i].pos;
+        const int cx = std::clamp(static_cast<int>(p.x / diameter), 0, cols - 1);
+        const int cy = std::clamp(static_cast<int>(p.y / diameter), 0, rows - 1);
+
+        for (int y = std::max(0, cy - 1); y <= std::min(rows - 1, cy + 1); ++y) {
+            for (int x = std::max(0, cx - 1); x <= std::min(cols - 1, cx + 1); ++x) {
+                const int cell = x + y * cols;
+                for (std::uint32_t s = start[cell]; s < start[cell + 1]; ++s) {
+                    const std::uint32_t j = order[s];
+                    if (j <= i) {
+                        continue; // each pair once
+                    }
+                    const glm::vec2 d = units[j].pos - p;
+                    const float distSq = d.x * d.x + d.y * d.y;
+                    if (distSq >= limitSq) {
+                        continue;
+                    }
+                    const double penetration = (diameter - std::sqrt(distSq)) / diameter;
+                    ++q.overlappingPairs;
+                    penetrationSum += penetration;
+                    q.maxPenetration = std::max(q.maxPenetration, penetration);
+                    overlapping[i] = true;
+                    overlapping[j] = true;
+                }
+            }
+        }
+    }
+
+    // Velocity relative to the touching neighbours' mean.
+    double jitterSum = 0.0;
+    double speedSum = 0.0;
+    std::uint32_t jitterUnits = 0;
+    const float touchSq = diameter * diameter;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const glm::vec2 p = units[i].pos;
+        speedSum += std::sqrt(units[i].vel.x * units[i].vel.x + units[i].vel.y * units[i].vel.y);
+        const int cx = std::clamp(static_cast<int>(p.x / diameter), 0, cols - 1);
+        const int cy = std::clamp(static_cast<int>(p.y / diameter), 0, rows - 1);
+        glm::vec2 velSum(0.0f);
+        std::uint32_t neighbours = 0;
+        for (int y = std::max(0, cy - 1); y <= std::min(rows - 1, cy + 1); ++y) {
+            for (int x = std::max(0, cx - 1); x <= std::min(cols - 1, cx + 1); ++x) {
+                const int cell = x + y * cols;
+                for (std::uint32_t s = start[cell]; s < start[cell + 1]; ++s) {
+                    const std::uint32_t j = order[s];
+                    const glm::vec2 d = units[j].pos - p;
+                    if (j != i && d.x * d.x + d.y * d.y < touchSq) {
+                        velSum += units[j].vel;
+                        ++neighbours;
+                    }
+                }
+            }
+        }
+        if (neighbours > 0) {
+            const glm::vec2 rel = units[i].vel - velSum / static_cast<float>(neighbours);
+            jitterSum += std::sqrt(rel.x * rel.x + rel.y * rel.y);
+            ++jitterUnits;
+        }
+    }
+    q.velocityJitter = jitterUnits ? jitterSum / jitterUnits : 0.0;
+    q.meanSpeed = speedSum / count;
+
+    q.overlappingUnits = static_cast<std::uint32_t>(std::count(overlapping.begin(), overlapping.end(), true));
+    q.meanPenetration = q.overlappingPairs ? penetrationSum / static_cast<double>(q.overlappingPairs) : 0.0;
+    return q;
+}
+
+} // namespace horde::bench

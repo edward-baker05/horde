@@ -1,10 +1,15 @@
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 #include "editor/EditorState.hpp"
 #include "editor/Handles.hpp"
 #include "editor/Markers.hpp"
+#include "editor/Paint.hpp"
 #include "editor/Tools.hpp"
 #include "gfx/Camera2D.hpp"
+#include "logic/WallGridShapes.hpp"
 #include "scene/Scene.hpp"
 
 namespace horde::scene {
@@ -69,6 +74,30 @@ private:
     // 0 = not dragging an end, 1 = the low end, 2 = the high end, 3 = the body.
     int m_markerDrag = 0;
     float m_markerGrabOffset = 0.0f;
+
+    // Handles the paint tool's mouse events. Returns whether it used the event.
+    bool handlePaintEvent(const SDL_Event& event);
+
+    // Draws the cell lines (when zoomed in far enough to see them) and what the
+    // brush would cover at the cursor.
+    void renderPaintOverlay(gfx::SpriteBatch& batch);
+
+    // A paint stroke in progress: which button started it, what it writes, and
+    // where it last stamped. The last stamp outlives the stroke, so a
+    // shift-click can draw a straight line from it.
+    bool m_painting = false;
+    std::uint8_t m_paintButton = 0;
+    logic::Cell m_paintValue;
+    editor::CellBox m_strokeBox;
+    bool m_hasLastStamp = false;
+    glm::vec2 m_lastStamp{0.0f, 0.0f};
+
+    // The wall grid merged for drawing, and the cells it was merged from.
+    // Rebuilt only when the cells differ, which comparing 160k bytes a frame
+    // finds far more cheaply than merging them would.
+    std::vector<logic::Cell> m_gridPiecesCells;
+    glm::ivec2 m_gridPiecesDim{-1, -1};
+    logic::GridPieces m_gridPieces;
 };
 
 } // namespace horde::scene

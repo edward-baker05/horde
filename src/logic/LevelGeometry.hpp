@@ -42,4 +42,12 @@ glm::vec2 worldToLocal(const Wall& wall, glm::vec2 world);
 // The inverse of worldToLocal.
 glm::vec2 localToWorld(const Wall& wall, glm::vec2 local);
 
+// A rectangle wall with a field region's transform and size, so the wall
+// helpers above (and the editor's handles) work on regions too. Never placed
+// in a level.
+Wall fieldRegionFrame(const FieldRegion& region);
+
+// The push direction of a field region in world space: its local +x axis.
+glm::vec2 fieldRegionDirection(const FieldRegion& region);
+
 } // namespace horde::logic

@@ -12,31 +12,47 @@ include(Shaders)
 add_executable(horde
     src/main.cpp
     src/app/App.cpp
+    src/app/CommandLine.cpp
+    src/bench/Benchmark.cpp
+    src/bench/Quality.cpp
     src/core/Paths.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
+    src/gfx/GpuTimer.cpp
     src/gfx/LevelRenderer.cpp
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
+    src/gfx/UnitRenderer.cpp
+    src/sim/GpuCollidePhysics.cpp
+    src/sim/GpuSpatialGrid.cpp
+    src/sim/GpuUnitCollisions.cpp
+    src/sim/GpuUnitReorder.cpp
+    src/sim/GpuWalls.cpp
+    src/sim/PhysicsRegistry.cpp
+    src/sim/Spawn.cpp
+    src/sim/UnitBuffers.cpp
+    src/sim/WallColliders.cpp
     src/editor/EditorUi.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp
     src/editor/HitTest.cpp
+    src/editor/Paint.cpp
     src/editor/Tools.cpp
     src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp
+    src/scene/Presets.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
     src/ui/ImGuiLayer.cpp
-    src/logic/UnitData.cpp
     src/logic/UnitData.hpp
     src/logic/Level.cpp
     src/logic/LevelGeometry.cpp
     src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
-    src/logic/LevelValidation.cpp)
+    src/logic/LevelValidation.cpp
+    src/logic/WallGridShapes.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

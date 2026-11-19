@@ -5,10 +5,12 @@
 #include <SDL3/SDL_timer.h>
 
 #include <algorithm>
+#include <vector>
 
 #include "core/Paths.hpp"
 #include "gfx/Camera2D.hpp"
 #include "gfx/ShaderLoader.hpp"
+#include "scene/LevelScene.hpp"
 #include "scene/MainMenuScene.hpp"
 
 namespace horde::app {
@@ -39,13 +41,27 @@ bool App::init(const AppConfig& config) {
         return false;
     }
     // m_gpu is a gfx::GpuContext object created in App.hpp header file, @see GpuContext
-    if (!m_gpu.init(m_window, m_config.gpuDebug)) {
+    if (!m_gpu.init(m_window, m_config.gpuDebug, m_config.lowPowerGpu)) {
         return false;
     }
 
     // swap chain stuff, I presume methods to update displayed window from frame buffer
-    SDL_SetGPUSwapchainParameters(m_gpu.device(), m_window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-                                  m_config.vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_MAILBOX);
+    // Without vsync, take whichever uncapped mode the backend has; VSYNC is the
+    // only one SDL guarantees. IMMEDIATE first: on D3D12, MAILBOX still caps at
+    // the display's refresh rate, which hides differences in a benchmark.
+    SDL_GPUPresentMode presentMode = SDL_GPU_PRESENTMODE_VSYNC;
+    if (!m_config.vsync) {
+        if (SDL_WindowSupportsGPUPresentMode(m_gpu.device(), m_window, SDL_GPU_PRESENTMODE_IMMEDIATE)) {
+            presentMode = SDL_GPU_PRESENTMODE_IMMEDIATE;
+            m_presentMode = "immediate";
+        } else if (SDL_WindowSupportsGPUPresentMode(m_gpu.device(), m_window, SDL_GPU_PRESENTMODE_MAILBOX)) {
+            presentMode = SDL_GPU_PRESENTMODE_MAILBOX;
+            m_presentMode = "mailbox";
+        } else {
+            SDL_Log("No uncapped present mode available; staying on vsync");
+        }
+    }
+    SDL_SetGPUSwapchainParameters(m_gpu.device(), m_window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, presentMode);
 
     // honestly no clue what this is doing, I think its assigning the gpu to @see ShaderLoader
     m_shaders = std::make_unique<gfx::ShaderLoader>(m_gpu.device());
@@ -70,9 +86,26 @@ bool App::init(const AppConfig& config) {
     services.shaders = m_shaders.get();
     services.atlas = &m_atlas;
     services.window = m_window;
+    services.frameStats = &m_stats;
+    services.measureSimGpu = &m_measureSimGpu;
+    // Benchmarks decide for themselves whether to sync the GPU.
+    if (m_config.bench) {
+        m_measureSimGpu = m_config.bench->syncGpu;
+    } else {
+        m_gpuTimer.start(m_gpu.device());
+    }
 
     m_scenes.emplace(services);
-    m_scenes->replace(std::make_unique<scene::MainMenuScene>());
+    if (m_config.bench) {
+        m_recorder.emplace(*m_config.bench);
+        m_scenes->replace(std::make_unique<scene::LevelScene>(m_config.bench->level));
+    } else {
+        m_scenes->replace(std::make_unique<scene::MainMenuScene>());
+        // Over the menu, so "Back to menu" still has somewhere to go.
+        if (m_config.startLevel) {
+            m_scenes->push(std::make_unique<scene::LevelScene>(*m_config.startLevel));
+        }
+    }
 
     if (!m_scenes->applyPending()) {
         return false;
@@ -86,11 +119,28 @@ bool App::init(const AppConfig& config) {
 int App::run() {
     while (m_running) {
         const Uint64 now = SDL_GetTicksNS();
+        const Uint64 frameNs = now - m_lastTicks;
         // Clamped so a hitch or a dragged window does not teleport the
         // simulation on the next frame.
         // TODO: This will need changing with more complex stuff, likely going to be moved to Logic/sim
-        const float deltaTime = std::min(static_cast<float>(now - m_lastTicks) / 1.0e9f, 0.01666f);
+        float deltaTime = std::min(static_cast<float>(frameNs) / 1.0e9f, 0.01666f);
         m_lastTicks = now;
+
+        if (m_haveStats) {
+            accumulateStats(frameNs);
+        }
+        m_haveStats = true;
+
+        if (m_recorder) {
+            // The previous iteration has now fully completed, so its sample is whole.
+            if (m_haveFrame && !m_recorder->record({frameNs, m_lastUpdateNs, m_lastRenderNs, m_lastAcquireNs, m_lastGpuNs, m_lastPresentNs})) {
+                return finishBenchmark();
+            }
+            m_haveFrame = true;
+            if (m_recorder->config().fixedDt > 0.0f) {
+                deltaTime = m_recorder->config().fixedDt;
+            }
+        }
 
         //? handles inputs maybe?
         pumpEvents();
@@ -100,8 +150,12 @@ int App::run() {
         }
 
         // App general update func
+        const Uint64 updateStart = SDL_GetTicksNS();
         update(deltaTime);
+        const Uint64 renderStart = SDL_GetTicksNS();
         render();
+        m_lastUpdateNs = renderStart - updateStart;
+        m_lastRenderNs = SDL_GetTicksNS() - renderStart;
 
         if (!m_scenes->applyPending()) {
             return 1;
@@ -114,6 +168,105 @@ int App::run() {
     }
 
     return 0;
+}
+
+int App::finishBenchmark() {
+    bench::RunInfo info;
+    info.videoDriver = SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "";
+    info.gpuDriver = m_gpu.driverName() ? m_gpu.driverName() : "";
+    info.gpuName = m_gpu.deviceName();
+    info.shaderFormat = m_shaders->formatName();
+    info.presentMode = m_presentMode;
+    SDL_GetWindowSizeInPixels(m_window, &info.windowWidth, &info.windowHeight);
+
+    // The benchmark always runs a LevelScene; measure where its units ended up.
+    if (auto* level = dynamic_cast<scene::LevelScene*>(m_scenes->active())) {
+        std::vector<BaseUnitData> units;
+        if (level->physics().readUnits(units)) {
+            info.quality = bench::measureCollisions(units, level->unitSize(), level->level().size, &level->walls());
+            if (!m_recorder->config().unitsPath.empty()) {
+                bench::writeUnitsCsv(units, level->unitSize(), m_recorder->config().unitsPath);
+            }
+        }
+        std::vector<float> health;
+        if (level->physics().readHealth(health) && !health.empty()) {
+            double sum = 0.0;
+            info.healthLowest = health.front();
+            for (const float hp : health) {
+                sum += hp;
+                info.healthLowest = std::min<double>(info.healthLowest, hp);
+            }
+            info.healthMean = sum / static_cast<double>(health.size());
+            info.healthMeasured = true;
+        }
+        if (const sim::CollisionSettings* collision = level->physics().collisionSettings()) {
+            info.collision = *collision;
+        }
+        info.wallCount = static_cast<std::uint32_t>(level->level().walls.size());
+        info.wallPrimitives = static_cast<std::uint32_t>(level->walls().primitives().size());
+    }
+
+    m_running = false;
+    return m_recorder->finish(info) ? 0 : 3;
+}
+
+void App::accumulateStats(Uint64 frameNs) {
+    // Render time includes the swapchain wait and, in a benchmark, the timed
+    // compute wait (m_lastGpuNs is 0 otherwise); what remains is the CPU
+    // building and submitting the frame.
+    const Uint64 waits = m_lastAcquireNs + m_lastPresentNs + m_lastGpuNs;
+    const Uint64 record = m_lastRenderNs > waits ? m_lastRenderNs - waits : 0;
+
+    m_statsWindow.frames++;
+    m_statsWindow.total += frameNs;
+    m_statsWindow.frame += frameNs;
+    m_statsWindow.frameMax = std::max(m_statsWindow.frameMax, frameNs);
+    m_statsWindow.update += m_lastSceneUpdateNs;
+    m_statsWindow.record += record;
+    m_statsWindow.wait += m_lastAcquireNs + m_lastPresentNs;
+    // GPU physics times: the frame's own when a benchmark waited for it,
+    // otherwise whatever GpuTimer has finished since the last frame. Those
+    // trail by a frame or two, so they are averaged by sample, not by frame.
+    m_gpuSamples.clear();
+    if (m_config.bench) {
+        if (m_measureSimGpu) {
+            m_gpuSamples.push_back(m_lastGpuNs);
+        }
+    } else {
+        m_gpuTimer.collect(m_gpuSamples);
+    }
+    if (m_measureSimGpu) {
+        for (const Uint64 sample : m_gpuSamples) {
+            m_statsWindow.gpu += sample;
+            m_statsWindow.gpuMax = std::max(m_statsWindow.gpuMax, sample);
+            m_statsWindow.gpuSamples++;
+        }
+    }
+
+    // Publish twice a second: steady enough to read.
+    if (m_statsWindow.total < 500'000'000) {
+        return;
+    }
+
+    const auto ms = [&](Uint64 sum) {
+        return static_cast<float>(static_cast<double>(sum) / static_cast<double>(m_statsWindow.frames) / 1.0e6);
+    };
+    m_stats.frameMs = ms(m_statsWindow.frame);
+    m_stats.frameMaxMs = static_cast<float>(m_statsWindow.frameMax / 1.0e6);
+    m_stats.updateMs = ms(m_statsWindow.update);
+    m_stats.recordMs = ms(m_statsWindow.record);
+    m_stats.waitMs = ms(m_statsWindow.wait);
+    m_stats.simGpuMeasured = m_measureSimGpu;
+    m_stats.simGpuMs = m_measureSimGpu && m_statsWindow.gpuSamples > 0
+                           ? static_cast<float>(static_cast<double>(m_statsWindow.gpu) /
+                                                static_cast<double>(m_statsWindow.gpuSamples) / 1.0e6)
+                           : 0.0f;
+    m_stats.simGpuMaxMs = m_measureSimGpu ? static_cast<float>(m_statsWindow.gpuMax / 1.0e6) : 0.0f;
+    // A benchmark's GPU wait was part of the frame; GpuTimer's ran alongside it.
+    const float gpuWaitMs = m_config.bench ? m_stats.simGpuMs : 0.0f;
+    m_stats.otherMs =
+        std::max(0.0f, m_stats.frameMs - m_stats.updateMs - m_stats.recordMs - m_stats.waitMs - gpuWaitMs);
+    m_statsWindow = {};
 }
 
 void App::pumpEvents() {
@@ -157,12 +310,15 @@ void App::update(float deltaTime) {
     m_imgui.beginFrame();
 
     if (scene::Scene* active = m_scenes->active()) {
+        const Uint64 start = SDL_GetTicksNS();
         active->update(deltaTime);
+        m_lastSceneUpdateNs = SDL_GetTicksNS() - start;
         active->debugUi();
     }
 }
 
 void App::render() {
+    m_lastPresentNs = 0;
     SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(m_gpu.device());
 
     if (commands == nullptr) {
@@ -175,7 +331,12 @@ void App::render() {
     Uint32 swapchainWidth = 0;
     Uint32 swapchainHeight = 0;
 
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(commands, m_window, &swapchain, &swapchainWidth, &swapchainHeight)) {
+    const Uint64 acquireStart = SDL_GetTicksNS();
+    const bool acquired =
+        SDL_WaitAndAcquireGPUSwapchainTexture(commands, m_window, &swapchain, &swapchainWidth, &swapchainHeight);
+    m_lastAcquireNs = SDL_GetTicksNS() - acquireStart;
+
+    if (!acquired) {
         SDL_LogError(SDL_LOG_CATEGORY_GPU, "SDL_WaitAndAcquireGPUSwapchainTexture failed: %s", SDL_GetError());
         SDL_CancelGPUCommandBuffer(commands);
         m_imgui.discardFrame();
@@ -195,7 +356,50 @@ void App::render() {
     // Compute runs first and outside the render pass — SDL_GPU passes cannot
     // nest, and the graphics pass samples what compute writes.
     if (active != nullptr) {
-        active->compute(commands);
+        if (m_measureSimGpu && !m_config.bench) {
+            // While playing: the compute work goes on a command buffer of its
+            // own, after an empty one whose fence marks the GPU reaching it,
+            // and GpuTimer times the gap between the two fences on its own
+            // thread. Nothing here waits, so the CPU and GPU still overlap as
+            // they do unmeasured.
+            m_lastGpuNs = 0;
+            SDL_GPUCommandBuffer* marker = SDL_AcquireGPUCommandBuffer(m_gpu.device());
+            SDL_GPUFence* begin = marker != nullptr ? SDL_SubmitGPUCommandBufferAndAcquireFence(marker) : nullptr;
+            SDL_GPUCommandBuffer* computeCommands = SDL_AcquireGPUCommandBuffer(m_gpu.device());
+            if (computeCommands != nullptr) {
+                active->compute(computeCommands);
+                SDL_GPUFence* end = SDL_SubmitGPUCommandBufferAndAcquireFence(computeCommands);
+                if (begin != nullptr && end != nullptr) {
+                    m_gpuTimer.track(begin, end);
+                    begin = nullptr;
+                } else if (end != nullptr) {
+                    SDL_ReleaseGPUFence(m_gpu.device(), end);
+                }
+            } else {
+                active->compute(commands);
+            }
+            if (begin != nullptr) {
+                SDL_ReleaseGPUFence(m_gpu.device(), begin);
+            }
+        } else if (m_measureSimGpu) {
+            // Benchmarks put the scene's compute work on a command buffer of
+            // its own and wait for it, which times the simulation's GPU cost
+            // alone: no rendering, no present, no frame-rate cap. The same
+            // queue runs it before the frame's render pass.
+            const Uint64 submitted = SDL_GetTicksNS();
+            SDL_GPUCommandBuffer* computeCommands = SDL_AcquireGPUCommandBuffer(m_gpu.device());
+            if (computeCommands != nullptr) {
+                active->compute(computeCommands);
+                if (SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(computeCommands)) {
+                    SDL_WaitForGPUFences(m_gpu.device(), true, &fence, 1);
+                    SDL_ReleaseGPUFence(m_gpu.device(), fence);
+                }
+            }
+            m_lastGpuNs = SDL_GetTicksNS() - submitted;
+        } else {
+            m_lastGpuNs = 0;
+            active->compute(commands);
+        }
     }
 
     m_batch.begin();
@@ -222,13 +426,19 @@ void App::render() {
         if (active != nullptr) {
             active->camera().setViewport(static_cast<float>(swapchainWidth), static_cast<float>(swapchainHeight));
             m_batch.flush(commands, pass, active->camera().viewProjection());
+            active->renderPass(commands, pass);
         }
 
         m_imgui.draw(commands, pass);
         SDL_EndGPURenderPass(pass);
     }
 
+    // Submitting the swapchain's command buffer presents the frame, and that is
+    // where a driver frame limiter (NVIDIA's cap, Reflex) or a full present
+    // queue sleeps, so it is timed as waiting rather than as work.
+    const Uint64 presentStart = SDL_GetTicksNS();
     SDL_SubmitGPUCommandBuffer(commands);
+    m_lastPresentNs = SDL_GetTicksNS() - presentStart;
 }
 
 void App::shutdown() {
@@ -238,6 +448,7 @@ void App::shutdown() {
         SDL_WaitForGPUIdle(m_gpu.device());
     }
 
+    m_gpuTimer.stop();
     m_scenes.reset();
     m_imgui.shutdown();
     m_atlas.release();

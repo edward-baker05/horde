@@ -1,0 +1,228 @@
+# Walls are binned convex primitives; the broadphase is a per-tier choice
+
+## Walls
+
+Units collide with level walls through `sim::WallColliders`, built once when a
+level starts (walls never move). Every wall is flattened into convex
+primitives, each with a signed distance function: a rotated box, a circle, a
+triangle, or for a polyline one box per segment and one circle per bend. The
+primitives are then binned
+into a coarse uniform grid of cells eight unit-radii across, so a unit only
+tests the few primitives near it however many walls the level has. `GpuWalls`
+uploads the same data, and `shaders/src/walls.hlsli` repeats the CPU maths, so
+the GPU, spawn placement and the benchmark's "units in walls" check all agree
+on the shapes.
+
+Wall pushes happen inside every collision pass, right after the unit-vs-unit
+correction, and once more in `unit_finalize`. Because velocity is derived from
+the corrected position, units slide along walls instead of sticking to them.
+
+A polyline's bend circles close the notch two segment boxes leave on the
+outside of a bend, so a unit sliding along it doesn't catch there; the renderer
+draws the same circle, and the ends stay square, as drawn.
+
+_Update 2026-10-31:_ polyline segments were capsules, whose rounded ends
+reached half a thickness past the square ends the renderer draws, so units
+visibly bumped into nothing at a polyline's ends. They are now boxes plus bend
+circles, and the capsule primitive is gone.
+
+We also considered baking a signed distance field texture of the whole level:
+one texture fetch per unit, whatever the walls. We rejected it for now. Its
+accuracy depends on resolution, thin polylines need about one texel per two
+world units (16 MB for a 2000×2000 level), and it would need rebaking whenever
+the editor changes a wall. Binned primitives are exact and already cheap. An SDF
+is still the move if wall counts ever reach thousands in one place.
+
+## Broadphase
+
+`GpuSpatialGrid` offers three methods behind one interface (`Broadphase`), and
+the collision shader variants share one binding layout:
+
+| method | build passes | cost | caveat |
+|---|---|---|---|
+| bitonic sort | ~210 at 1M units | O(n log² n) | the original; kept as a baseline |
+| counting sort | 7 | O(n + cells) | atomics order units within a cell non-deterministically |
+| buckets | 2 | O(n + cells) | a cell holding more than `bucketCapacity` units hides the extras from its neighbours |
+
+Measured on an RTX 5080, 4 collision passes, GPU simulation time per frame:
+
+| units, level | bitonic | counting | buckets |
+|---|---|---|---|
+| 100k, 2000² with 91 walls | 0.95 ms | 0.54 ms | 0.42 ms |
+| 1M, 8000², no walls | 2.96 ms | 1.97 ms | 2.38 ms |
+
+Buckets win on small grids. Counting sort wins on large ones, where the buckets
+method has to clear and scatter across millions of cells. The collision passes,
+not the broadphase, dominate at high counts.
+
+**Update (2026-10-30):** counting sort is now the only broadphase. Bitonic and
+buckets were removed, along with their shaders, `--broadphase`,
+`--bucket-capacity` and the `gpu-collide-*` registry entries. The table above
+is kept as the reason.
+
+## Solver
+
+Each collision pass is Jacobi: every unit reads the same state (one unit
+buffer) and writes the next (the other), so a pass doesn't depend on thread
+order. For each overlapping neighbour, a unit takes half the overlap along the
+line between them. `CollisionSettings::solver` picks how those halves are
+combined:
+
+- **relaxed** (default): the sum, times `relaxation`. Fast to converge. It can
+  overshoot when many neighbours push at once and relaxation is high.
+- **average**: the mean (position-based dynamics' constraint averaging). It
+  never overshoots, but a unit pressed from every side moves only by the
+  average push, so pressure spreads through a crowd more slowly.
+
+Measured on an RTX 5080, mean overlap depth at the end of the run (fraction of
+a diameter) on the walls level:
+
+| units, passes | relaxed (0.5) | average |
+|---|---|---|
+| 10k, 4 | 0.12 | 0.22 |
+| 100k, 4 | 0.22 | 0.30 |
+| 10k, 8 | 0.07 | 0.15 |
+| 100k, 8 | 0.17 | 0.26 |
+
+Both fully separate a stationary random spawn.
+
+The average solver can be over-relaxed: `averageOmega` (`--omega`, 1–2,
+default 1 = the plain average) scales the mean, as in Müller et al.'s PBD.
+Overlap depth for the same runs:
+
+| units, passes | ω 1 | 1.25 | 1.5 | 1.75 | 2 | relaxed |
+|---|---|---|---|---|---|---|
+| 10k, 4 | 0.218 | 0.195 | 0.175 | 0.161 | 0.147 | 0.117 |
+| 100k, 4 | 0.303 | 0.289 | 0.278 | 0.267 | 0.257 | 0.222 |
+| 10k, 8 | 0.148 | 0.127 | 0.113 | 0.100 | 0.091 | 0.070 |
+| 100k, 8 | 0.257 | 0.240 | 0.226 | 0.213 | 0.202 | 0.173 |
+
+Each step up in ω helps, and nothing diverged even at 2, but the relaxed
+solver still converges further. The reason is that summing at relaxation 0.5
+across a typical 4–6 overlapping neighbours pushes harder than any ω ≤ 2 on the
+mean. ω makes no difference to GPU time. The average solver is worth choosing
+when the hard no-overshoot guarantee at ω = 1 matters (for example tiny
+time steps or very dense spawns); otherwise relaxed is the better default.
+
+### Chebyshev acceleration
+
+**Added 2026-11-03.** `--solver chebyshev` runs relaxed passes and
+accelerates them by Chebyshev semi-iteration (Wang 2015): after
+`--chebyshev-delay` plain passes, each pass extrapolates its relaxed result
+along the change from two passes back, `next = w * (relaxed - older) +
+older`, with a weight `w` rising each pass from 2 / (2 - rho^2) toward 2 /
+(1 + sqrt(1 - rho^2)). It needs no extra buffer: the buffer a pass writes
+still holds this unit's iterate from two passes back, so a unit reads that
+before overwriting it. The extrapolated move is capped at `maxCorrection`,
+like any pass's, and walls are resolved after it. Cost per pass is the same
+as relaxed.
+
+The delay is at least 2. The first pass can't extrapolate at all: the buffer
+it writes doesn't hold this step's units yet. The second could, but it would
+extrapolate from the predicted positions, which no pass has pushed out of
+walls yet. A unit that walked into a wall would have its push back out
+multiplied by `w`, bouncing it off the wall; in play that showed as units
+bouncing hard off walls they walked into. From the third pass on, "two passes
+back" has been through wall resolution.
+
+Measured on an RTX 5080, `crowd-100k-relaxed` (a dense crowd pressing on the
+exits, relaxation 0.5), mean penetration at the end of the run. The rho
+sweep was run at delay 1, before the bounce was found; the delay 2 column is
+the default now:
+
+| passes | relaxed | rho 0.5 | 0.8 | 0.9 | 0.95 | 0.97 | 0.99 | 0.95, delay 2 | 0.97, delay 2 |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 | 0.308 | 0.302 | 0.278 | 0.258 | 0.243 | | | 0.278 | |
+| 8 | 0.264 | | | 0.176 | 0.144 | | | 0.165 | |
+| 16 | 0.197 | 0.184 | 0.149 | 0.124 | 0.088 | 0.072 | 0.161 | 0.096 | 0.082 |
+| 32 | 0.133 | | | | | | | | |
+
+Delay 2 gives back a little, most at 4 passes, where one less pass
+extrapolates. Even so, 8 Chebyshev passes beat 16 relaxed ones, and 16 beat
+32. Higher rho helps until it overshoots: 0.97 was best at 16 passes and 0.99
+got worse again. The default is 0.95, the best value measured at every pass
+count. Sweep it with `tools/bench.py --solver chebyshev --rho ...` if the pass
+count or relaxation changes a lot.
+
+Penetration alone undersells it when contacts are sparse. At 1M random units
+(8000x8000, 16 passes), Chebyshev left 155 overlapping pairs against relaxed's
+310, though those few went slightly deeper (0.35 against 0.26 of a diameter).
+Compare overlapping pairs too there.
+
+## Scaling down
+
+`sim::collisionPreset` (`--quality low|medium|high|ultra`, also in the level
+panel) sets passes, relaxation and broadphase together. Low runs 1 buckets pass
+at relaxation 0.8, and ultra runs 8 counting passes. On an Intel UHD 770
+(`--low-power-gpu`), 100k units on the walls level ran at 177 / 135 / 90 / 58 fps
+across low to ultra. Mean overlap depth fell from 0.23 to 0.07 of a diameter.
+
+**Update (2026-10-30):** the quality presets were removed, to be re-evaluated
+now that counting sort is the only broadphase. `--quality` and the level
+panel's preset menu are gone; set passes and relaxation directly. The figures
+above are from the old presets.
+
+Every method uses only compute features all three SDL_GPU backends have
+(structured buffers, 32-bit atomics, group-shared memory). There are no wave
+intrinsics or 64-bit atomics.
+
+## Reordering units by cell
+
+**Added 2026-11-02.** After the counting sort, `sim::GpuUnitReorder` gathers
+every per-unit buffer (units, previous positions, health, fling, IDs) into
+the sorted order and renumbers the grid's keys to match. A cell's key range
+`[start, end)` is then exactly the units in it, so a collision pass reads its
+neighbours from a few contiguous runs of memory, and a workgroup's threads
+handle units from one part of the level. `--reorder off` keeps the old order.
+
+To make the keys a full permutation, the grid now gives dead units slots
+too, after every live unit and outside every cell's range. A unit's index
+changes every step, so what has to stay with one unit is keyed on a stable ID
+buffer instead: the wobble phase, the explosion fallback direction and the
+red marker unit. A unit's ID is the slot it spawned into. Health and anything
+else per unit must be listed as a reorder stream, or it parts company with
+its unit.
+
+Measured on an RTX 5080, GPU sim ms per step, random spawn, same seed:
+
+| units, passes | off | on | |
+|---|---|---|---|
+| 100k, 16 | 0.90 | 0.43 | 2.1x |
+| 1M (8000x8000), 4 | 1.54 | 0.72 | 2.1x |
+| 1M (8000x8000), 16 | 5.10 | 1.20 | 4.2x |
+| 4M (8000x8000), 4 | 24.5 | 2.79 | 8.8x |
+| 4M (8000x8000), 16 | 96.4 | 6.47 | 14.9x |
+| `crowd-100k-relaxed` preset | 1.24 | 0.56 | 2.2x |
+
+Collision quality is unchanged: mean penetration at 1M x16 averaged 0.226
+both ways over three runs. The gather costs a fixed few passes per step,
+which more collision passes pay back many times over, so the gain grows with
+the pass count and with how far the unit buffer outgrows the GPU's caches.
+
+Drawn in index order, units would follow the grid order, which changes every
+step: within a cell it is whichever unit claimed its slot first, an atomic
+race. In a dense crowd that made overlapping units of different health swap
+which is on top 60 times a second, and colours seemed to jumble. So after each
+reorder, `GpuUnitReorder::writeSlots` records where each unit landed by ID
+(`unit_slots.comp`), and `unit.vert` draws instance i from that slot. Drawing
+is in ID order, which never changes, as it was before reordering. It costs
+one uint per unit, a scattered write per step and a scattered read when
+drawing: GPU sim time went from 1.20 to 1.26 ms at 1M units x16 and from 6.47
+to 7.26 ms at 4M, where frame time went from 6.90 to 7.84 ms.
+
+## Not done yet, in rough order of expected payoff
+
+- **Tune the reorder per solver**: a coloured Gauss-Seidel solver could run a
+  thread per cell straight over the sorted ranges, and a shared-memory tile
+  solver could load a tile of cells as one contiguous block. Cell order is row
+  major; a Z-order cell numbering would keep the cells above and below closer
+  in memory too.
+- **Adaptive quality**: lower the pass count when GPU sim time exceeds a frame
+  budget, instead of picking a preset by hand.
+- **Fewer passes for the same quality**: graph-coloured Gauss-Seidel (cells in
+  a 2×2 checkerboard), or warm-starting from last frame's corrections. Jacobi
+  only spreads crowd pressure one neighbour per pass; Chebyshev (above) helps,
+  but each pass still only reaches one neighbour further.
+- **Pathing**: units head straight for the exit and slide along whatever is in
+  the way. A flow field (the old `bailen-testing` branch has a `VectorField`)
+  would send them around walls rather than into them.

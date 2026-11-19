@@ -1,0 +1,185 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_StructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_StructuredBuffer_v2uint
+{
+    uint2 _m0[1];
+};
+
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_RWStructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_CollideParams
+{
+    float2 WorldMin;
+    float2 WorldMax;
+    uint2 GridDim;
+    float InvCellSize;
+    uint UnitCount;
+    float Diameter;
+    float Relaxation;
+    float MaxCorrection;
+    uint UnitsSorted;
+    uint2 WallBinDim;
+    float WallBinSize;
+    uint WallCount;
+    uint Solver;
+    float AverageOmega;
+    float ChebyshevOmega;
+    float Smoothing;
+};
+
+struct WallPrimitive
+{
+    float2 p0;
+    float2 p1;
+    float2 p2;
+    uint kind;
+    float radius;
+};
+
+struct type_StructuredBuffer_WallPrimitive
+{
+    WallPrimitive _m0[1];
+};
+
+kernel void main0(constant type_CollideParams& CollideParams [[buffer(0)]], device type_StructuredBuffer_UnitData& InUnits [[buffer(1)]], device type_StructuredBuffer_v2uint& GridA [[buffer(2)]], device type_StructuredBuffer_uint& GridB [[buffer(3)]], device type_RWStructuredBuffer_UnitData& OutUnits [[buffer(4)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= CollideParams.UnitCount)
+        {
+            break;
+        }
+        float2 _78 = InUnits._m0[gl_GlobalInvocationID.x].pos;
+        float2 _80 = InUnits._m0[gl_GlobalInvocationID.x].vel;
+        if (_78.x < (-100000001504746621987668885504.0))
+        {
+            OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _78, _80 };
+            break;
+        }
+        int2 _95 = clamp(int2(_78 * CollideParams.InvCellSize), int2(0), int2(CollideParams.GridDim) - int2(1));
+        float2 _97;
+        float _100;
+        _97 = float2(0.0);
+        _100 = 0.0;
+        float2 _98;
+        float _101;
+        for (int _102 = -1; _102 <= 1; _97 = _98, _100 = _101, _102++)
+        {
+            uint _157;
+            uint _158;
+            do
+            {
+                int _110 = _95.y + _102;
+                bool _118;
+                if (_110 >= 0)
+                {
+                    _118 = _110 >= int(CollideParams.GridDim.y);
+                }
+                else
+                {
+                    _118 = true;
+                }
+                if (_118)
+                {
+                    _157 = 0u;
+                    _158 = 4294967295u;
+                    break;
+                }
+                int _121 = _95.x;
+                uint _124 = uint(max((_121 - 1), 0));
+                uint _131 = uint(min((_121 + 1), (int(CollideParams.GridDim.x) - 1)));
+                uint _133 = uint(_110) * CollideParams.GridDim.x;
+                uint _135;
+                uint _138;
+                _135 = 0u;
+                _138 = 4294967295u;
+                uint _136;
+                uint _139;
+                for (uint _140 = _124; _140 <= _131; _135 = _136, _138 = _139, _140++)
+                {
+                    uint _146 = (_133 + _140) * 2u;
+                    if (GridB._m0[_146] != 4294967295u)
+                    {
+                        _136 = max(_135, GridB._m0[_146 + 1u]);
+                        _139 = min(_138, GridB._m0[_146]);
+                    }
+                    else
+                    {
+                        _136 = _135;
+                        _139 = _138;
+                    }
+                }
+                _157 = _135;
+                _158 = _138;
+                break;
+            } while(false);
+            _101 = _100;
+            _98 = _97;
+            float _160;
+            float2 _162;
+            for (uint _163 = _158; _163 < _157; _101 = _160, _98 = _162, _163++)
+            {
+                uint _176;
+                if (CollideParams.UnitsSorted != 0u)
+                {
+                    _176 = _163;
+                }
+                else
+                {
+                    _176 = ((device uint*)&GridA._m0[_163])[1];
+                }
+                if (_176 == gl_GlobalInvocationID.x)
+                {
+                    _160 = _101;
+                    _162 = _98;
+                    continue;
+                }
+                float2 _184 = _78 - InUnits._m0[_176].pos;
+                float _185 = dot(_184, _184);
+                if (_185 >= (CollideParams.Diameter * CollideParams.Diameter))
+                {
+                    _160 = _101;
+                    _162 = _98;
+                    continue;
+                }
+                float _194 = 1.0 - (sqrt(_185) / CollideParams.Diameter);
+                _160 = _101 + _194;
+                _162 = _98 + (InUnits._m0[_176].vel * _194);
+            }
+        }
+        float2 _208;
+        if (_100 > 0.0)
+        {
+            _208 = _80 + (((_97 / float2(_100)) - _80) * CollideParams.Smoothing);
+        }
+        else
+        {
+            _208 = _80;
+        }
+        OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _78, _208 };
+        break;
+    } while(false);
+}
+
