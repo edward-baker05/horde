@@ -6,15 +6,24 @@
 <body data-model="pause">
 	<div class="status-bar"></div>
 
-	<div class="header">
-		<span class="title">Paused</span>
+	<div class="page">
+		<div class="hero">
+			<span class="wordmark">PAUSED<span class="dot">.</span></span>
+			<span class="tagline">The horde can wait.</span>
+		</div>
+
+		<button class="primary" data-event-click="resume">Resume</button>
+
+		<div class="group">
+			<button class="row" data-event-click="restart">Restart</button>
+		</div>
+
+		<div class="group">
+			<button class="row danger" data-if="!to_editor" data-event-click="quit">Quit to menu</button>
+			<button class="row danger" data-if="to_editor" data-event-click="quit">Back to editor</button>
+		</div>
 	</div>
 
-	<div class="list">
-		<button class="row" data-event-click="resume">Resume</button>
-		<button class="row" data-event-click="restart">Restart</button>
-		<button class="row" data-if="!to_editor" data-event-click="quit">Quit to menu</button>
-		<button class="row" data-if="to_editor" data-event-click="quit">Back to editor</button>
-	</div>
+	<div class="home-bar"/>
 </body>
 </rml>

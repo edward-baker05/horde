@@ -40,6 +40,10 @@ bool RmlLayer::init(gfx::GpuContext& gpu, const gfx::ShaderLoader& shaders) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "RmlUi could not load the UI font");
         return false;
     }
+    // Bold is optional: without it RmlUi falls back to the regular face.
+    if (!Rml::LoadFontFace(paths::asset("fonts/LiberationSans-Bold.ttf").string())) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "RmlUi could not load the bold UI font");
+    }
 
     // Phone and tablet get logical-pixel sizes until the shell resizes them.
     m_sizes[static_cast<int>(DeviceKind::None)] = {1, 1};

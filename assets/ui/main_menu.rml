@@ -6,34 +6,64 @@
 <body data-model="menu">
 	<div class="status-bar">
 		<span class="clock">{{clock}}</span>
+		<span class="icons">
+			<span class="signal s1"/><span class="signal s2"/><span class="signal s3"/><span class="signal s4"/>
+			<span class="battery"><span class="charge"/></span>
+		</span>
 	</div>
 
-	<div class="header" data-if="page != 'root'">
-		<button class="back" data-event-click="back">&lt;</button>
-		<span class="title" data-if="page == 'play'">Play</span>
-		<span class="title" data-if="page == 'dev'">Dev Ground</span>
-	</div>
-	<div class="header" data-if="page == 'root'">
-		<span class="title">horde</span>
+	<div class="page" data-if="page == 'root'">
+		<div class="hero">
+			<span class="wordmark">HORDE<span class="dot">.</span></span>
+			<span class="tagline">Hold the line.</span>
+		</div>
+
+		<button class="primary" data-event-click="open('play')">Play</button>
+
+		<div class="group">
+			<button class="row" data-event-click="upgrades">Upgrades<span class="chevron">›</span></button>
+			<button class="row" data-event-click="editor">Level Editor<span class="chevron">›</span></button>
+			<button class="row" data-event-click="open('dev')">Dev Ground<span class="chevron">›</span></button>
+		</div>
+
+		<div class="group">
+			<button class="row danger" data-event-click="quit">Quit</button>
+		</div>
 	</div>
 
-	<div class="list" data-if="page == 'root'">
-		<button class="row" data-event-click="open('play')">Play</button>
-		<button class="row" data-event-click="upgrades">Upgrades</button>
-		<button class="row" data-event-click="editor">Level Editor</button>
-		<button class="row" data-event-click="open('dev')">Dev Ground</button>
-		<button class="row" data-event-click="quit">Quit</button>
+	<div data-if="page == 'play'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Play</div>
+		<div class="page scroll">
+			<div class="section">LEVELS</div>
+			<div class="group">
+				<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}<span class="chevron">›</span></button>
+			</div>
+		</div>
 	</div>
 
-	<div class="list" data-if="page == 'play'">
-		<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}</button>
+	<div data-if="page == 'dev'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Dev Ground</div>
+		<div class="page scroll">
+			<div class="section">LEVELS</div>
+			<div class="group">
+				<button class="row" data-event-click="dev_level(-1)">Built-in level<span class="hint">default</span><span class="chevron">›</span></button>
+				<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}<span class="chevron">›</span></button>
+			</div>
+			<div data-if="presets.size > 0">
+				<div class="section">PRESETS</div>
+				<div class="group">
+					<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}<span class="chevron">›</span></button>
+				</div>
+			</div>
+		</div>
 	</div>
 
-	<div class="list" data-if="page == 'dev'">
-		<button class="row" data-event-click="dev_level(-1)">Built-in level</button>
-		<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}</button>
-		<div class="section" data-if="presets.size > 0">Presets</div>
-		<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}</button>
-	</div>
+	<div class="home-bar"/>
 </body>
 </rml>
