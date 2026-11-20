@@ -14,6 +14,20 @@ ScenePresentation pres(DeviceKind d, Orientation o = Orientation::Portrait, bool
 }
 } // namespace
 
+TEST_CASE("levelPresentation: player is landscape tablet") {
+    const ScenePresentation p = horde::scene::levelPresentation(horde::scene::LevelMode::Player);
+    CHECK(p.device == DeviceKind::Tablet);
+    CHECK(p.orientation == Orientation::Landscape);
+}
+
+TEST_CASE("computeTargets: player level over phone menu") {
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone),
+                                     horde::scene::levelPresentation(horde::scene::LevelMode::Player)};
+    auto t = computeTargets(s);
+    CHECK(t.tablet == Placement::Centered);
+    CHECK(t.phone == Placement::Hidden);
+}
+
 TEST_CASE("computeTargets: phone menu") {
     std::vector<ScenePresentation> s{pres(DeviceKind::Phone)};
     auto t = computeTargets(s);
