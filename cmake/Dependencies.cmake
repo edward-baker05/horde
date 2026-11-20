@@ -166,9 +166,11 @@ endif()
 # every optional codec off (we only load TTF/OTF files).
 
 # Release tarballs rather than git clones: far faster and reproducible. The
-# SHA256s pin the default tags; bump them together with the tag variables.
+# SHA256 variables pin the default tags; set them together with the tag variables.
 set(HORDE_FREETYPE_TAG "VER-2-13-3" CACHE STRING "FreeType tag to fetch when no system copy is found")
+set(HORDE_FREETYPE_SHA256 "bc5c898e4756d373e0d991bab053036c5eb2aa7c0d5c67e8662ddc6da40c4103" CACHE STRING "SHA256 of the FreeType tarball for HORDE_FREETYPE_TAG")
 set(HORDE_RMLUI_TAG "6.3" CACHE STRING "RmlUi tag to fetch")
+set(HORDE_RMLUI_SHA256 "d977298bb6147610e5984d5db85ddf284020d655a8713913f6982074f1dbdede" CACHE STRING "SHA256 of the RmlUi tarball for HORDE_RMLUI_TAG")
 
 find_package(Freetype QUIET)
 
@@ -183,7 +185,7 @@ else()
     set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
     FetchContent_Declare(freetype
         URL https://github.com/freetype/freetype/archive/refs/tags/${HORDE_FREETYPE_TAG}.tar.gz
-        URL_HASH SHA256=bc5c898e4756d373e0d991bab053036c5eb2aa7c0d5c67e8662ddc6da40c4103
+        URL_HASH SHA256=${HORDE_FREETYPE_SHA256}
         DOWNLOAD_EXTRACT_TIMESTAMP ON
         EXCLUDE_FROM_ALL
         SYSTEM
@@ -201,7 +203,7 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(RMLUI_FONT_ENGINE freetype CACHE STRING "" FORCE)
 FetchContent_Declare(RmlUi
     URL https://github.com/mikke89/RmlUi/archive/refs/tags/${HORDE_RMLUI_TAG}.tar.gz
-    URL_HASH SHA256=d977298bb6147610e5984d5db85ddf284020d655a8713913f6982074f1dbdede
+    URL_HASH SHA256=${HORDE_RMLUI_SHA256}
     DOWNLOAD_EXTRACT_TIMESTAMP ON
     EXCLUDE_FROM_ALL
     SYSTEM)
