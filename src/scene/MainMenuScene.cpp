@@ -27,14 +27,7 @@ bool MainMenuScene::onEnter(Services& services) {
         return false;
     }
 
-    m_levelPaths = logic::listLevels();
-    for (const std::filesystem::path& path : m_levelPaths) {
-        m_levels.push_back(logic::levelDisplayName(path));
-    }
-    for (const std::filesystem::path& path : listPresets()) {
-        m_presetNames.push_back(presetName(path));
-        m_presets.push_back(m_presetNames.back());
-    }
+    refreshLists();
     refreshClock();
 
     Rml::DataModelConstructor constructor = m_context->CreateDataModel("menu");
@@ -79,7 +72,27 @@ void MainMenuScene::onExit() {
     }
 }
 
+void MainMenuScene::refreshLists() {
+    m_levelPaths = logic::listLevels();
+    m_levels.clear();
+    for (const std::filesystem::path& path : m_levelPaths) {
+        m_levels.push_back(logic::levelDisplayName(path));
+    }
+    m_presetNames.clear();
+    m_presets.clear();
+    for (const std::filesystem::path& path : listPresets()) {
+        m_presetNames.push_back(presetName(path));
+        m_presets.push_back(m_presetNames.back());
+    }
+    if (m_model) {
+        m_model.DirtyVariable("levels");
+        m_model.DirtyVariable("presets");
+    }
+}
+
 void MainMenuScene::onRevealed() {
+    // The editor may have saved levels while this scene was covered.
+    refreshLists();
     // Back on the top-level list rather than wherever the player left from.
     setPage("root");
     if (m_document != nullptr) {
@@ -153,6 +166,7 @@ int indexArg(const Rml::VariantList& args) {
 void MainMenuScene::onOpen(Rml::DataModelHandle, Rml::Event&, const Args& args) {
     const Rml::String target = args.empty() ? Rml::String() : args[0].Get<Rml::String>();
     if (target == "play") {
+        refreshLists();
         // One level means there is nothing to choose between: go straight into
         // it. With none saved, play the built-in level.
         if (m_levelPaths.size() > 1) {

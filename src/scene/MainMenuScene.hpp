@@ -43,6 +43,7 @@ public:
 
 private:
     // Pushes a LevelScene for the level file at `path` (empty: the built-in level).
+    void refreshLists();
     void playLevel(const std::filesystem::path& path, LevelMode mode = LevelMode::Player);
     void playPreset(const std::string& name);
     void setPage(const char* page);
