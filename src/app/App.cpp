@@ -13,6 +13,7 @@
 #include "gfx/ShaderLoader.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/MainMenuScene.hpp"
+#include "ui/ScreenInput.hpp"
 #include "ui/ShellState.hpp"
 
 namespace horde::app {
@@ -318,32 +319,6 @@ void App::accumulateStats(Uint64 frameNs) {
     m_statsWindow = {};
 }
 
-namespace {
-
-void scaleMouseToPixels(SDL_Event& event, float density) {
-    switch (event.type) {
-        case SDL_EVENT_MOUSE_MOTION:
-            event.motion.x *= density;
-            event.motion.y *= density;
-            event.motion.xrel *= density;
-            event.motion.yrel *= density;
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-            event.button.x *= density;
-            event.button.y *= density;
-            break;
-        case SDL_EVENT_MOUSE_WHEEL:
-            event.wheel.mouse_x *= density;
-            event.wheel.mouse_y *= density;
-            break;
-        default:
-            break;
-    }
-}
-
-} // namespace
-
 void App::pumpEvents() {
     SDL_Event event;
 
@@ -379,7 +354,7 @@ void App::pumpEvents() {
         // for itself.
         SDL_Event routed = event;
         if (kind != ui::DeviceKind::None) {
-            scaleMouseToPixels(routed, SDL_GetWindowPixelDensity(m_window));
+            ui::scaleMouseEvent(routed, SDL_GetWindowPixelDensity(m_window));
             // A press on the bezel or the background belongs to nobody.
             if (!m_shell.remapEvent(kind, routed)) {
                 continue;

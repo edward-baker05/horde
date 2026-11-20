@@ -60,3 +60,31 @@ TEST_CASE("remapMouseEvent drops outside button-downs but clamps motion") {
     CHECK(move.motion.x == doctest::Approx(0.0f));
     CHECK(move.motion.y == doctest::Approx(0.0f));
 }
+
+TEST_CASE("scaleMouseEvent scales positions and deltas, leaves others") {
+    SDL_Event motion{};
+    motion.type = SDL_EVENT_MOUSE_MOTION;
+    motion.motion.x = 10.0f;
+    motion.motion.y = 20.0f;
+    motion.motion.xrel = 1.0f;
+    motion.motion.yrel = -2.0f;
+    scaleMouseEvent(motion, 2.0f);
+    CHECK(motion.motion.x == doctest::Approx(20.0f));
+    CHECK(motion.motion.y == doctest::Approx(40.0f));
+    CHECK(motion.motion.xrel == doctest::Approx(2.0f));
+    CHECK(motion.motion.yrel == doctest::Approx(-4.0f));
+
+    SDL_Event button{};
+    button.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    button.button.x = 3.0f;
+    button.button.y = 4.0f;
+    scaleMouseEvent(button, 1.5f);
+    CHECK(button.button.x == doctest::Approx(4.5f));
+    CHECK(button.button.y == doctest::Approx(6.0f));
+
+    SDL_Event key{};
+    key.type = SDL_EVENT_KEY_DOWN;
+    key.key.scancode = SDL_SCANCODE_A;
+    scaleMouseEvent(key, 2.0f);
+    CHECK(key.key.scancode == SDL_SCANCODE_A);
+}

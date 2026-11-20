@@ -425,6 +425,11 @@ void RmlRenderer::draw(DeviceKind kind, SDL_GPURenderPass* pass, SDL_GPUCommandB
         SDL_DrawGPUIndexedPrimitives(pass, command.indexCount, 1, 0, 0, 0);
     }
 
+    // Later draws in the same pass (the device composite) must not inherit the
+    // last element's clip.
+    const SDL_Rect full{0, 0, size.x, size.y};
+    SDL_SetGPUScissor(pass, &full);
+
     list.clear();
 }
 

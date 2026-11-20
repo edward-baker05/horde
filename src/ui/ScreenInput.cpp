@@ -12,6 +12,28 @@ ScreenPoint mapMouseToScreen(const DeviceRect& rect, glm::vec2 offset, glm::vec2
     return out;
 }
 
+void scaleMouseEvent(SDL_Event& event, float density) {
+    switch (event.type) {
+    case SDL_EVENT_MOUSE_MOTION:
+        event.motion.x *= density;
+        event.motion.y *= density;
+        event.motion.xrel *= density;
+        event.motion.yrel *= density;
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        event.button.x *= density;
+        event.button.y *= density;
+        break;
+    case SDL_EVENT_MOUSE_WHEEL:
+        event.wheel.mouse_x *= density;
+        event.wheel.mouse_y *= density;
+        break;
+    default:
+        break;
+    }
+}
+
 bool remapMouseEvent(SDL_Event& event, const DeviceRect& rect, glm::vec2 offset) {
     float* x = nullptr;
     float* y = nullptr;

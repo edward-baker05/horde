@@ -6,6 +6,7 @@
 #include "core/Paths.hpp"
 #include "gfx/GpuContext.hpp"
 #include "ui/RmlInput.hpp"
+#include "ui/ScreenInput.hpp"
 
 namespace horde::ui {
 
@@ -123,26 +124,7 @@ bool RmlLayer::handleEvent(DeviceKind kind, const SDL_Event& event) {
     // The None context is sized in swapchain pixels, but SDL reports the mouse
     // in window units; they differ on high-DPI displays.
     SDL_Event scaled = event;
-    const float density = SDL_GetWindowPixelDensity(m_window);
-    switch (event.type) {
-    case SDL_EVENT_MOUSE_MOTION:
-        scaled.motion.x *= density;
-        scaled.motion.y *= density;
-        scaled.motion.xrel *= density;
-        scaled.motion.yrel *= density;
-        break;
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:
-    case SDL_EVENT_MOUSE_BUTTON_UP:
-        scaled.button.x *= density;
-        scaled.button.y *= density;
-        break;
-    case SDL_EVENT_MOUSE_WHEEL:
-        scaled.wheel.mouse_x *= density;
-        scaled.wheel.mouse_y *= density;
-        break;
-    default:
-        break;
-    }
+    scaleMouseEvent(scaled, SDL_GetWindowPixelDensity(m_window));
     return forwardToRml(*ctx, scaled);
 }
 
