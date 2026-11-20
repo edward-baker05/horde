@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/Paths.hpp"
+#include "core/PolishMode.hpp"
 #include "gfx/Camera2D.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "scene/LevelScene.hpp"
@@ -103,6 +104,11 @@ bool App::init(const AppConfig& config) {
     services.atlas = &m_atlas;
     services.ui = &m_rml;
     services.shell = &m_shell;
+    // No music or cow in benchmarks; without a sound device the game runs silent.
+    if (!m_config.bench && m_music.init()) {
+        services.music = &m_music;
+    }
+    services.dancingCow = !m_config.bench;
     // Benchmarks decide for themselves whether to sync the GPU.
     if (m_config.bench) {
         m_measureSimGpu = m_config.bench->syncGpu;
@@ -414,7 +420,7 @@ void App::update(float deltaTime) {
                                            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                            ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove |
                                            ImGuiWindowFlags_NoBringToFrontOnFocus;
-        if (ImGui::Begin("Frame stats", nullptr, flags)) {
+        if (ImGui::Begin(tr("Frame stats"), nullptr, flags)) {
             ui::drawFrameStats(m_stats, m_config.bench ? nullptr : &m_measureSimGpu);
         }
         ImGui::End();
@@ -516,6 +522,9 @@ void App::render() {
     }
 
     const ui::DeviceKind topDevice = active != nullptr ? active->presentation().device : ui::DeviceKind::None;
+    // Behind full-window scenes and device screens: slate, or dark wine in Polish mode.
+    const SDL_FColor backdrop =
+        polish::enabled() ? SDL_FColor{0.29f, 0.03f, 0.08f, 1.0f} : SDL_FColor{0.06f, 0.07f, 0.09f, 1.0f};
     const std::array<ui::DeviceKind, 2> deviceKinds{ui::DeviceKind::Phone, ui::DeviceKind::Tablet};
 
     // Which device screens get drawn this frame: visible, with a scene on them.
@@ -549,6 +558,15 @@ void App::render() {
     // The composite batch is in window pixels, y down, like the scene cameras.
     const glm::vec2 windowPx = m_shell.windowPx();
     m_compositeBatch.begin();
+    if (topDevice != ui::DeviceKind::None && polish::enabled()) {
+        // Behind the devices in Polish mode: the flag, white over red.
+        const glm::vec4 solid = gfx::atlasCell(1, 1, 4, 4);
+        const glm::vec2 half{windowPx.x, windowPx.y * 0.5f};
+        gfx::drawCentered(m_compositeBatch, m_atlas.handle(), {windowPx.x * 0.5f, windowPx.y * 0.25f}, half, 0.0f, solid,
+                          {0.96f, 0.96f, 0.96f, 1.0f});
+        gfx::drawCentered(m_compositeBatch, m_atlas.handle(), {windowPx.x * 0.5f, windowPx.y * 0.75f}, half, 0.0f, solid,
+                          {0.86f, 0.08f, 0.24f, 1.0f});
+    }
     m_shell.composite(m_compositeBatch, m_atlas.handle());
     m_compositeBatch.upload(commands);
     m_compositeCamera.setViewport(windowPx.x, windowPx.y);
@@ -578,7 +596,7 @@ void App::render() {
 
         SDL_GPUColorTargetInfo screenTarget{};
         screenTarget.texture = target.texture();
-        screenTarget.clear_color = SDL_FColor{0.06f, 0.07f, 0.09f, 1.0f};
+        screenTarget.clear_color = backdrop;
         screenTarget.load_op = SDL_GPU_LOADOP_CLEAR;
         screenTarget.store_op = SDL_GPU_STOREOP_STORE;
 
@@ -601,11 +619,11 @@ void App::render() {
     }
 
     // A scene without a device keeps its own background; otherwise the devices
-    // sit on black.
+    // sit on black, or on the flag drawn into the composite batch.
     const bool direct = topDevice == ui::DeviceKind::None;
     SDL_GPUColorTargetInfo colorTarget{};
     colorTarget.texture = swapchain;
-    colorTarget.clear_color = direct ? SDL_FColor{0.06f, 0.07f, 0.09f, 1.0f} : SDL_FColor{0.0f, 0.0f, 0.0f, 1.0f};
+    colorTarget.clear_color = direct ? backdrop : SDL_FColor{0.0f, 0.0f, 0.0f, 1.0f};
     colorTarget.load_op = SDL_GPU_LOADOP_CLEAR;
     colorTarget.store_op = SDL_GPU_STOREOP_STORE;
 
@@ -616,10 +634,12 @@ void App::render() {
             active->camera().setViewport(static_cast<float>(swapchainWidth), static_cast<float>(swapchainHeight));
             m_batch.flush(commands, pass, active->camera().viewProjection());
             active->renderPass(commands, pass);
-            m_rml.draw(ui::DeviceKind::None, pass, commands);
         }
 
         m_compositeBatch.flush(commands, pass, m_compositeCamera.viewProjection());
+        // The window context last, so what it shows (the dancing cow) sits over
+        // the devices as well as over device-less scenes.
+        m_rml.draw(ui::DeviceKind::None, pass, commands);
         m_imgui.draw(commands, pass);
         SDL_EndGPURenderPass(pass);
     }
@@ -641,6 +661,7 @@ void App::shutdown() {
 
     m_gpuTimer.stop();
     m_scenes.reset();
+    m_music.shutdown();
     m_compositeBatch.shutdown();
     m_shell.shutdown();
     m_rml.shutdown();

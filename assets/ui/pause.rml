@@ -4,26 +4,36 @@
 	<link type="text/rcss" href="phone.rcss"/>
 </head>
 <body data-model="pause">
-	<div class="status-bar"></div>
-
-	<div class="page">
+	<div class="band">
+		<div class="status-bar"></div>
 		<div class="hero">
-			<span class="wordmark">PAUSED<span class="dot">.</span></span>
-			<span class="tagline">The horde can wait.</span>
+			<div class="spin"><img src="folk/rosette.png"/></div>
+			<div class="title-row">
+				<img class="bird" src="folk/bird_r.png"/><span class="wordmark">PAUZA</span><img class="bird" src="folk/bird_l.png"/>
+			</div>
+			<span class="tagline">„Horda poczeka.”</span>
+			<img class="tulips" src="folk/tulips.png"/>
 		</div>
+	</div>
+	<div class="scallop"/>
 
-		<button class="primary" data-event-click="resume">Resume</button>
+	<div class="page red">
+		<button class="primary" data-event-click="resume">WZNÓW</button>
 
 		<div class="group">
-			<button class="row" data-event-click="restart">Restart</button>
+			<button class="row" data-event-click="restart">Od nowa</button>
 		</div>
 
-		<div class="group">
-			<button class="row danger" data-if="!to_editor" data-event-click="quit">Quit to menu</button>
-			<button class="row danger" data-if="to_editor" data-event-click="quit">Back to editor</button>
+		<div class="group" data-if="!to_editor">
+			<button class="row danger" data-event-click="quit">Wyjdź do menu</button>
+		</div>
+		<div class="group" data-if="to_editor">
+			<button class="row danger" data-event-click="quit">Wróć do edytora</button>
 		</div>
 	</div>
 
 	<div class="home-bar"/>
+	<div class="pasiak top"/>
+	<div class="pasiak bottom"/>
 </body>
 </rml>

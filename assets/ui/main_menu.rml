@@ -4,66 +4,88 @@
 	<link type="text/rcss" href="phone.rcss"/>
 </head>
 <body data-model="menu">
-	<div class="status-bar">
-		<span class="clock">{{clock}}</span>
-		<span class="icons">
-			<span class="signal s1"/><span class="signal s2"/><span class="signal s3"/><span class="signal s4"/>
-			<span class="battery"><span class="charge"/></span>
-		</span>
-	</div>
-
-	<div class="page" data-if="page == 'root'">
-		<div class="hero">
-			<span class="wordmark">HORDE<span class="dot">.</span></span>
-			<span class="tagline">Hold the line.</span>
+	<div class="band">
+		<div class="status-bar">
+			<span class="clock">{{clock}}</span>
+			<span class="icons">
+				<span class="carrier">PL</span>
+				<span class="signal s1"/><span class="signal s2"/><span class="signal s3"/><span class="signal s4"/>
+				<span class="battery"><span class="charge"><span class="lower"/></span></span>
+			</span>
 		</div>
 
-		<button class="primary" data-event-click="open('play')">Play</button>
+		<div class="hero" data-if="page == 'root'">
+			<span class="date">{{date}}</span>
+			<div class="spin"><img src="folk/rosette.png"/></div>
+			<div class="title-row">
+				<img class="bird" src="folk/bird_r.png"/><span class="wordmark">HORDA</span><img class="bird" src="folk/bird_l.png"/>
+			</div>
+			<span class="tagline">„Trzymaj linię!”</span>
+			<img class="tulips" src="folk/tulips.png"/>
+		</div>
+
+		<div data-if="page == 'play'">
+			<div class="header"><button class="back" data-event-click="back">‹ Menu</button></div>
+			<div class="page-title">Graj<img class="bird" src="folk/bird_l.png"/></div>
+		</div>
+
+		<div data-if="page == 'dev'">
+			<div class="header"><button class="back" data-event-click="back">‹ Menu</button></div>
+			<div class="page-title">Poligon<img class="bird" src="folk/bird_l.png"/></div>
+		</div>
+
+		<div data-if="page == 'settings'">
+			<div class="header"><button class="back" data-event-click="back">‹ Menu</button></div>
+			<div class="page-title">Ustawienia<img class="bird" src="folk/bird_l.png"/></div>
+		</div>
+	</div>
+	<div class="scallop"/>
+
+	<div class="page red" data-if="page == 'root'">
+		<button class="primary" data-event-click="open('play')">GRAJ</button>
 
 		<div class="group">
-			<button class="row" data-event-click="upgrades">Upgrades<span class="chevron">›</span></button>
-			<button class="row" data-event-click="editor">Level Editor<span class="chevron">›</span></button>
-			<button class="row" data-event-click="open('dev')">Dev Ground<span class="chevron">›</span></button>
+			<button class="row" data-event-click="upgrades">Ulepszenia<img class="chev" src="folk/rosette.png"/></button>
+			<button class="row" data-event-click="editor">Edytor poziomów<img class="chev" src="folk/rosette.png"/></button>
+			<button class="row" data-event-click="open('dev')">Poligon<img class="chev" src="folk/rosette.png"/></button>
+			<button class="row" data-event-click="open('settings')">Ustawienia<img class="chev" src="folk/rosette.png"/></button>
 		</div>
 
 		<div class="group">
-			<button class="row danger" data-event-click="quit">Quit</button>
+			<button class="row danger" data-event-click="quit">Wyjdź z gry</button>
 		</div>
 	</div>
 
-	<div data-if="page == 'play'">
-		<div class="header">
-			<button class="back" data-event-click="back">‹ Menu</button>
+	<div class="page scroll" data-if="page == 'play'">
+		<div class="section">POZIOMY</div>
+		<div class="group">
+			<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}<img class="chev" src="folk/rosette.png"/></button>
 		</div>
-		<div class="page-title">Play</div>
-		<div class="page scroll">
-			<div class="section">LEVELS</div>
+	</div>
+
+	<div class="page scroll" data-if="page == 'dev'">
+		<div class="section">POZIOMY</div>
+		<div class="group">
+			<button class="row" data-event-click="dev_level(-1)">Poziom wbudowany<span class="hint">domyślny</span><img class="chev" src="folk/rosette.png"/></button>
+			<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}<img class="chev" src="folk/rosette.png"/></button>
+		</div>
+		<div data-if="presets.size > 0">
+			<div class="section">ZESTAWY</div>
 			<div class="group">
-				<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}<span class="chevron">›</span></button>
+				<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}<img class="chev" src="folk/rosette.png"/></button>
 			</div>
 		</div>
 	</div>
 
-	<div data-if="page == 'dev'">
-		<div class="header">
-			<button class="back" data-event-click="back">‹ Menu</button>
-		</div>
-		<div class="page-title">Dev Ground</div>
-		<div class="page scroll">
-			<div class="section">LEVELS</div>
-			<div class="group">
-				<button class="row" data-event-click="dev_level(-1)">Built-in level<span class="hint">default</span><span class="chevron">›</span></button>
-				<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}<span class="chevron">›</span></button>
-			</div>
-			<div data-if="presets.size > 0">
-				<div class="section">PRESETS</div>
-				<div class="group">
-					<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}<span class="chevron">›</span></button>
-				</div>
-			</div>
+	<div class="page scroll" data-if="page == 'settings'">
+		<div class="section">GRA</div>
+		<div class="group">
+			<button class="row" data-event-click="toggle_polish">Tryb polski<span class="switch" data-class-on="polish"><span class="knob"/></span></button>
 		</div>
 	</div>
 
 	<div class="home-bar"/>
+	<div class="pasiak top"/>
+	<div class="pasiak bottom"/>
 </body>
 </rml>

@@ -47,6 +47,7 @@ public:
 private:
     bool m_initialised = false;
     bool m_frameStarted = false;
+    bool m_polishStyle = false; // the style last applied
     void* m_drawData = nullptr;
 };
 

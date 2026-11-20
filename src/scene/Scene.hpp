@@ -14,6 +14,10 @@ class SpriteBatch;
 class Texture;
 } // namespace horde::gfx
 
+namespace horde::audio {
+class MusicPlayer;
+}
+
 namespace horde::ui {
 class RmlLayer;
 class DeviceShell;
@@ -48,6 +52,8 @@ struct Services {
     SceneStack* scenes = nullptr;
     ui::RmlLayer* ui = nullptr;
     ui::DeviceShell* shell = nullptr;
+    audio::MusicPlayer* music = nullptr; // null when there is no sound device
+    bool dancingCow = false;             // off in benchmarks, so timings stay comparable
 };
 
 // A distinct view of the game: the level, the tech tree, the main menu.

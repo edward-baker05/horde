@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/PolishMode.hpp"
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "scene/Scene.hpp"
@@ -518,10 +519,10 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
 void GpuCollidePhysics::debugUi() {
     // Live: the shader reads these every step.
     float wobbleDegrees = glm::degrees(m_config.movement.wobbleAngle);
-    if (ImGui::SliderFloat("Wobble", &wobbleDegrees, 0.0f, 60.0f, "%.0f deg")) {
+    if (ImGui::SliderFloat(tr("Wobble"), &wobbleDegrees, 0.0f, 60.0f, tr("%.0f deg"))) {
         m_config.movement.wobbleAngle = glm::radians(wobbleDegrees);
     }
-    ImGui::SliderFloat("Wobble rate", &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
+    ImGui::SliderFloat(tr("Wobble rate"), &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
 }
 
 bool GpuCollidePhysics::readHealth(std::vector<float>& out) {

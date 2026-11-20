@@ -35,6 +35,7 @@ bool EditorScene::onEnter(Services& services) {
                                window.y / (m_state.level.size.y * 1.2f));
     m_camera.setZoom(fit);
 
+    m_cow.show(services);
     return true;
 }
 

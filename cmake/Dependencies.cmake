@@ -214,3 +214,27 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(RmlUi)
 unset(CMAKE_POLICY_VERSION_MINIMUM)
 set(BUILD_SHARED_LIBS ${_horde_saved_shared})
+
+# --- stb_vorbis --------------------------------------------------------------
+#
+# Public-domain Ogg Vorbis decoder for the menu music. stb has no releases, so a
+# commit is pinned; set HORDE_STB_SHA256 together with HORDE_STB_COMMIT.
+
+set(HORDE_STB_COMMIT "0e9206afd9752c8c0826b671b16b702ec7d175cd" CACHE STRING "nothings/stb commit to fetch")
+set(HORDE_STB_SHA256 "bfa11113029788800e1bbecdf6de107f9922d382c73ad20d3441526e4634c96e" CACHE STRING "SHA256 of the stb tarball for HORDE_STB_COMMIT")
+
+FetchContent_Declare(stb
+    URL https://github.com/nothings/stb/archive/${HORDE_STB_COMMIT}.tar.gz
+    URL_HASH SHA256=${HORDE_STB_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+FetchContent_MakeAvailable(stb)
+
+add_library(stb_vorbis STATIC ${stb_SOURCE_DIR}/stb_vorbis.c)
+target_include_directories(stb_vorbis SYSTEM PUBLIC ${stb_SOURCE_DIR})
+# Decoding from memory and files only; no stdio-based pushdata API needed.
+target_compile_definitions(stb_vorbis PRIVATE STB_VORBIS_NO_PUSHDATA_API)
+if(NOT MSVC)
+    target_compile_options(stb_vorbis PRIVATE -w)
+endif()

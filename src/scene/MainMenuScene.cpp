@@ -5,7 +5,9 @@
 
 #include <memory>
 
+#include "audio/MusicPlayer.hpp"
 #include "core/Paths.hpp"
+#include "core/PolishMode.hpp"
 #include "logic/LevelFiles.hpp"
 #include "scene/EditorScene.hpp"
 #include "scene/LevelScene.hpp"
@@ -40,6 +42,8 @@ bool MainMenuScene::onEnter(Services& services) {
     constructor.Bind("presets", &m_presets);
     constructor.Bind("page", &m_page);
     constructor.Bind("clock", &m_clock);
+    constructor.Bind("date", &m_date);
+    constructor.Bind("polish", &m_polish);
     constructor.BindEventCallback("open", &MainMenuScene::onOpen, this);
     constructor.BindEventCallback("back", &MainMenuScene::onBack, this);
     constructor.BindEventCallback("play", &MainMenuScene::onPlay, this);
@@ -48,17 +52,63 @@ bool MainMenuScene::onEnter(Services& services) {
     constructor.BindEventCallback("upgrades", &MainMenuScene::onUpgrades, this);
     constructor.BindEventCallback("editor", &MainMenuScene::onEditor, this);
     constructor.BindEventCallback("quit", &MainMenuScene::onQuit, this);
+    constructor.BindEventCallback("toggle_polish", &MainMenuScene::onTogglePolish, this);
     m_model = constructor.GetModelHandle();
 
-    const std::string documentPath = paths::asset("ui/main_menu.rml").string();
-    m_document = m_context->LoadDocument(documentPath);
-    if (m_document == nullptr) {
+    m_polish = polish::enabled();
+    if (!loadDocument()) {
+        return false;
+    }
+    playMusic();
+    return true;
+}
+
+bool MainMenuScene::loadDocument() {
+    // Each mode has its own document and stylesheet; both bind this model.
+    const std::string documentPath =
+        paths::asset(polish::enabled() ? "ui/main_menu.rml" : "ui/main_menu_normal.rml").string();
+    Rml::ElementDocument* document = m_context->LoadDocument(documentPath);
+    if (document == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "main menu: could not load %s", documentPath.c_str());
         return false;
     }
+    if (m_document != nullptr) {
+        m_document->Close();
+    }
+    m_document = document;
     m_document->Show();
     SDL_Log("Main menu document loaded: %s", documentPath.c_str());
     return true;
+}
+
+void MainMenuScene::onTogglePolish(Rml::DataModelHandle, Rml::Event&, const Args&) {
+    // Only flagged here: swapping documents closes the one this click came
+    // from, which frees the handler RmlUi is still running. update() swaps.
+    m_togglePending = true;
+}
+
+void MainMenuScene::applyToggle() {
+    m_togglePending = false;
+    polish::setEnabled(!polish::enabled());
+    m_polish = polish::enabled();
+    m_model.DirtyVariable("polish");
+    // The other mode's menu, still on the settings page, and its music.
+    loadDocument();
+    playMusic();
+}
+
+void MainMenuScene::playMusic() {
+    // Polish mode: Chopin, Polonaise in A major Op. 40 No. 1 "Military", Aya
+    // Higuchi / Musopen (public domain). About 12 dB hotter than the pause
+    // mazurka, hence the gain. Normal mode is silent.
+    if (m_services->music == nullptr) {
+        return;
+    }
+    if (polish::enabled()) {
+        m_services->music->play(paths::asset("music/polonaise_op40_no1.ogg"), 0.3f);
+    } else {
+        m_services->music->stop();
+    }
 }
 
 void MainMenuScene::onExit() {
@@ -98,9 +148,13 @@ void MainMenuScene::onRevealed() {
     if (m_document != nullptr) {
         m_document->Show();
     }
+    playMusic();
 }
 
 void MainMenuScene::update(float deltaTime) {
+    if (m_togglePending) {
+        applyToggle();
+    }
     m_clockTimer += deltaTime;
     if (m_clockTimer >= 1.0f) {
         m_clockTimer = 0.0f;
@@ -108,13 +162,34 @@ void MainMenuScene::update(float deltaTime) {
     }
 }
 
+namespace {
+
+// Polish weekday (from Sunday) and month names, the months in the genitive as
+// a date takes them: "piątek, 20 listopada".
+constexpr const char* kDays[] = {"niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"};
+constexpr const char* kMonths[] = {"stycznia", "lutego",   "marca",    "kwietnia",     "maja",      "czerwca",
+                                   "lipca",    "sierpnia", "września", "października", "listopada", "grudnia"};
+
+} // namespace
+
 void MainMenuScene::refreshClock() {
     SDL_Time now = 0;
     SDL_DateTime time{};
     std::string text;
+    std::string date;
     if (SDL_GetCurrentTime(&now) && SDL_TimeToDateTime(now, &time, true)) {
         text = std::to_string(time.hour / 10) + std::to_string(time.hour % 10) + ":" +
                std::to_string(time.minute / 10) + std::to_string(time.minute % 10);
+        if (time.day_of_week >= 0 && time.day_of_week < 7 && time.month >= 1 && time.month <= 12) {
+            date =
+                std::string(kDays[time.day_of_week]) + ", " + std::to_string(time.day) + " " + kMonths[time.month - 1];
+        }
+    }
+    if (date != m_date) {
+        m_date = std::move(date);
+        if (m_model) {
+            m_model.DirtyVariable("date");
+        }
     }
     if (text != m_clock) {
         m_clock = std::move(text);
@@ -176,6 +251,8 @@ void MainMenuScene::onOpen(Rml::DataModelHandle, Rml::Event&, const Args& args) 
         }
     } else if (target == "dev") {
         setPage("dev");
+    } else if (target == "settings") {
+        setPage("settings");
     }
 }
 

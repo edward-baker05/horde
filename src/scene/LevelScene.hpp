@@ -13,6 +13,7 @@
 #include "logic/Level.hpp"
 #include "logic/WallGridShapes.hpp"
 #include "scene/LevelMode.hpp"
+#include "scene/DancingCow.hpp"
 #include "scene/Scene.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
@@ -79,6 +80,7 @@ public:
 
     bool onEnter(Services& services) override;
     void onExit() override;
+    void onCovered() override;
     void onRevealed() override;
     bool handleEvent(const SDL_Event& event) override;
     void update(float dt) override;
@@ -127,6 +129,7 @@ private:
     void explosionUi();
 
     Services* m_services = nullptr;
+    DancingCow m_cow;
     // A pause has been pushed and not yet popped.
     bool m_pausePending = false;
     gfx::Camera2D m_camera;

@@ -1,0 +1,29 @@
+<rml>
+<head>
+	<title>Paused</title>
+	<link type="text/rcss" href="phone_normal.rcss"/>
+</head>
+<body data-model="pause">
+	<div class="status-bar"></div>
+
+	<div class="page">
+		<div class="hero">
+			<span class="wordmark">PAUSED<span class="dot">.</span></span>
+			<span class="tagline">The horde can wait.</span>
+		</div>
+
+		<button class="primary" data-event-click="resume">Resume</button>
+
+		<div class="group">
+			<button class="row" data-event-click="restart">Restart</button>
+		</div>
+
+		<div class="group">
+			<button class="row danger" data-if="!to_editor" data-event-click="quit">Quit to menu</button>
+			<button class="row danger" data-if="to_editor" data-event-click="quit">Back to editor</button>
+		</div>
+	</div>
+
+	<div class="home-bar"/>
+</body>
+</rml>

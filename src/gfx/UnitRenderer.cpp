@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL_log.h>
 
+#include "core/PolishMode.hpp"
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "gfx/SpriteBatch.hpp"
@@ -132,7 +133,8 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
     UnitDrawUniforms uniforms{};
     uniforms.viewProjection = viewProjection;
     uniforms.uvRect = atlasCell(1, 0, 4, 4);
-    uniforms.color = glm::vec4(0.0f, 1.0f, 0.2f, 1.0f);
+    // Green, or in Polish mode Lowicz blue, clear on the cream floor and crimson walls.
+    uniforms.color = polish::enabled() ? glm::vec4(0.11f, 0.25f, 0.62f, 1.0f) : glm::vec4(0.0f, 1.0f, 0.2f, 1.0f);
     uniforms.unitSize = glm::vec2(unitSize, unitSize);
     uniforms.alpha = options.alpha;
     uniforms.maxJump = options.previous ? options.maxJump : 0.0f;

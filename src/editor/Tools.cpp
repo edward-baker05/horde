@@ -4,6 +4,8 @@
 #include <cmath>
 #include <utility>
 
+#include "core/PolishMode.hpp"
+
 namespace horde::editor {
 
 bool isBoxTool(Tool tool) {
@@ -13,25 +15,25 @@ bool isBoxTool(Tool tool) {
 const char* toolName(Tool tool) {
     switch (tool) {
         case Tool::Select:
-            return "Select";
+            return tr("Select");
         case Tool::Rectangle:
-            return "Rectangle";
+            return tr("Rectangle");
         case Tool::Triangle:
-            return "Triangle";
+            return tr("Triangle");
         case Tool::Circle:
-            return "Circle";
+            return tr("Circle");
         case Tool::Polyline:
-            return "Polyline";
+            return tr("Polyline");
         case Tool::Spawn:
-            return "Spawn";
+            return tr("Spawn");
         case Tool::Exit:
-            return "Exit";
+            return tr("Exit");
         case Tool::FieldRegion:
-            return "Field region";
+            return tr("Field region");
         case Tool::Paint:
-            return "Paint cells";
+            return tr("Paint cells");
     }
-    return "Select";
+    return tr("Select");
 }
 
 bool makeWallFromDrag(Tool tool, glm::vec2 start, glm::vec2 end, logic::Rgb color, logic::Wall& out) {

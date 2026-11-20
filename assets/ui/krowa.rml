@@ -1,0 +1,74 @@
+<rml>
+<head>
+	<title>Krowa</title>
+	<style>
+		/* The dancing cow. Frames come from the Tenor GIF, stepped by
+		   DancingCow::update(). Nothing here takes the pointer, so clicks
+		   reach the level and its panels underneath.
+
+		   DVD bounce without code: two nested boxes, one sliding left to right
+		   and one top to bottom, each ping-ponging with a different period, so
+		   the path wanders and only rarely hits a corner. */
+		body {
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+		}
+
+		/* The cow's 150 x 125 box (the GIF's 1.2:1) can travel the screen
+		   less its own size. */
+		.lane {
+			position: absolute;
+			left: 0;
+			top: 0;
+			right: 150dp;
+			bottom: 125dp;
+			pointer-events: none;
+		}
+
+		.x {
+			position: absolute;
+			left: 0%;
+			top: 0;
+			bottom: 0;
+			width: 0;
+			pointer-events: none;
+			animation: 9.1s linear-in-out infinite alternate slide-x;
+		}
+
+		.y {
+			position: absolute;
+			left: 0;
+			top: 0%;
+			pointer-events: none;
+			animation: 5.3s linear-in-out infinite alternate slide-y;
+		}
+
+		@keyframes slide-x {
+			from { left: 0%; }
+			to { left: 100%; }
+		}
+
+		@keyframes slide-y {
+			from { top: 0%; }
+			to { top: 100%; }
+		}
+
+		#cow {
+			display: block;
+			width: 150dp;
+			height: 125dp;
+			pointer-events: none;
+		}
+	</style>
+</head>
+<body>
+	<div class="lane">
+		<div class="x">
+			<div class="y">
+				<img id="cow" src="krowa/00.png"/>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>

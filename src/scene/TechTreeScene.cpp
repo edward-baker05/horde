@@ -4,6 +4,7 @@
 
 #include <cmath>
 
+#include "core/PolishMode.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
 #include "scene/SceneStack.hpp"
@@ -47,9 +48,9 @@ void TechTreeScene::render(gfx::SpriteBatch& batch) {
 
 void TechTreeScene::debugUi() {
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Tech tree");
+    ImGui::Begin(tr("Tech tree"));
 
-    if (ImGui::Button("Back to menu", ImVec2(160.0f, 0.0f))) {
+    if (ImGui::Button(tr("Back to menu"), ImVec2(160.0f, 0.0f))) {
         m_services->scenes->pop();
     }
 

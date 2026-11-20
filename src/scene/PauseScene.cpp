@@ -4,7 +4,9 @@
 
 #include <RmlUi/Core.h>
 
+#include "audio/MusicPlayer.hpp"
 #include "core/Paths.hpp"
+#include "core/PolishMode.hpp"
 #include "scene/SceneStack.hpp"
 #include "ui/RmlLayer.hpp"
 
@@ -33,7 +35,7 @@ bool PauseScene::onEnter(Services& services) {
     // The menu's document is still in this shared context. This one is shown
     // after it, so it sits on top, and its opaque body covers the whole phone
     // screen, so the menu is neither seen nor clicked through it.
-    const std::string documentPath = paths::asset("ui/pause.rml").string();
+    const std::string documentPath = paths::asset(polish::enabled() ? "ui/pause.rml" : "ui/pause_normal.rml").string();
     m_document = m_context->LoadDocument(documentPath);
     if (m_document == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "pause: could not load %s", documentPath.c_str());
@@ -41,6 +43,15 @@ bool PauseScene::onEnter(Services& services) {
         return false;
     }
     m_document->Show();
+    // Polish mode: Chopin, Mazurka in C major Op. 24 No. 2, Edward Neeman /
+    // Musopen (public domain). Normal mode is silent.
+    if (services.music != nullptr) {
+        if (polish::enabled()) {
+            services.music->play(paths::asset("music/mazurka_op24_no2.ogg"));
+        } else {
+            services.music->stop();
+        }
+    }
     return true;
 }
 

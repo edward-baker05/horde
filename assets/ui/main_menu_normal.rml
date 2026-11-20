@@ -1,0 +1,83 @@
+<rml>
+<head>
+	<title>Main menu</title>
+	<link type="text/rcss" href="phone_normal.rcss"/>
+</head>
+<body data-model="menu">
+	<div class="status-bar">
+		<span class="clock">{{clock}}</span>
+		<span class="icons">
+			<span class="signal s1"/><span class="signal s2"/><span class="signal s3"/><span class="signal s4"/>
+			<span class="battery"><span class="charge"/></span>
+		</span>
+	</div>
+
+	<div class="page" data-if="page == 'root'">
+		<div class="hero">
+			<span class="wordmark">HORDE<span class="dot">.</span></span>
+			<span class="tagline">Hold the line.</span>
+		</div>
+
+		<button class="primary" data-event-click="open('play')">Play</button>
+
+		<div class="group">
+			<button class="row" data-event-click="upgrades">Upgrades<span class="chevron">›</span></button>
+			<button class="row" data-event-click="editor">Level Editor<span class="chevron">›</span></button>
+			<button class="row" data-event-click="open('dev')">Dev Ground<span class="chevron">›</span></button>
+			<button class="row" data-event-click="open('settings')">Settings<span class="chevron">›</span></button>
+		</div>
+
+		<div class="group">
+			<button class="row danger" data-event-click="quit">Quit</button>
+		</div>
+	</div>
+
+	<div data-if="page == 'play'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Play</div>
+		<div class="page scroll">
+			<div class="section">LEVELS</div>
+			<div class="group">
+				<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}<span class="chevron">›</span></button>
+			</div>
+		</div>
+	</div>
+
+	<div data-if="page == 'dev'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Dev Ground</div>
+		<div class="page scroll">
+			<div class="section">LEVELS</div>
+			<div class="group">
+				<button class="row" data-event-click="dev_level(-1)">Built-in level<span class="hint">default</span><span class="chevron">›</span></button>
+				<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}<span class="chevron">›</span></button>
+			</div>
+			<div data-if="presets.size > 0">
+				<div class="section">PRESETS</div>
+				<div class="group">
+					<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}<span class="chevron">›</span></button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div data-if="page == 'settings'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Settings</div>
+		<div class="page scroll">
+			<div class="section">GAME</div>
+			<div class="group">
+				<button class="row" data-event-click="toggle_polish">Polish mode<span class="switch" data-class-on="polish"><span class="knob"/></span></button>
+			</div>
+		</div>
+	</div>
+
+	<div class="home-bar"/>
+</body>
+</rml>

@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "core/PolishMode.hpp"
 #include "gfx/LevelRenderer.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
@@ -111,14 +112,21 @@ bool LevelScene::onEnter(Services& services) {
         return false;
     }
     m_physics->setFlingDrag(m_flingDrag);
+    m_cow.show(services);
     return true;
+}
+
+void LevelScene::onCovered() {
+    m_cow.hide();
 }
 
 void LevelScene::onRevealed() {
     m_pausePending = false;
+    m_cow.show(*m_services);
 }
 
 void LevelScene::onExit() {
+    m_cow.hide();
     if (m_physics) {
         m_physics->shutdown();
         m_physics.reset();
@@ -161,6 +169,7 @@ bool LevelScene::handleCameraGesture(const SDL_Event& event) {
 }
 
 void LevelScene::update(float dt) {
+    m_cow.update(dt);
     // Rate 0: one step per frame, as long as the frame took.
     if (m_options.physicsRate <= 0.0f) {
         m_stepsThisFrame = 1;
@@ -217,19 +226,70 @@ void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* p
     m_physics->renderPass(commands, pass, m_camera.viewProjection(), alpha);
 }
 
+namespace {
+
+// Names for the dev panel's combos: Polish in Polish mode, otherwise the
+// sim's own names. Those stay English either way, as benchmark output and
+// presets use them.
+const char* spawnLabel(sim::SpawnPattern pattern) {
+    if (polish::enabled()) {
+        switch (pattern) {
+            case sim::SpawnPattern::Column:
+                return "kolumna";
+            case sim::SpawnPattern::Random:
+                return "losowo";
+            case sim::SpawnPattern::Grid:
+                return "siatka";
+            case sim::SpawnPattern::Markers:
+                return "znaczniki";
+        }
+    }
+    return sim::spawnPatternName(pattern);
+}
+
+const char* solverLabel(sim::CollisionSolver solver) {
+    if (polish::enabled()) {
+        switch (solver) {
+            case sim::CollisionSolver::Relaxed:
+                return "relaksacyjny";
+            case sim::CollisionSolver::Average:
+                return "uśredniający";
+            case sim::CollisionSolver::Chebyshev:
+                return "Czebyszewa";
+        }
+    }
+    return sim::solverName(solver);
+}
+
+const char* falloffLabel(sim::ExplosionFalloff falloff) {
+    if (polish::enabled()) {
+        switch (falloff) {
+            case sim::ExplosionFalloff::Constant:
+                return "stały";
+            case sim::ExplosionFalloff::Linear:
+                return "liniowy";
+            case sim::ExplosionFalloff::Quadratic:
+                return "kwadratowy";
+        }
+    }
+    return sim::falloffName(falloff);
+}
+
+} // namespace
+
 void LevelScene::debugUi() {
     if (m_options.mode == LevelMode::Player) {
         return;
     }
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Level");
+    ImGui::Begin(tr("Level##dev"));
 
-    ImGui::Text("Units: %u", m_physics->unitCount());
+    ImGui::Text(tr("Units: %u"), m_physics->unitCount());
     healthUi();
 
     // Drawing only: hidden regions still push units.
     if (!m_level.fieldRegions.empty()) {
-        ImGui::Checkbox("Show field regions", &m_showFieldRegions);
+        ImGui::Checkbox(tr("Show field regions"), &m_showFieldRegions);
         ImGui::SameLine();
         ImGui::TextDisabled("(%zu)", m_level.fieldRegions.size());
     }
@@ -237,7 +297,7 @@ void LevelScene::debugUi() {
 
     // Applies immediately: stepping is the scene's, not the physics system's.
     int rate = m_options.physicsRate >= 120.0f ? 1 : 0;
-    ImGui::TextUnformatted("Physics rate");
+    ImGui::TextUnformatted(tr("Physics rate"));
     ImGui::SameLine();
     const bool to60 = ImGui::RadioButton("60 Hz", &rate, 0);
     ImGui::SameLine();
@@ -247,23 +307,23 @@ void LevelScene::debugUi() {
         m_pendingOptions.physicsRate = m_options.physicsRate;
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("%.2f steps/frame", m_stepsPerFrame);
+    ImGui::TextDisabled(tr("%.2f steps/frame"), m_stepsPerFrame);
 
     if (const sim::CollisionSettings* collision = m_physics->collisionSettings()) {
         const float rateHz = m_options.physicsRate;
         if (rateHz > 0.0f) {
-            ImGui::Text("%u passes x %.0f Hz = %.0f passes/s", collision->iterations, rateHz,
+            ImGui::Text(tr("%u passes x %.0f Hz = %.0f passes/s"), collision->iterations, rateHz,
                         static_cast<float>(collision->iterations) * rateHz);
         } else {
-            ImGui::Text("%u passes, one step per frame", collision->iterations);
+            ImGui::Text(tr("%u passes, one step per frame"), collision->iterations);
         }
     }
 
-    ImGui::SeparatorText("Restart with");
+    ImGui::SeparatorText(tr("Restart with"));
 
     // Loading a preset fills in everything below; edit further before restarting.
-    const char* presetLabel = m_pendingOptions.presetName.empty() ? "(none)" : m_pendingOptions.presetName.c_str();
-    if (ImGui::BeginCombo("Preset", presetLabel)) {
+    const char* presetLabel = m_pendingOptions.presetName.empty() ? tr("(none)") : m_pendingOptions.presetName.c_str();
+    if (ImGui::BeginCombo(tr("Preset"), presetLabel)) {
         for (const std::filesystem::path& path : listPresets()) {
             const std::string name = presetName(path);
             if (ImGui::Selectable(name.c_str(), name == m_pendingOptions.presetName)) {
@@ -283,82 +343,82 @@ void LevelScene::debugUi() {
     }
 
     int units = static_cast<int>(m_pendingOptions.unitCount);
-    if (ImGui::InputInt("Units", &units, 1000, 10000)) {
+    if (ImGui::InputInt(tr("Units"), &units, 1000, 10000)) {
         m_pendingOptions.unitCount = static_cast<std::uint32_t>(std::clamp(units, 0, 4'000'000));
     }
 
     constexpr sim::SpawnPattern patterns[] = {sim::SpawnPattern::Markers, sim::SpawnPattern::Random,
                                               sim::SpawnPattern::Grid, sim::SpawnPattern::Column};
-    if (ImGui::BeginCombo("Spawn", sim::spawnPatternName(m_pendingOptions.spawn))) {
+    if (ImGui::BeginCombo(tr("Spawn##pattern"), spawnLabel(m_pendingOptions.spawn))) {
         for (const sim::SpawnPattern pattern : patterns) {
-            if (ImGui::Selectable(sim::spawnPatternName(pattern), pattern == m_pendingOptions.spawn)) {
+            if (ImGui::Selectable(spawnLabel(pattern), pattern == m_pendingOptions.spawn)) {
                 m_pendingOptions.spawn = pattern;
             }
         }
         ImGui::EndCombo();
     }
     if (m_pendingOptions.spawn == sim::SpawnPattern::Markers) {
-        ImGui::SliderFloat("Spawn rate", &m_pendingOptions.spawnRate, 0.0f, 20000.0f, "%.0f/s",
+        ImGui::SliderFloat(tr("Spawn rate"), &m_pendingOptions.spawnRate, 0.0f, 20000.0f, "%.0f/s",
                            ImGuiSliderFlags_Logarithmic);
     }
     int maxHp = static_cast<int>(m_pendingOptions.health.maxHp);
-    if (ImGui::InputInt("Max HP", &maxHp)) {
+    if (ImGui::InputInt(tr("Max HP"), &maxHp)) {
         m_pendingOptions.health.maxHp = static_cast<std::uint32_t>(std::clamp(maxHp, 1, 100000));
     }
-    if (ImGui::InputFloat("Damage at exit", &m_pendingOptions.health.exitDamage, 0.5f, 5.0f, "%.1f")) {
+    if (ImGui::InputFloat(tr("Damage at exit"), &m_pendingOptions.health.exitDamage, 0.5f, 5.0f, "%.1f")) {
         m_pendingOptions.health.exitDamage = std::max(m_pendingOptions.health.exitDamage, 0.0f);
     }
 
     int iterations = static_cast<int>(m_pendingOptions.collision.iterations);
-    if (ImGui::SliderInt("Collision passes", &iterations, 0, 32)) {
+    if (ImGui::SliderInt(tr("Collision passes"), &iterations, 0, 32)) {
         m_pendingOptions.collision.iterations = static_cast<std::uint32_t>(iterations);
     }
     if (m_pendingOptions.collision.solver == sim::CollisionSolver::Average) {
         ImGui::SliderFloat("Omega", &m_pendingOptions.collision.averageOmega, 0.5f, 2.0f);
     } else {
-        ImGui::SliderFloat("Relaxation", &m_pendingOptions.collision.relaxation, 0.0f, 0.5f);
+        ImGui::SliderFloat(tr("Relaxation"), &m_pendingOptions.collision.relaxation, 0.0f, 0.5f);
     }
     if (m_pendingOptions.collision.solver == sim::CollisionSolver::Chebyshev) {
         ImGui::SliderFloat("Rho", &m_pendingOptions.collision.chebyshevRho, 0.05f, 0.99f);
         int delay = static_cast<int>(m_pendingOptions.collision.chebyshevDelay);
-        if (ImGui::SliderInt("Chebyshev delay", &delay, static_cast<int>(sim::kMinChebyshevDelay), 8)) {
+        if (ImGui::SliderInt(tr("Chebyshev delay"), &delay, static_cast<int>(sim::kMinChebyshevDelay), 8)) {
             m_pendingOptions.collision.chebyshevDelay = static_cast<std::uint32_t>(delay);
         }
     }
-    ImGui::SeparatorText("Crowd flow");
+    ImGui::SeparatorText(tr("Crowd flow"));
     bool congestion = m_pendingOptions.collision.congestionStop > 0.0f;
-    if (ImGui::Checkbox("Slow down for crowds ahead", &congestion)) {
+    if (ImGui::Checkbox(tr("Slow down for crowds ahead"), &congestion)) {
         m_pendingOptions.collision.congestionStop = congestion ? m_pendingOptions.collision.congestionStart + 0.3f : 0.0f;
     }
     if (congestion) {
-        ImGui::SliderFloat("Start (units/cell)", &m_pendingOptions.collision.congestionStart, 0.1f, 1.5f);
-        ImGui::SliderFloat("Stop (units/cell)", &m_pendingOptions.collision.congestionStop,
+        ImGui::SliderFloat(tr("Start (units/cell)"), &m_pendingOptions.collision.congestionStart, 0.1f, 1.5f);
+        ImGui::SliderFloat(tr("Stop (units/cell)"), &m_pendingOptions.collision.congestionStop,
                            m_pendingOptions.collision.congestionStart + 0.05f, 2.0f);
     }
-    ImGui::SliderFloat("Speed", &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
+    ImGui::SliderFloat(tr("Speed"), &m_pendingOptions.maxSpeed, 0.0f, 300.0f);
 
     // Settings that rarely need touching, folded away. Presets set the solver.
-    if (ImGui::CollapsingHeader("Advanced")) {
-        ImGui::TextDisabled("Live");
+    if (ImGui::CollapsingHeader(tr("Advanced"))) {
+        ImGui::TextDisabled(tr("Live"));
         m_physics->debugUi();
 
-        ImGui::TextDisabled("On restart");
-        ImGui::Checkbox("Reorder units by cell", &m_pendingOptions.collision.reorderUnits);
-        ImGui::Checkbox("Respawn at exit", &m_pendingOptions.respawnAtExit);
+        ImGui::TextDisabled(tr("On restart"));
+        ImGui::Checkbox(tr("Reorder units by cell"), &m_pendingOptions.collision.reorderUnits);
+        ImGui::Checkbox(tr("Respawn at exit"), &m_pendingOptions.respawnAtExit);
         constexpr sim::CollisionSolver solvers[] = {sim::CollisionSolver::Relaxed, sim::CollisionSolver::Average,
                                                     sim::CollisionSolver::Chebyshev};
-        if (ImGui::BeginCombo("Solver", sim::solverName(m_pendingOptions.collision.solver))) {
+        if (ImGui::BeginCombo(tr("Solver"), solverLabel(m_pendingOptions.collision.solver))) {
             for (const sim::CollisionSolver solver : solvers) {
-                if (ImGui::Selectable(sim::solverName(solver), solver == m_pendingOptions.collision.solver)) {
+                if (ImGui::Selectable(solverLabel(solver), solver == m_pendingOptions.collision.solver)) {
                     m_pendingOptions.collision.solver = solver;
                 }
             }
             ImGui::EndCombo();
         }
-        ImGui::SliderFloat("Velocity smoothing", &m_pendingOptions.collision.velocitySmoothing, 0.0f, 1.0f);
+        ImGui::SliderFloat(tr("Velocity smoothing"), &m_pendingOptions.collision.velocitySmoothing, 0.0f, 1.0f);
     }
 
-    if (ImGui::Button("Restart level", ImVec2(160.0f, 0.0f))) {
+    if (ImGui::Button(tr("Restart level"), ImVec2(160.0f, 0.0f))) {
         // The explosion tool is set live, not as a pending option: take it as
         // it is now, whatever preset was loaded since.
         m_pendingOptions.explosionArmed = m_explosionArmed;
@@ -367,7 +427,7 @@ void LevelScene::debugUi() {
         m_services->scenes->replace(std::make_unique<LevelScene>(m_pendingOptions));
     }
 
-    if (ImGui::Button("Back", ImVec2(160.0f, 0.0f))) {
+    if (ImGui::Button(tr("Back"), ImVec2(160.0f, 0.0f))) {
         m_services->scenes->pop();
     }
 
@@ -375,64 +435,64 @@ void LevelScene::debugUi() {
 }
 
 void LevelScene::explosionUi() {
-    ImGui::SeparatorText("Explosion");
+    ImGui::SeparatorText(tr("Explosion"));
     if (!m_physics->supportsExplosions()) {
-        ImGui::TextDisabled("Not supported by this physics system");
+        ImGui::TextDisabled(tr("Not supported by this physics system"));
         return;
     }
 
-    ImGui::Checkbox("Armed (right-click to fire)", &m_explosionArmed);
-    ImGui::Checkbox("Fling (past max speed)", &m_explosion.fling);
-    ImGui::SliderFloat("Blast radius", &m_explosion.radius, 5.0f, 1000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+    ImGui::Checkbox(tr("Armed (right-click to fire)"), &m_explosionArmed);
+    ImGui::Checkbox(tr("Fling (past max speed)"), &m_explosion.fling);
+    ImGui::SliderFloat(tr("Blast radius"), &m_explosion.radius, 5.0f, 1000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
     // A fling's strength is a speed, so it wants a wider range than a shove's distance.
     const float range = m_explosion.fling ? 2000.0f : 500.0f;
-    ImGui::SliderFloat("Blast strength", &m_explosion.strength, -range, range,
+    ImGui::SliderFloat(tr("Blast strength"), &m_explosion.strength, -range, range,
                        m_explosion.fling ? "%.0f /s" : "%.0f");
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(m_explosion.fling
-                              ? "Speed, in world units per second, a unit at the centre is launched at in all.\n"
-                                "Negative pulls units in."
-                              : "World units a unit at the centre is moved in all.\nNegative pulls units in.");
+                              ? tr("Speed, in world units per second, a unit at the centre is launched at in all.\n"
+                                "Negative pulls units in.")
+                              : tr("World units a unit at the centre is moved in all.\nNegative pulls units in."));
     }
-    ImGui::SliderFloat("Blast duration", &m_explosion.duration, 0.0f, 5.0f, "%.2f s");
-    ImGui::SliderFloat("Blast damage", &m_explosion.damage, 0.0f, 100.0f, "%.1f hp");
+    ImGui::SliderFloat(tr("Blast duration"), &m_explosion.duration, 0.0f, 5.0f, "%.2f s");
+    ImGui::SliderFloat(tr("Blast damage"), &m_explosion.damage, 0.0f, 100.0f, tr("%.1f hp"));
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Hit points a unit at the centre loses over the blast, fading toward the edge\n"
-                          "by the falloff. Units left with none are despawned.");
+        ImGui::SetTooltip(tr("Hit points a unit at the centre loses over the blast, fading toward the edge\n"
+                          "by the falloff. Units left with none are despawned."));
     }
 
     constexpr sim::ExplosionFalloff curves[] = {sim::ExplosionFalloff::Constant, sim::ExplosionFalloff::Linear,
                                                 sim::ExplosionFalloff::Quadratic};
     const auto curveCombo = [&](const char* label, sim::ExplosionFalloff& value) {
-        if (ImGui::BeginCombo(label, sim::falloffName(value))) {
+        if (ImGui::BeginCombo(label, falloffLabel(value))) {
             for (const sim::ExplosionFalloff curve : curves) {
-                if (ImGui::Selectable(sim::falloffName(curve), curve == value)) {
+                if (ImGui::Selectable(falloffLabel(curve), curve == value)) {
                     value = curve;
                 }
             }
             ImGui::EndCombo();
         }
     };
-    curveCombo("Falloff", m_explosion.falloff);
+    curveCombo(tr("Falloff"), m_explosion.falloff);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How the blast fades from its centre to its edge.");
+        ImGui::SetTooltip(tr("How the blast fades from its centre to its edge."));
     }
-    curveCombo("Decay", m_explosion.decay);
+    curveCombo(tr("Decay"), m_explosion.decay);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How the blast fades over its duration: constant is even all the way,\n"
-                          "linear and quadratic put more of it at the start.");
+        ImGui::SetTooltip(tr("How the blast fades over its duration: constant is even all the way,\n"
+                          "linear and quadratic put more of it at the start."));
     }
 
     if (m_explosion.fling) {
-        if (ImGui::SliderFloat("Fling drag", &m_flingDrag, 0.1f, 20.0f, "%.1f /s", ImGuiSliderFlags_Logarithmic)) {
+        if (ImGui::SliderFloat(tr("Fling drag"), &m_flingDrag, 0.1f, 20.0f, "%.1f /s", ImGuiSliderFlags_Logarithmic)) {
             m_physics->setFlingDrag(m_flingDrag);
         }
     }
@@ -467,7 +527,7 @@ void LevelScene::healthUi() {
 
     if (m_healthSampled) {
         // Max HP is whole; hit points after damage need not be.
-        ImGui::Text("Health: mean %.1f / %u, lowest %.1f, %u despawned", m_healthMean, m_options.health.maxHp,
+        ImGui::Text(tr("Health: mean %.1f / %u, lowest %.1f, %u despawned"), m_healthMean, m_options.health.maxHp,
                     m_healthLowest, m_healthAtZero);
     }
 }

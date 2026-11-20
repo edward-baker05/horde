@@ -1,11 +1,13 @@
 #include "FrameStatsOverlay.hpp"
 
+#include "core/PolishMode.hpp"
+
 #include <imgui.h>
 
 namespace horde::ui {
 
 void drawFrameStats(const scene::FrameStats& stats, bool* measureSimGpu) {
-    ImGui::Text("%.1f fps: %.2f ms per frame (worst %.2f)", stats.frameMs > 0.0f ? 1000.0f / stats.frameMs : 0.0f,
+    ImGui::Text(tr("%.1f fps: %.2f ms per frame (worst %.2f)"), stats.frameMs > 0.0f ? 1000.0f / stats.frameMs : 0.0f,
                 stats.frameMs, stats.frameMaxMs);
 
     // What the frame actually cost, as opposed to how often frames came.
@@ -18,36 +20,36 @@ void drawFrameStats(const scene::FrameStats& stats, bool* measureSimGpu) {
             ImGui::TextUnformatted(label);
             ImGui::TableNextColumn();
             if (worst >= 0.0f) {
-                ImGui::Text("%6.3f ms  (worst %.3f)", value, worst);
+                ImGui::Text(tr("%6.3f ms  (worst %.3f)"), value, worst);
             } else {
                 ImGui::Text(format, value);
             }
         };
-        row("Physics, CPU", "%6.3f ms", stats.updateMs);
+        row(tr("Physics, CPU"), "%6.3f ms", stats.updateMs);
         if (stats.simGpuMeasured) {
-            row("Physics, GPU", "", stats.simGpuMs, stats.simGpuMaxMs);
+            row(tr("Physics, GPU"), "", stats.simGpuMs, stats.simGpuMaxMs);
         } else {
-            row("Physics, GPU", "not measured", 0.0f);
+            row(tr("Physics, GPU"), tr("not measured"), 0.0f);
         }
-        row("Physics total", "%6.3f ms", physics);
-        row("Frame building, CPU", "%6.3f ms", stats.recordMs);
-        row("Other (events, UI)", "%6.3f ms", stats.otherMs);
-        row("Busy per frame", "%6.3f ms", busy);
-        row("Waiting (cap, vsync)", "%6.3f ms", stats.waitMs);
+        row(tr("Physics total"), "%6.3f ms", physics);
+        row(tr("Frame building, CPU"), "%6.3f ms", stats.recordMs);
+        row(tr("Other (events, UI)"), "%6.3f ms", stats.otherMs);
+        row(tr("Busy per frame"), "%6.3f ms", busy);
+        row(tr("Waiting (cap, vsync)"), "%6.3f ms", stats.waitMs);
         ImGui::EndTable();
     }
 
     if (busy > 0.0f) {
-        ImGui::Text("Could run at ~%.0f fps uncapped", 1000.0f / busy);
+        ImGui::Text(tr("Could run at ~%.0f fps uncapped"), 1000.0f / busy);
     }
     if (measureSimGpu) {
-        ImGui::Checkbox("Measure GPU physics", measureSimGpu);
+        ImGui::Checkbox(tr("Measure GPU physics"), measureSimGpu);
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Times the physics compute work on the GPU from a background thread,\n"
+            ImGui::SetTooltip(tr("Times the physics compute work on the GPU from a background thread,\n"
                               "without waiting for it, so the frame rate is unaffected. Figures trail\n"
-                              "by a frame or two. Drawing's GPU time is not included in any line.");
+                              "by a frame or two. Drawing's GPU time is not included in any line."));
         }
     }
 }

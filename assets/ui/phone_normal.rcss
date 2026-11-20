@@ -1,0 +1,305 @@
+/* Phone theme: near-black ground, grouped cards, one warm accent. All sizes
+   are in dp so the layout scales with the display. The renderer has no shader
+   or layer support, so stick to flat colours, vertex gradients, radii,
+   opacity and transforms (no box-shadow, filter or linear-gradient). */
+
+body {
+	font-family: "Liberation Sans";
+	font-size: 17dp;
+	color: #f2f2f5;
+	background-color: #08080b;
+	decorator: vertical-gradient(#16131a #08080b);
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+/* --- Status bar ------------------------------------------------------- */
+
+.status-bar {
+	display: block;
+	height: 44dp;
+	padding: 14dp 28dp 0 28dp;
+	font-size: 15dp;
+	font-weight: bold;
+	color: #f2f2f5;
+}
+
+.status-bar .clock {
+	float: left;
+}
+
+.status-bar .icons {
+	float: right;
+	height: 12dp;
+	margin-top: 3dp;
+}
+
+.signal {
+	display: inline-block;
+	width: 3dp;
+	margin-left: 2dp;
+	background-color: #f2f2f5;
+	border-radius: 1dp;
+	vertical-align: bottom;
+}
+
+.signal.s1 { height: 4dp; }
+.signal.s2 { height: 6dp; }
+.signal.s3 { height: 9dp; }
+.signal.s4 { height: 12dp; background-color: #5a5a64; }
+
+.battery {
+	display: inline-block;
+	width: 22dp;
+	height: 10dp;
+	margin-left: 8dp;
+	padding: 1dp;
+	border: 1dp #8c8c96;
+	border-radius: 3dp;
+	vertical-align: bottom;
+}
+
+.battery .charge {
+	display: block;
+	width: 72%;
+	height: 100%;
+	background-color: #f2f2f5;
+	border-radius: 1dp;
+}
+
+/* --- Headers ---------------------------------------------------------- */
+
+.hero {
+	display: block;
+	padding: 150dp 28dp 40dp 28dp;
+}
+
+.wordmark {
+	display: block;
+	font-size: 56dp;
+	font-weight: bold;
+	letter-spacing: 6dp;
+	color: #f2f2f5;
+}
+
+.wordmark .dot {
+	color: #ff8a3d;
+}
+
+.tagline {
+	display: block;
+	margin-top: 6dp;
+	font-size: 15dp;
+	letter-spacing: 1dp;
+	color: #8c8c96;
+}
+
+.header {
+	display: block;
+	height: 52dp;
+	padding: 4dp 16dp 0 16dp;
+}
+
+.header .back {
+	display: inline-block;
+	height: 40dp;
+	padding: 0 12dp 0 8dp;
+	font-size: 17dp;
+	line-height: 40dp;
+	color: #ff8a3d;
+	border-radius: 20dp;
+	transition: background-color 0.12s;
+}
+
+.header .back:hover {
+	background-color: #ff8a3d1f;
+}
+
+.header .back:active {
+	background-color: #ff8a3d40;
+}
+
+.page-title {
+	display: block;
+	padding: 4dp 28dp 20dp 28dp;
+	font-size: 34dp;
+	font-weight: bold;
+	color: #f2f2f5;
+}
+
+/* --- Content ---------------------------------------------------------- */
+
+.page {
+	display: block;
+	padding: 0 16dp;
+	animation: 0.22s cubic-out page-in;
+}
+
+@keyframes page-in {
+	from { opacity: 0; transform: translateY(14dp); }
+	to { opacity: 1; transform: translateY(0dp); }
+}
+
+/* Sub-page lists scroll under a fixed header and title. Top is the status
+   bar + header + title heights; bottom leaves room for the home bar. */
+.scroll {
+	position: absolute;
+	top: 160dp;
+	bottom: 24dp;
+	left: 0;
+	right: 0;
+	overflow-y: auto;
+	padding-bottom: 16dp;
+}
+
+scrollbarvertical {
+	width: 4dp;
+	margin-right: 4dp;
+}
+
+scrollbarvertical sliderbar {
+	min-height: 32dp;
+	background-color: #ffffff30;
+	border-radius: 2dp;
+}
+
+.section {
+	display: block;
+	padding: 18dp 14dp 8dp 14dp;
+	font-size: 12dp;
+	font-weight: bold;
+	letter-spacing: 1.5dp;
+	color: #8c8c96;
+}
+
+/* Rows sit inset in the card with their own radius, so hover pills look right
+   whichever rows data-if / data-for leave visible. */
+.group {
+	display: block;
+	margin-bottom: 12dp;
+	padding: 4dp;
+	background-color: #17171d;
+	border-radius: 18dp;
+}
+
+button.row {
+	display: block;
+	height: 52dp;
+	padding: 0 14dp;
+	font-size: 17dp;
+	line-height: 52dp;
+	text-align: left;
+	color: #f2f2f5;
+	border-radius: 14dp;
+	transition: background-color 0.12s;
+	position: relative;
+}
+
+button.row:hover {
+	background-color: #24242c;
+}
+
+button.row:active {
+	background-color: #30303a;
+}
+
+.row .chevron {
+	position: absolute;
+	top: 0;
+	right: 16dp;
+	color: #55555f;
+	font-size: 17dp;
+}
+
+.row .hint {
+	position: absolute;
+	top: 0;
+	right: 36dp;
+	font-size: 15dp;
+	color: #8c8c96;
+}
+
+.row.danger {
+	color: #ff5a5f;
+}
+
+/* The one filled call to action on a screen. */
+button.primary {
+	display: block;
+	height: 60dp;
+	margin-bottom: 12dp;
+	font-size: 19dp;
+	font-weight: bold;
+	line-height: 60dp;
+	text-align: center;
+	color: #140a03;
+	background-color: #ff8a3d;
+	decorator: vertical-gradient(#ffa060 #ff7a28);
+	border-radius: 18dp;
+	transition: transform 0.1s cubic-out;
+}
+
+button.primary:hover {
+	decorator: vertical-gradient(#ffb07a #ff8a3d);
+}
+
+button.primary:active {
+	transform: scale(0.97);
+}
+
+.empty {
+	display: block;
+	padding: 18dp;
+	font-size: 15dp;
+	text-align: center;
+	color: #8c8c96;
+}
+
+/* --- Home indicator --------------------------------------------------- */
+
+.home-bar {
+	position: absolute;
+	bottom: 10dp;
+	left: 50%;
+	width: 134dp;
+	height: 5dp;
+	margin-left: -67dp;
+	background-color: #f2f2f5;
+	border-radius: 3dp;
+	opacity: 0.85;
+}
+
+/* --- Settings ---------------------------------------------------------- */
+
+/* An iOS-style switch at the row's right edge; .on when the setting is. */
+.switch {
+	position: absolute;
+	top: 16dp;
+	right: 16dp;
+	width: 46dp;
+	height: 28dp;
+	border-radius: 14dp;
+	background-color: #3a3a44;
+	transition: background-color 0.18s;
+}
+
+.switch.on {
+	background-color: #ff8a3d;
+}
+
+.switch .knob {
+	position: absolute;
+	top: 3dp;
+	left: 3dp;
+	width: 22dp;
+	height: 22dp;
+	border-radius: 11dp;
+	background-color: #f2f2f5;
+	transition: left 0.18s cubic-out;
+}
+
+.switch.on .knob {
+	left: 21dp;
+}
+

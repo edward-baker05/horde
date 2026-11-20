@@ -10,6 +10,7 @@
 #include "editor/Tools.hpp"
 #include "gfx/Camera2D.hpp"
 #include "logic/WallGridShapes.hpp"
+#include "scene/DancingCow.hpp"
 #include "scene/Scene.hpp"
 
 namespace horde::scene {
@@ -22,6 +23,18 @@ namespace horde::scene {
 class EditorScene : public Scene {
 public:
     bool onEnter(Services& services) override;
+    void onExit() override {
+        m_cow.hide();
+    }
+    void onCovered() override {
+        m_cow.hide();
+    }
+    void onRevealed() override {
+        m_cow.show(*m_services);
+    }
+    void update(float deltaTime) override {
+        m_cow.update(deltaTime);
+    }
     bool handleEvent(const SDL_Event& event) override;
     void render(gfx::SpriteBatch& batch) override;
     void debugUi() override;
@@ -49,6 +62,7 @@ private:
     float handlePickRadius() const;
 
     Services* m_services = nullptr;
+    DancingCow m_cow;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
 

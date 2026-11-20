@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 
+#include "core/PolishMode.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "logic/LevelGeometry.hpp"
 
@@ -33,6 +34,49 @@ glm::vec4 toFloatColor(logic::Rgb color) {
     return {static_cast<float>(color.r) / 255.0f, static_cast<float>(color.g) / 255.0f,
             static_cast<float>(color.b) / 255.0f, 1.0f};
 }
+
+namespace {
+
+bool same(logic::Rgb a, logic::Rgb b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b;
+}
+
+// Polish mode re-skins only the stock colours, at draw time, so level files
+// stay as authored: a cream floor, crimson walls (the flag), and Lowicz
+// wycinanki papers for the default paint palette. Colours a level chose for
+// itself are drawn as they are.
+constexpr logic::Rgb kCream{247, 240, 225};
+constexpr logic::Rgb kCrimson{200, 16, 46};
+constexpr std::array<logic::Rgb, logic::kPaletteSize> kFolkPalette{{
+    {200, 16, 46},
+    {26, 20, 22},
+    {31, 133, 66},
+    {29, 63, 158},
+    {246, 190, 0},
+    {240, 122, 20},
+    {194, 24, 111},
+    {98, 52, 150},
+}};
+
+glm::vec4 backgroundColor(logic::Rgb color) {
+    static const logic::Rgb stock = logic::Level{}.backgroundColor;
+    return toFloatColor(polish::enabled() && same(color, stock) ? kCream : color);
+}
+
+glm::vec4 wallColor(logic::Rgb color) {
+    // 150,150,165 is the stock grey from before the current default.
+    static const logic::Rgb current = logic::Wall{}.color;
+    const bool stock = same(color, current) || same(color, {150, 150, 165});
+    return toFloatColor(polish::enabled() && stock ? kCrimson : color);
+}
+
+glm::vec4 paletteColor(const logic::WallGrid& grid, std::uint8_t index) {
+    static const auto stock = logic::WallGrid::defaultPalette();
+    const logic::Rgb color = grid.palette[index];
+    return toFloatColor(polish::enabled() && same(color, stock[index]) ? kFolkPalette[index] : color);
+}
+
+} // namespace
 
 void renderWall(const logic::Wall& wall, SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec4 color) {
     if (const auto* rect = std::get_if<logic::RectangleShape>(&wall.shape)) {
@@ -106,10 +150,10 @@ void renderWallGrid(const logic::GridPieces& pieces, const logic::WallGrid& grid
     for (const logic::GridRect& rect : pieces.rects) {
         const glm::vec2 size = glm::vec2(rect.size) * logic::kCellSize;
         drawCentered(batch, atlas, glm::vec2(rect.origin) * logic::kCellSize + size * 0.5f, size, 0.0f, cellSolid(),
-                     toFloatColor(grid.palette[rect.colorIndex]));
+                     paletteColor(grid, rect.colorIndex));
     }
     for (const logic::GridSlope& slope : pieces.slopes) {
-        renderSlope(slope.cell, slope.shape, batch, atlas, toFloatColor(grid.palette[slope.colorIndex]));
+        renderSlope(slope.cell, slope.shape, batch, atlas, paletteColor(grid, slope.colorIndex));
     }
 }
 
@@ -143,7 +187,7 @@ void renderFieldRegion(const logic::FieldRegion& region, SpriteBatch& batch, SDL
 void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* atlas, bool showFieldRegions,
                  const logic::GridPieces* gridPieces) {
     // Background: exactly the bounds, drawn first so everything lands on top.
-    drawCentered(batch, atlas, level.size * 0.5f, level.size, 0.0f, cellSolid(), toFloatColor(level.backgroundColor));
+    drawCentered(batch, atlas, level.size * 0.5f, level.size, 0.0f, cellSolid(), backgroundColor(level.backgroundColor));
 
     // Under the walls: a region is a hint drawn on the floor, not an object.
     if (showFieldRegions) {
@@ -159,7 +203,7 @@ void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* 
     }
 
     for (const logic::Wall& wall : level.walls) {
-        renderWall(wall, batch, atlas, toFloatColor(wall.color));
+        renderWall(wall, batch, atlas, wallColor(wall.color));
     }
 
     for (const logic::Marker& marker : level.markers) {
@@ -167,10 +211,13 @@ void renderLevel(const logic::Level& level, SpriteBatch& batch, SDL_GPUTexture* 
         glm::vec2 size{};
         logic::markerRect(level, marker, center, size);
 
-        // Spawns green, exits red. Fixed, not authored: markers are placeholders
-        // for a future integration rather than art.
-        const glm::vec4 color = marker.kind == logic::MarkerKind::Spawn ? glm::vec4{0.25f, 0.85f, 0.35f, 1.0f}
-                                                                        : glm::vec4{0.9f, 0.3f, 0.25f, 1.0f};
+        // Spawns green, exits red; in Polish mode folk green and black, as red
+        // would vanish into the crimson walls. Fixed, not authored: markers are
+        // placeholders for a future integration rather than art.
+        const bool spawn = marker.kind == logic::MarkerKind::Spawn;
+        const glm::vec4 color = polish::enabled()
+                                    ? (spawn ? glm::vec4{0.12f, 0.52f, 0.26f, 1.0f} : glm::vec4{0.1f, 0.08f, 0.09f, 1.0f})
+                                    : (spawn ? glm::vec4{0.25f, 0.85f, 0.35f, 1.0f} : glm::vec4{0.9f, 0.3f, 0.25f, 1.0f});
         drawCentered(batch, atlas, center, size, 0.0f, cellSolid(), color);
     }
 }

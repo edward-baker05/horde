@@ -46,6 +46,9 @@ private:
     void refreshLists();
     void playLevel(const std::filesystem::path& path, LevelMode mode = LevelMode::Player);
     void playPreset(const std::string& name);
+    void playMusic();
+    // Loads the current mode's menu document, replacing the shown one.
+    bool loadDocument();
     void setPage(const char* page);
     void refreshClock();
 
@@ -58,6 +61,8 @@ private:
     void onUpgrades(Rml::DataModelHandle, Rml::Event&, const Args& args);
     void onEditor(Rml::DataModelHandle, Rml::Event&, const Args& args);
     void onQuit(Rml::DataModelHandle, Rml::Event&, const Args& args);
+    void onTogglePolish(Rml::DataModelHandle, Rml::Event&, const Args& args);
+    void applyToggle();
 
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
@@ -69,6 +74,9 @@ private:
     // Model state. Level files and preset names behind the lists, index for index.
     std::string m_page = "root";
     std::string m_clock;
+    std::string m_date;
+    bool m_polish = false; // mirrors polish::enabled() for the settings switch
+    bool m_togglePending = false;
     float m_clockTimer = 0.0f;
     std::vector<std::filesystem::path> m_levelPaths;
     std::vector<std::string> m_presetNames;

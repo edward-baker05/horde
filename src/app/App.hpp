@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 
+#include "audio/MusicPlayer.hpp"
 #include "bench/Benchmark.hpp"
 #include "gfx/GpuContext.hpp"
 #include "gfx/Camera2D.hpp"
@@ -68,6 +69,7 @@ private:
     gfx::Texture m_atlas;
     ui::ImGuiLayer m_imgui;
     ui::RmlLayer m_rml;
+    audio::MusicPlayer m_music;
     // Phone and tablet screens; scenes on them draw offscreen and are composited
     // through m_compositeBatch, which is in window pixels.
     ui::DeviceShell m_shell;

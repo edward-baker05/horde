@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(horde LANGUAGES CXX VERSION 0.1.0)
+project(horde LANGUAGES C CXX VERSION 0.1.0)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -58,6 +58,9 @@ add_executable(horde
     src/ui/RmlLayer.cpp
     src/ui/RmlRenderer.cpp
     src/ui/RmlSystem.cpp
+    src/audio/MusicPlayer.cpp
+    src/scene/DancingCow.cpp
+    src/core/PolishMode.cpp
     src/ui/ScreenInput.cpp
     src/ui/ShellState.cpp
     src/logic/UnitData.hpp
@@ -76,6 +79,7 @@ target_link_libraries(horde PRIVATE
     glm::glm
     imgui::imgui
     RmlUi::RmlUi
+    stb_vorbis
     nlohmann_json::nlohmann_json)
 
 if(MSVC)
