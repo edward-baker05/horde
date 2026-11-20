@@ -126,10 +126,13 @@ bool DeviceShell::remapEvent(DeviceKind kind, SDL_Event& event) const {
 }
 
 void DeviceShell::queue(const Device& d, gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas) const {
-    const glm::vec2 center = glm::round(d.rect.center + slideOffset(d));
+    // The texture is the rounded integer target, so draw it 1:1 (NEAREST drops
+    // rows otherwise) with its top-left on a whole pixel; the bezel shares the centre.
+    const glm::vec2 screen = glm::vec2(d.target.size());
+    const glm::vec2 center = glm::round(d.rect.center + slideOffset(d) - screen * 0.5f) + screen * 0.5f;
     const float bezel = d.spec.bezelLogical * d.rect.scale;
 
-    gfx::drawCentered(compositeBatch, atlas, center, d.rect.screenSize + glm::vec2(2.0f * bezel), 0.0f,
+    gfx::drawCentered(compositeBatch, atlas, center, screen + glm::vec2(2.0f * bezel), 0.0f,
                       gfx::atlasCell(1, 1, 4, 4), kBezelColor);
 
     // The sharp screen, then its blur over it at alpha = blur: a fade between the
@@ -137,16 +140,15 @@ void DeviceShell::queue(const Device& d, gfx::SpriteBatch& compositeBatch, SDL_G
     const float blur = d.animator.blur();
     const float shade = 1.0f - kBlurDim * blur;
     const glm::vec4 uv{0.0f, 0.0f, 1.0f, 1.0f};
-    gfx::drawCentered(compositeBatch, d.target.texture(), center, d.rect.screenSize, 0.0f, uv,
+    gfx::drawCentered(compositeBatch, d.target.texture(), center, screen, 0.0f, uv,
                       {shade, shade, shade, 1.0f});
     if (blur > 0.0f && d.blur.texture() != nullptr) {
-        gfx::drawCentered(compositeBatch, d.blur.texture(), center, d.rect.screenSize, 0.0f, uv,
+        gfx::drawCentered(compositeBatch, d.blur.texture(), center, screen, 0.0f, uv,
                           {shade, shade, shade, blur});
     }
 }
 
-void DeviceShell::composite(gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas, glm::vec2 windowPx) const {
-    (void)windowPx; // slide distances use the window the shell was laid out for
+void DeviceShell::composite(gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas) const {
     // Back to front.
     for (const Placement layer : {Placement::Hidden, Placement::Background, Placement::Centered}) {
         for (const Device* d : {&m_phone, &m_tablet}) {

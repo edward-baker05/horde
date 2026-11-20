@@ -68,7 +68,7 @@ public:
 
     // Queues the visible devices back to front (Background before Centered):
     // bezel, then the screen texture at its slide offset.
-    void composite(gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas, glm::vec2 windowPx) const;
+    void composite(gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas) const;
 
 private:
     struct Device {

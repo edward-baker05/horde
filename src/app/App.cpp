@@ -101,11 +101,8 @@ bool App::init(const AppConfig& config) {
     services.gpu = &m_gpu;
     services.shaders = m_shaders.get();
     services.atlas = &m_atlas;
-    services.window = m_window;
-    services.frameStats = &m_stats;
     services.ui = &m_rml;
     services.shell = &m_shell;
-    services.measureSimGpu = &m_measureSimGpu;
     // Benchmarks decide for themselves whether to sync the GPU.
     if (m_config.bench) {
         m_measureSimGpu = m_config.bench->syncGpu;
@@ -408,11 +405,15 @@ void App::update(float deltaTime) {
     }
 
     if (frameStatsVisible()) {
-        ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f));
+        // Top-right: every other window's first-use position is near the top-left,
+        // and this one takes clicks, so it must not sit over them.
+        const ImVec2 display = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos(ImVec2(display.x - 8.0f, 8.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
         ImGui::SetNextWindowBgAlpha(0.55f);
         constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                           ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+                                           ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove |
+                                           ImGuiWindowFlags_NoBringToFrontOnFocus;
         if (ImGui::Begin("Frame stats", nullptr, flags)) {
             ui::drawFrameStats(m_stats, m_config.bench ? nullptr : &m_measureSimGpu);
         }
@@ -548,7 +549,7 @@ void App::render() {
     // The composite batch is in window pixels, y down, like the scene cameras.
     const glm::vec2 windowPx = m_shell.windowPx();
     m_compositeBatch.begin();
-    m_shell.composite(m_compositeBatch, m_atlas.handle(), windowPx);
+    m_shell.composite(m_compositeBatch, m_atlas.handle());
     m_compositeBatch.upload(commands);
     m_compositeCamera.setViewport(windowPx.x, windowPx.y);
     m_compositeCamera.setCenter(windowPx * 0.5f);

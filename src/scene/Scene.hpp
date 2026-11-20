@@ -45,16 +45,9 @@ struct Services {
     gfx::GpuContext* gpu = nullptr;
     gfx::ShaderLoader* shaders = nullptr;
     gfx::Texture* atlas = nullptr; // shared sprite atlas
-    SDL_Window* window = nullptr;
     SceneStack* scenes = nullptr;
-    const FrameStats* frameStats = nullptr;
     ui::RmlLayer* ui = nullptr;
     ui::DeviceShell* shell = nullptr;
-    // When set, App submits the scene's compute work on a command buffer of
-    // its own and times it into FrameStats::simGpuMs. While playing that is
-    // done off the main thread with fences, costing the GPU nothing; a
-    // benchmark waits for the work instead, to isolate it exactly.
-    bool* measureSimGpu = nullptr;
 };
 
 // A distinct view of the game: the level, the tech tree, the main menu.
