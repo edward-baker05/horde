@@ -1,5 +1,7 @@
 # Unit tests for pure logic. Only src/ files with no SDL runtime or GPU
-# dependency are compiled in, so the suite runs headless on CI.
+# dependency are compiled in, so the suite runs headless on CI. Input mapping
+# also links RmlUi (headers and Rml::Context, no initialisation); RmlSystem is
+# SDL-runtime glue and stays out.
 add_executable(horde_tests
     test_main.cpp
     TweenTests.cpp
@@ -9,7 +11,6 @@ add_executable(horde_tests
     ${PROJECT_SOURCE_DIR}/src/ui/DeviceLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/ShellState.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/RmlInput.cpp
-    ${PROJECT_SOURCE_DIR}/src/ui/RmlSystem.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/ScreenInput.cpp)
 
 target_compile_features(horde_tests PRIVATE cxx_std_20)

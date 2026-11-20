@@ -165,6 +165,8 @@ endif()
 # FreeType: use the system one if present, otherwise build a minimal copy with
 # every optional codec off (we only load TTF/OTF files).
 
+# Release tarballs rather than git clones: far faster and reproducible. The
+# SHA256s pin the default tags; bump them together with the tag variables.
 set(HORDE_FREETYPE_TAG "VER-2-13-3" CACHE STRING "FreeType tag to fetch when no system copy is found")
 set(HORDE_RMLUI_TAG "6.3" CACHE STRING "RmlUi tag to fetch")
 
@@ -180,9 +182,9 @@ else()
     set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
     set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
     FetchContent_Declare(freetype
-        GIT_REPOSITORY https://github.com/freetype/freetype.git
-        GIT_TAG ${HORDE_FREETYPE_TAG}
-        GIT_SHALLOW ON
+        URL https://github.com/freetype/freetype/archive/refs/tags/${HORDE_FREETYPE_TAG}.tar.gz
+        URL_HASH SHA256=bc5c898e4756d373e0d991bab053036c5eb2aa7c0d5c67e8662ddc6da40c4103
+        DOWNLOAD_EXTRACT_TIMESTAMP ON
         EXCLUDE_FROM_ALL
         SYSTEM
         OVERRIDE_FIND_PACKAGE)
@@ -198,11 +200,15 @@ set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(RMLUI_FONT_ENGINE freetype CACHE STRING "" FORCE)
 FetchContent_Declare(RmlUi
-    GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
-    GIT_TAG ${HORDE_RMLUI_TAG}
-    GIT_SHALLOW ON
+    URL https://github.com/mikke89/RmlUi/archive/refs/tags/${HORDE_RMLUI_TAG}.tar.gz
+    URL_HASH SHA256=d977298bb6147610e5984d5db85ddf284020d655a8713913f6982074f1dbdede
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
     EXCLUDE_FROM_ALL
     SYSTEM)
+# Static, so we ship no extra .so/.dll and a fetched (non-PIC) FreeType links in.
+set(_horde_saved_shared ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(RmlUi)
 unset(CMAKE_POLICY_VERSION_MINIMUM)
+set(BUILD_SHARED_LIBS ${_horde_saved_shared})

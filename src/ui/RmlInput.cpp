@@ -33,6 +33,15 @@ KeyIdentifier toRmlKey(SDL_Keycode key) {
     }
 }
 
+int toRmlButton(Uint8 sdlButton) {
+    switch (sdlButton) {
+    case SDL_BUTTON_LEFT: return 0;
+    case SDL_BUTTON_RIGHT: return 1;
+    case SDL_BUTTON_MIDDLE: return 2;
+    default: return -1;
+    }
+}
+
 int toRmlModifiers(SDL_Keymod mod) {
     int out = 0;
     if (mod & SDL_KMOD_CTRL) out |= Rml::Input::KM_CTRL;
@@ -51,8 +60,10 @@ bool forwardToRml(Rml::Context& context, const SDL_Event& event) {
                                          toRmlModifiers(SDL_GetModState()));
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP: {
-        // SDL buttons are 1=left 2=middle 3=right; RmlUi's are 0-based.
-        const int button = static_cast<int>(event.button.button) - 1;
+        // RmlUi orders buttons left/right/middle, unlike SDL's left/middle/right.
+        const int button = toRmlButton(event.button.button);
+        if (button < 0)
+            return false;
         const int mods = toRmlModifiers(SDL_GetModState());
         return event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? !context.ProcessMouseButtonDown(button, mods)
                                                          : !context.ProcessMouseButtonUp(button, mods);

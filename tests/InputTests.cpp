@@ -24,6 +24,13 @@ TEST_CASE("toRmlKey maps common keys and rejects the rest") {
     CHECK(toRmlKey(SDLK_KP_0) == Rml::Input::KI_UNKNOWN);
 }
 
+TEST_CASE("toRmlButton swaps middle and right and rejects extras") {
+    CHECK(toRmlButton(SDL_BUTTON_LEFT) == 0);
+    CHECK(toRmlButton(SDL_BUTTON_RIGHT) == 1);
+    CHECK(toRmlButton(SDL_BUTTON_MIDDLE) == 2);
+    CHECK(toRmlButton(SDL_BUTTON_X1) == -1);
+}
+
 TEST_CASE("mapMouseToScreen converts window pixels to screen pixels") {
     const ScreenPoint c = mapMouseToScreen(tablet(), {0.0f, 0.0f}, {800.0f, 450.0f});
     CHECK(c.inside);
