@@ -95,6 +95,11 @@ private:
     // Rolling frame cost, published to scenes through Services::frameStats.
     void accumulateStats(Uint64 frameNs);
     scene::FrameStats m_stats;
+    // F3 overlay: the default follows the top scene (on for full-window ones)
+    // until the player presses F3, after which their choice stands.
+    bool frameStatsVisible() const;
+    bool m_showFrameStats = false;
+    bool m_frameStatsChosen = false;
     bool m_measureSimGpu = true;
     bool m_haveStats = false;
     // GPU physics timing while playing: fences polled off the main thread, so

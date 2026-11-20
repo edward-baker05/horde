@@ -7,10 +7,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "gfx/Camera2D.hpp"
 #include "logic/Level.hpp"
 #include "logic/WallGridShapes.hpp"
+#include "scene/LevelMode.hpp"
 #include "scene/Scene.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
@@ -36,9 +38,9 @@ struct LevelOptions {
     std::uint32_t seed = 1;
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;
-    // Plays on the tablet; off draws straight to the swapchain (benchmarks, CLI
-    // levels). Placeholder until level modes replace it.
-    bool onDevice = true;
+    // Player plays on the tablet; Dev draws straight to the window with the
+    // debug panel (CLI levels, presets, benchmarks).
+    LevelMode mode = LevelMode::Player;
     sim::CollisionSettings collision;
     // Physics steps per second, independent of the frame rate; drawing blends
     // between steps. 0 steps once per frame, with the frame's own dt.
@@ -52,6 +54,14 @@ struct LevelOptions {
     bool explosionArmed = false;
     sim::Explosion explosion;
     float flingDrag = 3.0f;
+};
+
+// The views a level can be watched through. The player sees one fixed view
+// fitted to the level; more views and gestures to switch between them (pan,
+// zoom, multiple cameras) plug in here later.
+struct FeedCamera {
+    std::vector<gfx::Camera2D> views;
+    std::size_t active = 0;
 };
 
 // The game world. Currently a level full of simulated units and a button back
@@ -78,8 +88,7 @@ public:
     void debugUi() override;
     void onResize(float width, float height) override;
     ui::ScenePresentation presentation() const override {
-        return m_options.onDevice ? ui::ScenePresentation{ui::DeviceKind::Tablet, ui::Orientation::Landscape}
-                                  : ui::ScenePresentation{};
+        return levelPresentation(m_options.mode);
     }
 
     sim::PhysicsSystem& physics() {
@@ -108,8 +117,10 @@ public:
 
 private:
     void fitCameraToLevel(float width, float height);
-    // The frame cost breakdown at the top of the debug panel.
-    void frameCostUi();
+    // Points m_camera at the active feed view.
+    void applyFeedCamera();
+    // The seam for camera input in Player mode; no gestures yet.
+    bool handleCameraGesture(const SDL_Event& event);
     // Live health summary, sampled from the GPU about once a second.
     void healthUi();
     // The debug explosion tool's settings.
@@ -120,6 +131,7 @@ private:
     bool m_pausePending = false;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
+    FeedCamera m_feed;
 
     LevelOptions m_options;
     // What the debug panel's restart button will apply.

@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include "scene/LevelMode.hpp"
 #include "ui/ShellState.hpp"
 
 #include <cstddef>
@@ -88,4 +89,11 @@ TEST_CASE("DeviceAnimator retarget mid-slide does not jump") {
     CHECK(a.offscreen() == doctest::Approx(before));
     a.update(0.05f);
     CHECK(a.offscreen() > before);
+}
+
+TEST_CASE("computeTargets: a dev-mode level over the menu hides both devices") {
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone), horde::scene::levelPresentation(horde::scene::LevelMode::Dev)};
+    auto t = computeTargets(s);
+    CHECK(t.phone == Placement::Hidden);
+    CHECK(t.tablet == Placement::Hidden);
 }

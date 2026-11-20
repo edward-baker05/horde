@@ -52,6 +52,7 @@ add_executable(horde
     src/scene/TechTreeScene.cpp
     src/ui/DeviceLayout.cpp
     src/ui/DeviceShell.cpp
+    src/ui/FrameStatsOverlay.cpp
     src/ui/ImGuiLayer.cpp
     src/ui/RmlInput.cpp
     src/ui/RmlLayer.cpp

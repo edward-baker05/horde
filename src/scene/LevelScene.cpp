@@ -29,7 +29,8 @@ LevelScene::~LevelScene() {
 bool LevelScene::onEnter(Services& services) {
     m_services = &services;
     m_pendingOptions = m_options;
-    m_explosionArmed = m_options.explosionArmed;
+    // The explosion tool is a Dev tool.
+    m_explosionArmed = m_options.mode == LevelMode::Dev && m_options.explosionArmed;
     m_explosion = m_options.explosion;
     m_flingDrag = m_options.flingDrag;
 
@@ -127,7 +128,7 @@ void LevelScene::onExit() {
 bool LevelScene::handleEvent(const SDL_Event& event) {
     // Esc pauses a round on the device. Only the top scene gets events, and
     // m_pausePending covers the frame between the push and it taking effect.
-    if (m_options.onDevice && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
+    if (m_options.mode == LevelMode::Player && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
         if (!m_pausePending) {
             m_pausePending = true;
             // The copy carries the explosion tool's live settings, as the debug restart does.
@@ -142,6 +143,9 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
         }
         return true;
     }
+    if (m_options.mode == LevelMode::Player) {
+        return handleCameraGesture(event);
+    }
     // Right-click: the camera pans with the left and middle buttons.
     if (m_explosionArmed && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
         sim::Explosion explosion = m_explosion;
@@ -149,6 +153,11 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
         return m_physics->addExplosion(explosion);
     }
     return m_cameraController.handleEvent(event, m_camera);
+}
+
+bool LevelScene::handleCameraGesture(const SDL_Event& event) {
+    (void)event;
+    return false;
 }
 
 void LevelScene::update(float dt) {
@@ -209,10 +218,12 @@ void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* p
 }
 
 void LevelScene::debugUi() {
+    if (m_options.mode == LevelMode::Player) {
+        return;
+    }
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Level");
 
-    frameCostUi();
     ImGui::Text("Units: %u", m_physics->unitCount());
     healthUi();
 
@@ -260,7 +271,7 @@ void LevelScene::debugUi() {
                 std::string error;
                 LevelOptions base;
                 base.fitCamera = m_options.fitCamera;
-                base.onDevice = m_options.onDevice;
+                base.mode = m_options.mode;
                 if (loadPreset(name, base, preset, error)) {
                     m_pendingOptions = std::move(preset.options);
                 } else {
@@ -461,64 +472,24 @@ void LevelScene::healthUi() {
     }
 }
 
-void LevelScene::frameCostUi() {
-    const FrameStats* stats = m_services->frameStats;
-    if (stats == nullptr) {
-        return;
-    }
-
-    ImGui::Text("%.1f fps: %.2f ms per frame (worst %.2f)", stats->frameMs > 0.0f ? 1000.0f / stats->frameMs : 0.0f,
-                stats->frameMs, stats->frameMaxMs);
-
-    // What the frame actually cost, as opposed to how often frames came.
-    const float physics = stats->updateMs + stats->simGpuMs;
-    const float busy = physics + stats->recordMs + stats->otherMs;
-    if (ImGui::BeginTable("frame cost", 2, ImGuiTableFlags_SizingFixedFit)) {
-        const auto row = [](const char* label, const char* format, float value, float worst = -1.0f) {
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            if (worst >= 0.0f) {
-                ImGui::Text("%6.3f ms  (worst %.3f)", value, worst);
-            } else {
-                ImGui::Text(format, value);
-            }
-        };
-        row("Physics, CPU", "%6.3f ms", stats->updateMs);
-        if (stats->simGpuMeasured) {
-            row("Physics, GPU", "", stats->simGpuMs, stats->simGpuMaxMs);
-        } else {
-            row("Physics, GPU", "not measured", 0.0f);
-        }
-        row("Physics total", "%6.3f ms", physics);
-        row("Frame building, CPU", "%6.3f ms", stats->recordMs);
-        row("Other (events, UI)", "%6.3f ms", stats->otherMs);
-        row("Busy per frame", "%6.3f ms", busy);
-        row("Waiting (cap, vsync)", "%6.3f ms", stats->waitMs);
-        ImGui::EndTable();
-    }
-
-    if (busy > 0.0f) {
-        ImGui::Text("Could run at ~%.0f fps uncapped", 1000.0f / busy);
-    }
-    if (m_services->measureSimGpu) {
-        ImGui::Checkbox("Measure GPU physics", m_services->measureSimGpu);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Times the physics compute work on the GPU from a background thread,\n"
-                              "without waiting for it, so the frame rate is unaffected. Figures trail\n"
-                              "by a frame or two. Drawing's GPU time is not included in any line.");
-        }
-    }
-    ImGui::Separator();
-}
-
 void LevelScene::onResize(float width, float height) {
     m_camera.setViewport(width, height);
-    if (m_options.fitCamera) {
+    if (m_options.mode == LevelMode::Player) {
+        // One static view fitted to the level, rebuilt for the new screen size.
         fitCameraToLevel(width, height);
+        m_feed.views.assign(1, m_camera);
+        m_feed.active = 0;
+        applyFeedCamera();
+    } else if (m_options.fitCamera) {
+        fitCameraToLevel(width, height);
+    }
+}
+
+void LevelScene::applyFeedCamera() {
+    if (m_feed.active < m_feed.views.size()) {
+        const gfx::Camera2D& view = m_feed.views[m_feed.active];
+        m_camera.setCenter(view.center());
+        m_camera.setZoom(view.zoom());
     }
 }
 

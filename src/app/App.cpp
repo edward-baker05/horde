@@ -4,6 +4,8 @@
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_timer.h>
 
+#include <imgui.h>
+
 #include <algorithm>
 #include <array>
 #include <vector>
@@ -13,6 +15,7 @@
 #include "gfx/ShaderLoader.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/MainMenuScene.hpp"
+#include "ui/FrameStatsOverlay.hpp"
 #include "ui/ScreenInput.hpp"
 #include "ui/ShellState.hpp"
 
@@ -323,6 +326,13 @@ void App::pumpEvents() {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
+        // F3 toggles the frame stats in any scene, unless a text field has the keyboard.
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F3 && !event.key.repeat &&
+            !ImGui::GetIO().WantTextInput) {
+            m_showFrameStats = !frameStatsVisible();
+            m_frameStatsChosen = true;
+            continue;
+        }
         // ImGui gets first refusal so that tool panels capture input before the
         // game camera sees it.
         const bool consumed = m_imgui.handleEvent(event);
@@ -396,6 +406,27 @@ void App::update(float deltaTime) {
         m_rml.update();
         active->debugUi();
     }
+
+    if (frameStatsVisible()) {
+        ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f));
+        ImGui::SetNextWindowBgAlpha(0.55f);
+        constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                           ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+        if (ImGui::Begin("Frame stats", nullptr, flags)) {
+            ui::drawFrameStats(m_stats, m_config.bench ? nullptr : &m_measureSimGpu);
+        }
+        ImGui::End();
+    }
+}
+
+bool App::frameStatsVisible() const {
+    if (m_frameStatsChosen) {
+        return m_showFrameStats;
+    }
+    // Until F3 is pressed: on for full-window scenes, off on the devices.
+    const scene::Scene* active = m_scenes->active();
+    return active == nullptr || active->presentation().device == ui::DeviceKind::None;
 }
 
 void App::render() {

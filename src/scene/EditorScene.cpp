@@ -702,6 +702,7 @@ void EditorScene::debugUi() {
         options.unitCount = static_cast<std::uint32_t>(m_state.testUnits);
         options.spawn = sim::SpawnPattern::Markers;
         options.fitCamera = true;
+        options.mode = LevelMode::Player;
         m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
     }
 }

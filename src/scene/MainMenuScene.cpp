@@ -120,11 +120,12 @@ void MainMenuScene::setPage(const char* page) {
     }
 }
 
-void MainMenuScene::playLevel(const std::filesystem::path& path) {
+void MainMenuScene::playLevel(const std::filesystem::path& path, LevelMode mode) {
     // Empty path: the built-in level. Zoomed to fit, so the whole level is in view.
     LevelOptions options;
     options.levelPath = path;
     options.fitCamera = true;
+    options.mode = mode;
     m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
 }
 
@@ -133,8 +134,7 @@ void MainMenuScene::playPreset(const std::string& name) {
     std::string error;
     if (loadPreset(name, LevelOptions{}, preset, error)) {
         preset.options.fitCamera = true;
-        // Dev Ground presets stay full-window until level modes exist.
-        preset.options.onDevice = false;
+        preset.options.mode = LevelMode::Dev;
         m_services->scenes->push(std::make_unique<LevelScene>(std::move(preset.options)));
     } else {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "preset '%s': %s", name.c_str(), error.c_str());
@@ -181,9 +181,9 @@ void MainMenuScene::onDevLevel(Rml::DataModelHandle, Rml::Event&, const Args& ar
     // -1 is the built-in level, listed first on the Dev Ground page.
     const int index = indexArg(args);
     if (index == -1) {
-        playLevel({});
+        playLevel({}, LevelMode::Dev);
     } else if (index >= 0 && index < static_cast<int>(m_levelPaths.size())) {
-        playLevel(m_levelPaths[index]);
+        playLevel(m_levelPaths[index], LevelMode::Dev);
     }
 }
 
