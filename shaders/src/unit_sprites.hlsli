@@ -3,15 +3,15 @@
 #define HORDE_UNIT_SPRITES_HLSLI
 
 static const uint ATLAS_COLUMNS = 8;
-static const uint ROWS_PER_LOD = 7;
+static const uint ROWS_PER_LOD = 4;
 static const uint CELL = 13;
-static const float2 ATLAS_SIZE = float2(104.0f, 273.0f);
-static const uint HUMAN_STYLE_COUNT = 9;
-static const uint ACCESSORY_COUNT = 5;
+static const float2 ATLAS_SIZE = float2(104.0f, 156.0f);
+static const uint HUMAN_STYLE_COUNT = 6;
+static const uint ACCESSORY_COUNT = 4;
 static const uint ALIEN_STYLE_COUNT = 4;
-static const uint ALIEN_VARIANT_BASE = 45;
-static const uint ACCESSORY_TABLE_SIZE = 7;
-static const uint ACCESSORY_TABLE[7] = {0, 0, 0, 1, 2, 3, 4};
+static const uint ALIEN_VARIANT_BASE = 24;
+static const uint ACCESSORY_TABLE_SIZE = 6;
+static const uint ACCESSORY_TABLE[6] = {0, 0, 0, 1, 2, 3};
 // Hair colour index by weight: pick HUMAN_HAIR_TABLE[hash % HUMAN_HAIR_TABLE_SIZE].
 static const uint HUMAN_HAIR_TABLE_SIZE = 82;
 static const uint HUMAN_HAIR_TABLE[82] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 10};

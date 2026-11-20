@@ -47,7 +47,7 @@ fragment main0_out main0(main0_in in [[stage_in]], constant type_UnitSpriteUnifo
                 discard_fragment();
             }
             float3 _153;
-            switch (uint(rint(Atlas.sample(AtlasSampler, (in.in_var_TEXCOORD3 * float2(0.009615384973585605621337890625, 0.00366300367750227451324462890625)), level(0.0)).x * 255.0)))
+            switch (uint(rint(Atlas.sample(AtlasSampler, (in.in_var_TEXCOORD3 * float2(0.009615384973585605621337890625, 0.0064102564938366413116455078125)), level(0.0)).x * 255.0)))
             {
                 case 1u:
                 {
@@ -116,7 +116,7 @@ fragment main0_out main0(main0_in in [[stage_in]], constant type_UnitSpriteUnifo
         {
             discard_fragment();
         }
-        float4 _197 = Atlas.sample(AtlasSampler, ((in.in_var_TEXCOORD3 + _186) * float2(0.009615384973585605621337890625, 0.00366300367750227451324462890625)), level(0.0));
+        float4 _197 = Atlas.sample(AtlasSampler, ((in.in_var_TEXCOORD3 + _186) * float2(0.009615384973585605621337890625, 0.0064102564938366413116455078125)), level(0.0));
         uint _201 = uint(rint(_197.x * 255.0));
         bool _207;
         if (_201 != 0u)

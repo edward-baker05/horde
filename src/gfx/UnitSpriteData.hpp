@@ -8,8 +8,8 @@
 namespace horde::gfx::unit_sprites {
 
 inline constexpr int kAtlasWidth = 104;
-inline constexpr int kAtlasHeight = 273;
-inline constexpr int kVariantCount = 49;
+inline constexpr int kAtlasHeight = 156;
+inline constexpr int kVariantCount = 28;
 inline constexpr int kPaletteSize = 79;
 
 // Matches `float4 Palette[PALETTE_SIZE]` in unit_sprite.frag.hlsl, linear 0-1 sRGB values.

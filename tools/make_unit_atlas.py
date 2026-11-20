@@ -87,25 +87,19 @@ SHOULDERS = [".........", ".........", ".........", "CCCCCCCCC",
 
 HUMAN_NEAR = {
     "short":     ["...HHH...", "..HLHHH..", ".HLHHHHH.", ".HHHHHHH.", ".HHHHHHH.", "..HHHHD..", "...DDD...", "........."],
-    "pompadour": ["..LLLLL..", ".HHLLLHH.", ".HHHHHHH.", ".HHHHHHH.", ".HHHHHHH.", "..HHHHH..", "...DDD...", "........."],
     "afro":      ["..HHHHH..", ".HHDHHHH.", "HHHHHHDHH", "HDHHHHHHH", "HHHHDHHHH", "HHHHHHHDH", ".HDHHHHH.", "..HHHHH.."],
-    "beehive":   ["...HHH...", "..HHHHH..", ".HHLLLHH.", ".HHLLLHH.", ".HHLLLHH.", "..HHHHH..", "...DDD...", "........."],
     "mohawk":    ["....H....", "...SLS...", "..SSLSS..", ".SSSHSSS.", ".SSSHSSS.", "..SSHSS..", "...SHS...", "....D...."],
     "bald":      ["...SSS...", "..SKSSS..", ".SKSSSSS.", ".SSSSSSS.", ".SSSSSSS.", "..SSSSS..", "...SSS...", "........."],
     "mullet":    ["...HHH...", "..HLHHH..", ".HLHHHHH.", ".HHHHHHH.", ".HHHHHHH.", "..HHHHH..", "...HHH...", "...HDH..."],
     "perm":      ["..H.H.H..", ".HHHHHHH.", "HHLHHDHHH", ".HHHHHHHH", "HHHDHHHH.", ".HHHHHDHH", "..HHHHH..", "...H.H..."],
-    "ponytail":  ["...HHH...", "..HLHHH..", ".HLHHHHH.", ".HHHHHHH.", ".HHHHHHH.", "..HHHHH..", "....D....", "....H...."],
 }
 HUMAN_MID = {
     "short":     [".......", "..HHH..", ".HLHHH.", ".HHHHH.", ".HHHHH.", "..HDH..", "......."],
-    "pompadour": ["..LLL..", ".HHHHH.", ".HHHHH.", ".HHHHH.", ".HHHHH.", "..HDH..", "......."],
     "afro":      ["..HHH..", ".HHHHH.", "HHHHHHH", "HHHHHHH", "HHHHHHH", ".HHHHH.", "..HHH.."],
-    "beehive":   [".......", "..HHH..", ".HLLLH.", ".HLLLH.", ".HLLLH.", "..HHH..", "......."],
     "mohawk":    ["...H...", "..SHS..", ".SSHSS.", ".SSHSS.", ".SSHSS.", "..SHS..", "...H..."],
     "bald":      [".......", "..SSS..", ".SKSSS.", ".SSSSS.", ".SSSSS.", "..SSS..", "......."],
     "mullet":    [".......", "..HHH..", ".HLHHH.", ".HHHHH.", ".HHHHH.", "..HHH..", "..HDH.."],
     "perm":      [".H.H.H.", "HHHHHHH", ".HHHHHH", "HHHHHHH", "HHHHHH.", ".HHHHHH", "..H.H.."],
-    "ponytail":  [".......", "..HHH..", ".HLHHH.", ".HHHHH.", ".HHHHH.", "..HDH..", "...H..."],
 }
 ALIEN_NEAR = {
     "antennae": [".A.....A.", "..Z...Z..", "..XXXXX..", ".XYXXXXX.", ".XXXXXXX.", ".XXXXXXX.", "..XXXXX..", "...ZZZ..."],
@@ -121,12 +115,11 @@ ALIEN_MID = {
 }
 FAR = [".XXX.", "XXXXX", "XXXXX", "XXXXX", ".XXX."]
 
-ACCESSORIES = ["none", "cap", "sunglasses", "headband", "bow"]
-ACCESSORY_WEIGHTS = [3, 1, 1, 1, 1]          # out of sum: most units wear nothing
+ACCESSORIES = ["none", "cap", "sunglasses", "bow"]
+ACCESSORY_WEIGHTS = [3, 1, 1, 1]             # out of sum: most units wear nothing
 ACC_OVERLAY = {
     "cap":        {0: "..aaaaa..", 1: "..AAAAA..", 2: ".AAAAAAA.", 3: ".AAAaAAA.", 4: ".AAAAAAA.", 5: "..AAAAA.."},
     "sunglasses": {1: "..GGGGW.."},           # pushed up on the head
-    "headband":   "ring",                     # front half of the head outline
     "bow":        {0: ".....AaA.", 1: ".....A.A."},
 }
 FREE_PAINT = {"cap", "bow"}                   # may paint outside the head
@@ -184,19 +177,11 @@ def overlay(rows, acc):
     if acc == "none":
         return rows
     g = [list(r) for r in rows]
-    h, w = len(g), len(g[0])
     spec = ACC_OVERLAY[acc]
-    if spec == "ring":
-        for y in range(0, 4):
-            for x in range(w):
-                if g[y][x] != "." and any(not (0 <= x + dx < w and 0 <= y + dy < h) or g[y + dy][x + dx] == "."
-                                          for dx, dy in ((1, 0), (-1, 0), (0, -1))):
-                    g[y][x] = "A"
-    else:
-        for y, row in spec.items():
-            for x, ch in enumerate(row):
-                if ch != "." and (acc in FREE_PAINT or g[y][x] != "."):
-                    g[y][x] = ch
+    for y, row in spec.items():
+        for x, ch in enumerate(row):
+            if ch != "." and (acc in FREE_PAINT or g[y][x] != "."):
+                g[y][x] = ch
     return ["".join(r) for r in g]
 
 
