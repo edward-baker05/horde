@@ -106,7 +106,8 @@ void appearance(uint unitId, out uint variant, out uint4 pal) {
         h2 /= HUMAN_SKIN_COUNT;
         pal.z = PAL_HUMAN_CLOTHES + (h2 % HUMAN_CLOTHES_COUNT);
         h2 /= HUMAN_CLOTHES_COUNT;
-        pal.w = PAL_HUMAN_ACCESSORY + (h2 % HUMAN_ACCESSORY_COUNT) * 2;
+        pal.w = accessory == ACCESSORY_CAP ? PAL_HUMAN_CAP + (h2 % HUMAN_CAP_COUNT) * 2
+                                           : PAL_HUMAN_ACCESSORY + (h2 % HUMAN_ACCESSORY_COUNT) * 2;
     } else {
         variant = ALIEN_VARIANT_BASE + h1 % ALIEN_STYLE_COUNT;
         h1 /= ALIEN_STYLE_COUNT;

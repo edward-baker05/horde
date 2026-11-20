@@ -94,12 +94,12 @@ struct type_UnitUniforms
     float2 Padding;
 };
 
-constant spvUnsafeArray<uint, 6> _132 = spvUnsafeArray<uint, 6>({ 0u, 0u, 0u, 1u, 2u, 3u });
-constant spvUnsafeArray<uint, 82> _133 = spvUnsafeArray<uint, 82>({ 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 4u, 4u, 4u, 4u, 4u, 5u, 5u, 5u, 5u, 5u, 6u, 6u, 6u, 6u, 6u, 7u, 7u, 7u, 7u, 7u, 8u, 8u, 8u, 8u, 8u, 9u, 10u });
-constant spvUnsafeArray<float, 3> _134 = spvUnsafeArray<float, 3>({ 7.0, 5.0, 5.0 });
-constant spvUnsafeArray<float, 3> _135 = spvUnsafeArray<float, 3>({ 13.0, 11.0, 5.0 });
-constant spvUnsafeArray<uint, 6> _136 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
-constant spvUnsafeArray<float2, 4> _137 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
+constant spvUnsafeArray<uint, 6> _133 = spvUnsafeArray<uint, 6>({ 0u, 0u, 0u, 1u, 2u, 3u });
+constant spvUnsafeArray<uint, 82> _134 = spvUnsafeArray<uint, 82>({ 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 4u, 4u, 4u, 4u, 4u, 5u, 5u, 5u, 5u, 5u, 6u, 6u, 6u, 6u, 6u, 7u, 7u, 7u, 7u, 7u, 8u, 8u, 8u, 8u, 8u, 9u, 10u });
+constant spvUnsafeArray<float, 3> _135 = spvUnsafeArray<float, 3>({ 7.0, 5.0, 5.0 });
+constant spvUnsafeArray<float, 3> _136 = spvUnsafeArray<float, 3>({ 13.0, 11.0, 5.0 });
+constant spvUnsafeArray<uint, 6> _137 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
+constant spvUnsafeArray<float2, 4> _138 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
 
 struct main0_out
 {
@@ -114,213 +114,224 @@ struct main0_out
 vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], const device type_StructuredBuffer_UnitData& Units [[buffer(1)]], const device type_StructuredBuffer_v2float& PrevPos [[buffer(2)]], const device type_StructuredBuffer_float& Health [[buffer(3)]], const device type_StructuredBuffer_uint& Ids [[buffer(4)]], const device type_StructuredBuffer_uint& Slots [[buffer(5)]], uint gl_VertexIndex [[vertex_id]])
 {
     main0_out out = {};
-    uint _143 = gl_VertexIndex / 6u;
-    uint _152;
+    uint _144 = gl_VertexIndex / 6u;
+    uint _153;
     if (UnitUniforms.HasSlots != 0u)
     {
-        _152 = Slots._m0[_143];
+        _153 = Slots._m0[_144];
     }
     else
     {
-        _152 = _143;
+        _153 = _144;
     }
-    uint _153 = gl_VertexIndex % 6u;
-    uint _168;
+    uint _154 = gl_VertexIndex % 6u;
+    uint _169;
     if (UnitUniforms.HasIds != 0u)
     {
-        _168 = Ids._m0[_152];
+        _169 = Ids._m0[_153];
     }
     else
     {
-        _168 = _152;
+        _169 = _153;
     }
-    float2 _185;
+    float2 _186;
     if (UnitUniforms.MaxJump > 0.0)
     {
-        float2 _184;
-        if (distance(PrevPos._m0[_152], Units._m0[_152].pos) <= UnitUniforms.MaxJump)
+        float2 _185;
+        if (distance(PrevPos._m0[_153], Units._m0[_153].pos) <= UnitUniforms.MaxJump)
         {
-            _184 = mix(PrevPos._m0[_152], Units._m0[_152].pos, float2(UnitUniforms.Alpha));
+            _185 = mix(PrevPos._m0[_153], Units._m0[_153].pos, float2(UnitUniforms.Alpha));
         }
         else
         {
-            _184 = Units._m0[_152].pos;
+            _185 = Units._m0[_153].pos;
         }
-        _185 = _184;
+        _186 = _185;
     }
     else
     {
-        _185 = Units._m0[_152].pos;
+        _186 = Units._m0[_153].pos;
     }
-    bool _188 = UnitUniforms.SpriteMode == 0u;
-    uint4 _372;
-    float2 _373;
-    float2 _374;
-    float2 _375;
-    float2 _376;
-    float2 _377;
-    if (_188)
+    bool _189 = UnitUniforms.SpriteMode == 0u;
+    uint4 _381;
+    float2 _382;
+    float2 _383;
+    float2 _384;
+    float2 _385;
+    float2 _386;
+    if (_189)
     {
-        spvUnsafeArray<float2, 4> _204 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
-        spvUnsafeArray<float2, 4> _141 = _204;
-        _372 = uint4(0u);
-        _373 = _141[_136[_153]];
-        _374 = float2(0.0);
-        _375 = float2(0.0, -1.0);
-        _376 = _185;
-        _377 = _185 + (_137[_136[_153]] * UnitUniforms.UnitSize);
+        spvUnsafeArray<float2, 4> _205 = spvUnsafeArray<float2, 4>({ float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.y), float2(UnitUniforms.UvRect.x, UnitUniforms.UvRect.w), float2(UnitUniforms.UvRect.z, UnitUniforms.UvRect.w) });
+        spvUnsafeArray<float2, 4> _142 = _205;
+        _381 = uint4(0u);
+        _382 = _142[_137[_154]];
+        _383 = float2(0.0);
+        _384 = float2(0.0, -1.0);
+        _385 = _186;
+        _386 = _186 + (_138[_137[_154]] * UnitUniforms.UnitSize);
     }
     else
     {
-        uint _217 = (UnitUniforms.Seed ^ (UnitUniforms.Seed >> 16u)) * 2146121005u;
-        uint _220 = (_217 ^ (_217 >> 15u)) * 2221713035u;
-        uint _223 = _168 ^ (_220 ^ (_220 >> 16u));
-        uint _226 = (_223 ^ (_223 >> 16u)) * 2146121005u;
-        uint _229 = (_226 ^ (_226 >> 15u)) * 2221713035u;
-        uint _231 = _229 ^ (_229 >> 16u);
-        uint _232 = _231 + 2654435769u;
-        uint _235 = (_232 ^ (_232 >> 16u)) * 2146121005u;
-        uint _238 = (_235 ^ (_235 >> 15u)) * 2221713035u;
-        uint _240 = _238 ^ (_238 >> 16u);
-        uint4 _282;
-        uint _283;
+        uint _218 = (UnitUniforms.Seed ^ (UnitUniforms.Seed >> 16u)) * 2146121005u;
+        uint _221 = (_218 ^ (_218 >> 15u)) * 2221713035u;
+        uint _224 = _169 ^ (_221 ^ (_221 >> 16u));
+        uint _227 = (_224 ^ (_224 >> 16u)) * 2146121005u;
+        uint _230 = (_227 ^ (_227 >> 15u)) * 2221713035u;
+        uint _232 = _230 ^ (_230 >> 16u);
+        uint _233 = _232 + 2654435769u;
+        uint _236 = (_233 ^ (_233 >> 16u)) * 2146121005u;
+        uint _239 = (_236 ^ (_236 >> 15u)) * 2221713035u;
+        uint _241 = _239 ^ (_239 >> 16u);
+        uint4 _291;
+        uint _292;
         if (UnitUniforms.Species == 0u)
         {
-            uint _248 = _231 / 6u;
-            uint _262 = _240 / 5u;
-            _282 = uint4(_133[(_248 / 6u) % 82u] * 3u, 33u + ((_240 % 5u) * 2u), 43u + (_262 % 8u), 51u + (((_262 / 8u) % 3u) * 2u));
-            _283 = ((_231 % 6u) * 4u) + _132[_248 % 6u];
-        }
-        else
-        {
-            uint _275 = 57u + (((_231 / 4u) % 5u) * 3u);
-            _282 = uint4(_275, _275, 75u + (_240 % 2u), 72u + ((_240 / 2u) % 3u));
-            _283 = 24u + (_231 % 4u);
-        }
-        float2 _287 = _185 + (UnitUniforms.UnitSize * 0.5);
-        uint _290 = min(UnitUniforms.Lod, 2u);
-        float _304 = UnitUniforms.UnitSize.x / _134[_290];
-        bool _313;
-        if (UnitUniforms.IntegerScale != 0u)
-        {
-            _313 = UnitUniforms.PixelsPerUnit > 0.0;
-        }
-        else
-        {
-            _313 = false;
-        }
-        float _322;
-        if (_313)
-        {
-            _322 = precise::max(1.0, rint(_304 * UnitUniforms.PixelsPerUnit)) / UnitUniforms.PixelsPerUnit;
-        }
-        else
-        {
-            _322 = _304;
-        }
-        float _325 = _135[_290] * 0.5;
-        float2 _330 = ((_137[_136[_153]] * 2.0) - float2(1.0)) * _325;
-        float _336 = length(Units._m0[_152].vel);
-        bool _343;
-        if (UnitUniforms.Rotate != 0u)
-        {
-            _343 = _290 != 2u;
-        }
-        else
-        {
-            _343 = false;
-        }
-        bool _349;
-        if (_343)
-        {
-            _349 = _336 > UnitUniforms.MinTurnSpeed;
-        }
-        else
-        {
-            _349 = false;
-        }
-        float2 _371;
-        if (_349)
-        {
-            float2 _353 = Units._m0[_152].vel / float2(_336);
-            float2 _370;
-            if (UnitUniforms.DirectionSteps > 0u)
+            uint _249 = _232 / 6u;
+            uint _250 = _249 % 6u;
+            uint _263 = _241 / 5u;
+            uint _266 = _263 / 8u;
+            uint _277;
+            if (_133[_250] == 1u)
             {
-                float _360 = 6.283185482025146484375 / float(UnitUniforms.DirectionSteps);
-                float _366 = rint(precise::atan2(_353.y, _353.x) / _360) * _360;
-                _370 = float2(cos(_366), sin(_366));
+                _277 = 57u + ((_266 % 2u) * 2u);
             }
             else
             {
-                _370 = _353;
+                _277 = 51u + ((_266 % 3u) * 2u);
             }
-            _371 = _370;
+            _291 = uint4(_134[(_249 / 6u) % 82u] * 3u, 33u + ((_241 % 5u) * 2u), 43u + (_263 % 8u), _277);
+            _292 = ((_232 % 6u) * 4u) + _133[_250];
         }
         else
         {
-            _371 = float2(0.0, -1.0);
+            uint _284 = 61u + (((_232 / 4u) % 5u) * 3u);
+            _291 = uint4(_284, _284, 79u + (_241 % 2u), 76u + ((_241 / 2u) % 3u));
+            _292 = 24u + (_232 % 4u);
         }
-        _372 = _282;
-        _373 = _330;
-        _374 = (float2(float(_283 % 8u), float((_290 * 4u) + (_283 / 8u))) * 13.0) + float2(6.5);
-        _375 = _371;
-        _376 = _287 - float2(_325 * _322);
-        _377 = _287 + (_330 * _322);
+        float2 _296 = _186 + (UnitUniforms.UnitSize * 0.5);
+        uint _299 = min(UnitUniforms.Lod, 2u);
+        float _313 = UnitUniforms.UnitSize.x / _135[_299];
+        bool _322;
+        if (UnitUniforms.IntegerScale != 0u)
+        {
+            _322 = UnitUniforms.PixelsPerUnit > 0.0;
+        }
+        else
+        {
+            _322 = false;
+        }
+        float _331;
+        if (_322)
+        {
+            _331 = precise::max(1.0, rint(_313 * UnitUniforms.PixelsPerUnit)) / UnitUniforms.PixelsPerUnit;
+        }
+        else
+        {
+            _331 = _313;
+        }
+        float _334 = _136[_299] * 0.5;
+        float2 _339 = ((_138[_137[_154]] * 2.0) - float2(1.0)) * _334;
+        float _345 = length(Units._m0[_153].vel);
+        bool _352;
+        if (UnitUniforms.Rotate != 0u)
+        {
+            _352 = _299 != 2u;
+        }
+        else
+        {
+            _352 = false;
+        }
+        bool _358;
+        if (_352)
+        {
+            _358 = _345 > UnitUniforms.MinTurnSpeed;
+        }
+        else
+        {
+            _358 = false;
+        }
+        float2 _380;
+        if (_358)
+        {
+            float2 _362 = Units._m0[_153].vel / float2(_345);
+            float2 _379;
+            if (UnitUniforms.DirectionSteps > 0u)
+            {
+                float _369 = 6.283185482025146484375 / float(UnitUniforms.DirectionSteps);
+                float _375 = rint(precise::atan2(_362.y, _362.x) / _369) * _369;
+                _379 = float2(cos(_375), sin(_375));
+            }
+            else
+            {
+                _379 = _362;
+            }
+            _380 = _379;
+        }
+        else
+        {
+            _380 = float2(0.0, -1.0);
+        }
+        _381 = _291;
+        _382 = _339;
+        _383 = (float2(float(_292 % 8u), float((_299 * 4u) + (_292 / 8u))) * 13.0) + float2(6.5);
+        _384 = _380;
+        _385 = _296 - float2(_334 * _331);
+        _386 = _296 + (_339 * _331);
     }
-    float4 _383 = UnitUniforms.ViewProjection * float4(_377, 0.0, 1.0);
-    bool _390;
+    float4 _392 = UnitUniforms.ViewProjection * float4(_386, 0.0, 1.0);
+    bool _399;
     if (UnitUniforms.SpriteMode != 0u)
     {
-        _390 = UnitUniforms.ViewportSize.x > 0.0;
+        _399 = UnitUniforms.ViewportSize.x > 0.0;
     }
     else
     {
-        _390 = false;
+        _399 = false;
     }
-    float4 _410;
-    if (_390)
+    float4 _419;
+    if (_399)
     {
-        float2 _402 = (((UnitUniforms.ViewProjection * float4(_376, 0.0, 1.0)).xy * 0.5) + float2(0.5)) * UnitUniforms.ViewportSize;
-        float2 _408 = _383.xy + (((rint(_402) - _402) / UnitUniforms.ViewportSize) * 2.0);
-        _410 = float4(_408.x, _408.y, _383.z, _383.w);
+        float2 _411 = (((UnitUniforms.ViewProjection * float4(_385, 0.0, 1.0)).xy * 0.5) + float2(0.5)) * UnitUniforms.ViewportSize;
+        float2 _417 = _392.xy + (((rint(_411) - _411) / UnitUniforms.ViewportSize) * 2.0);
+        _419 = float4(_417.x, _417.y, _392.z, _392.w);
     }
     else
     {
-        _410 = _383;
+        _419 = _392;
     }
-    float4 _418;
-    if (Units._m0[_152].pos.x < (-100000001504746621987668885504.0))
+    float4 _427;
+    if (Units._m0[_153].pos.x < (-100000001504746621987668885504.0))
     {
-        _418 = UnitUniforms.ViewProjection * float4(Units._m0[_152].pos, 0.0, 1.0);
+        _427 = UnitUniforms.ViewProjection * float4(Units._m0[_153].pos, 0.0, 1.0);
     }
     else
     {
-        _418 = _410;
+        _427 = _419;
     }
-    float _429;
+    float _438;
     if (UnitUniforms.InvMaxHealth > 0.0)
     {
-        _429 = fast::clamp(Health._m0[_152] * UnitUniforms.InvMaxHealth, 0.0, 1.0);
+        _438 = fast::clamp(Health._m0[_153] * UnitUniforms.InvMaxHealth, 0.0, 1.0);
     }
     else
     {
-        _429 = 1.0;
+        _438 = 1.0;
     }
-    float4 _447;
-    if (_188)
+    float4 _456;
+    if (_189)
     {
-        _447 = select(float4(UnitUniforms.Color.xyz * _429, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_168 == 0u));
+        _456 = select(float4(UnitUniforms.Color.xyz * _438, UnitUniforms.Color.w), float4(1.0, 0.0, 0.0, 1.0), bool4(_169 == 0u));
     }
     else
     {
-        _447 = float4(_429, _429, _429, 1.0);
+        _456 = float4(_438, _438, _438, 1.0);
     }
-    out.out_var_TEXCOORD0 = _447;
-    out.out_var_TEXCOORD1 = _373;
-    out.out_var_TEXCOORD2 = _372;
-    out.out_var_TEXCOORD3 = _374;
-    out.out_var_TEXCOORD4 = _375;
-    out.gl_Position = _418;
+    out.out_var_TEXCOORD0 = _456;
+    out.out_var_TEXCOORD1 = _382;
+    out.out_var_TEXCOORD2 = _381;
+    out.out_var_TEXCOORD3 = _383;
+    out.out_var_TEXCOORD4 = _384;
+    out.gl_Position = _427;
     return out;
 }
 

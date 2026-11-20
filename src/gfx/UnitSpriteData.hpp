@@ -10,7 +10,7 @@ namespace horde::gfx::unit_sprites {
 inline constexpr int kAtlasWidth = 104;
 inline constexpr int kAtlasHeight = 156;
 inline constexpr int kVariantCount = 28;
-inline constexpr int kPaletteSize = 79;
+inline constexpr int kPaletteSize = 83;
 
 // Matches `float4 Palette[PALETTE_SIZE]` in unit_sprite.frag.hlsl, linear 0-1 sRGB values.
 inline constexpr std::array<glm::vec4, kPaletteSize> kPalette{{
@@ -71,6 +71,10 @@ inline constexpr std::array<glm::vec4, kPaletteSize> kPalette{{
     {0.4980f, 0.4275f, 0.2157f, 1.0f},
     {0.1725f, 0.1725f, 0.1882f, 1.0f},
     {0.1098f, 0.1098f, 0.1216f, 1.0f},
+    {0.6902f, 0.2510f, 0.2353f, 1.0f},
+    {0.4471f, 0.1608f, 0.1529f, 1.0f},
+    {0.2588f, 0.4235f, 0.6118f, 1.0f},
+    {0.1647f, 0.2745f, 0.3961f, 1.0f},
     {0.2745f, 0.4314f, 0.9412f, 1.0f},
     {0.4902f, 0.6000f, 0.9569f, 1.0f},
     {0.1765f, 0.2784f, 0.6118f, 1.0f},

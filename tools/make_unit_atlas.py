@@ -149,9 +149,11 @@ PALETTES = {
     "human_skin": [(242, 206, 172), (224, 178, 140), (194, 140, 100), (150, 102, 72), (104, 70, 50)],
     "human_clothes": [(196, 194, 186), (54, 56, 62), (72, 86, 118), (118, 54, 52), (92, 100, 72),
                       (148, 122, 86), (62, 70, 92), (128, 96, 108)],
-    # No blue or white: from afar a cap wearer reads as a cap-coloured head,
-    # so those would look like blue / white hair.
+    # Bows and the like. No blue or white: from afar those read as hair.
     "human_accessory": [(176, 64, 60), (196, 168, 86), (44, 44, 48)],
+    # Caps, picked evenly: red and blue. From afar a cap wearer is a
+    # cap-coloured circle.
+    "human_cap": [(176, 64, 60), (66, 108, 156)],
     "alien_skin": [(70, 110, 240), (240, 96, 190), (150, 80, 220), (60, 210, 220), (140, 230, 70)],
     "alien_tip": [(255, 240, 90), (255, 255, 255), (255, 120, 60)],
     "alien_suit": [(170, 176, 190), (120, 126, 140)],
@@ -357,6 +359,7 @@ def palette_table():
     add("HUMAN_SKIN", PALETTES["human_skin"], (0, LIGHT))
     add("HUMAN_CLOTHES", PALETTES["human_clothes"], (CLOTHES_DARKEN,))
     add("HUMAN_ACCESSORY", PALETTES["human_accessory"], (0, DARK))
+    add("HUMAN_CAP", PALETTES["human_cap"], (0, DARK))
     add("ALIEN_SKIN", PALETTES["alien_skin"], (0, LIGHT, DARK))
     add("ALIEN_TIP", PALETTES["alien_tip"], (0,))
     add("ALIEN_SUIT", PALETTES["alien_suit"], (0,))
@@ -374,6 +377,7 @@ def write_headers(vs, rows_per_lod, w, h):
         "HUMAN_HAIR_COUNT": len(PALETTES["human_hair"]), "HUMAN_SKIN_COUNT": len(PALETTES["human_skin"]),
         "HUMAN_CLOTHES_COUNT": len(PALETTES["human_clothes"]),
         "HUMAN_ACCESSORY_COUNT": len(PALETTES["human_accessory"]),
+        "HUMAN_CAP_COUNT": len(PALETTES["human_cap"]), "ACCESSORY_CAP": ACCESSORIES.index("cap"),
         "ALIEN_SKIN_COUNT": len(PALETTES["alien_skin"]), "ALIEN_TIP_COUNT": len(PALETTES["alien_tip"]),
         "ALIEN_SUIT_COUNT": len(PALETTES["alien_suit"]),
     }
