@@ -44,6 +44,14 @@ public:
     glm::ivec2 screenSize(DeviceKind kind) const;
     const DeviceRect& rect(DeviceKind kind) const;
 
+    // True while a device slides out (target Hidden, still on screen): its
+    // screen keeps its last frame rather than being redrawn from whatever scene
+    // is now on top of it, which would swap its content mid-slide. False if the
+    // texture was recreated since it was last drawn, as it is then undefined.
+    bool frozen(DeviceKind kind) const;
+    // Tells the shell the device's screen texture holds a drawn frame.
+    void markDrawn(DeviceKind kind);
+
     gfx::RenderTarget& screen(DeviceKind kind);
     // One batch per device so each frame's uploads do not overwrite each other.
     gfx::SpriteBatch& batch(DeviceKind kind);
@@ -72,6 +80,8 @@ private:
         gfx::RenderTarget target;
         gfx::SpriteBatch batch;
         gfx::Blur blur;
+        // False after the target is recreated, until a frame is drawn into it.
+        bool drawn = false;
     };
 
     Device& device(DeviceKind kind) { return kind == DeviceKind::Phone ? m_phone : m_tablet; }

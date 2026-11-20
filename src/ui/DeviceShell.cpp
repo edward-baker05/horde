@@ -37,7 +37,11 @@ void DeviceShell::layoutDevice(Device& d) {
     // The tablet is stored portrait-swapped, so ask for landscape to get 1280x800.
     d.spec = deviceSpec(d.kind, d.kind == DeviceKind::Phone ? m_phoneOrientation : Orientation::Landscape);
     d.rect = fitDevice(d.spec, m_windowPx);
+    const glm::ivec2 before = d.target.size();
     d.target.resize(m_gpu, m_format, screenPixelSize(d.rect));
+    if (d.target.size() != before) {
+        d.drawn = false;
+    }
     // Sized here so the blurred texture the composite refers to is the one the blur pass writes.
     d.blur.resize(d.target.size());
 }
@@ -83,6 +87,20 @@ gfx::RenderTarget& DeviceShell::screen(DeviceKind kind) {
 
 gfx::SpriteBatch& DeviceShell::batch(DeviceKind kind) {
     return device(kind).batch;
+}
+
+bool DeviceShell::frozen(DeviceKind kind) const {
+    if (kind == DeviceKind::None) {
+        return false;
+    }
+    const Device& d = device(kind);
+    return d.drawn && d.placement == Placement::Hidden && d.animator.visible();
+}
+
+void DeviceShell::markDrawn(DeviceKind kind) {
+    if (kind != DeviceKind::None) {
+        device(kind).drawn = true;
+    }
 }
 
 float DeviceShell::blurAmount(DeviceKind kind) const {

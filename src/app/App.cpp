@@ -490,7 +490,9 @@ void App::render() {
     // Covered scenes are frozen but still show. A device slid fully off is skipped.
     std::array<scene::Scene*, 2> deviceScenes{};
     for (size_t i = 0; i < deviceKinds.size(); ++i) {
-        if (m_shell.visible(deviceKinds[i])) {
+        // A device sliding out keeps its last frame: skipping it here also skips
+        // its uploads, RmlUi record, screen pass and blur.
+        if (m_shell.visible(deviceKinds[i]) && !m_shell.frozen(deviceKinds[i])) {
             deviceScenes[i] = m_scenes->topmostOn(deviceKinds[i]);
         }
     }
@@ -549,6 +551,7 @@ void App::render() {
         screenTarget.store_op = SDL_GPU_STOREOP_STORE;
 
         if (SDL_GPURenderPass* screenPass = SDL_BeginGPURenderPass(commands, &screenTarget, 1, nullptr)) {
+            m_shell.markDrawn(deviceKinds[i]);
             scene->camera().setViewport(static_cast<float>(target.size().x), static_cast<float>(target.size().y));
             m_shell.batch(deviceKinds[i]).flush(commands, screenPass, scene->camera().viewProjection());
             scene->renderPass(commands, screenPass);
