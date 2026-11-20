@@ -5,6 +5,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+option(HORDE_BUILD_TESTS "Build the unit tests" ON)
+
 include(Dependencies)
 include(Shaders)
 
@@ -45,6 +47,7 @@ add_executable(horde
     src/scene/Presets.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
+    src/ui/DeviceLayout.cpp
     src/ui/ImGuiLayer.cpp
     src/logic/UnitData.hpp
     src/logic/Level.cpp
@@ -84,5 +87,11 @@ add_custom_command(TARGET horde POST_BUILD
         $<TARGET_FILE_DIR:horde>/shaders
     COMMENT "Copying assets and compiled shaders next to horde binary")
 
+
+if(HORDE_BUILD_TESTS)
+    # Not include(CTest): that would also switch on RmlUi's own test targets.
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT horde)

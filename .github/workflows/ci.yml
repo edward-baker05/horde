@@ -60,6 +60,9 @@ jobs:
     - name: Build
       run: cmake --build --preset ${{ matrix.platform.build_preset }}
 
+    - name: Test
+      run: ctest --preset ${{ matrix.platform.build_preset }} --output-on-failure
+
   # Every shader format we ship must be reproducible from shaders/src/. This job
   # rebuilds SPIR-V and MSL and fails if the committed artifacts have drifted.
   # It is separate because building shadercross means building

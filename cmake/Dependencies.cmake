@@ -12,6 +12,7 @@ set(HORDE_SDL3_IMAGE_TAG "release-3.4.4" CACHE STRING "SDL3_image tag to fetch w
 set(HORDE_GLM_TAG "1.0.1" CACHE STRING "glm tag to fetch when no system glm is found")
 set(HORDE_IMGUI_TAG "v1.92.9-docking" CACHE STRING "Dear ImGui tag to fetch")
 set(HORDE_JSON_TAG "v3.11.3" CACHE STRING "nlohmann/json tag to fetch when no system copy is found")
+set(HORDE_DOCTEST_TAG "v2.4.11" CACHE STRING "doctest tag to fetch when no system copy is found")
 
 # --- SDL3 --------------------------------------------------------------------
 
@@ -131,3 +132,29 @@ target_compile_features(imgui PUBLIC cxx_std_20)
 target_link_libraries(imgui PUBLIC SDL3::SDL3)
 
 add_library(imgui::imgui ALIAS imgui)
+
+# --- doctest -----------------------------------------------------------------
+#
+# Header-only test framework, used only by tests/.
+
+if(HORDE_BUILD_TESTS)
+    find_package(doctest CONFIG QUIET)
+
+    if(doctest_FOUND)
+        message(STATUS "horde: using system doctest ${doctest_VERSION}")
+    else()
+        message(STATUS "horde: no system doctest, fetching ${HORDE_DOCTEST_TAG}")
+        set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
+        set(DOCTEST_WITH_MAIN_IN_STATIC_LIB OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(doctest
+            GIT_REPOSITORY https://github.com/doctest/doctest.git
+            GIT_TAG ${HORDE_DOCTEST_TAG}
+            GIT_SHALLOW ON
+            EXCLUDE_FROM_ALL
+            SYSTEM)
+        # v2.4.11 declares cmake_minimum_required below 3.5, which CMake 4 rejects.
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+        FetchContent_MakeAvailable(doctest)
+        unset(CMAKE_POLICY_VERSION_MINIMUM)
+    endif()
+endif()
