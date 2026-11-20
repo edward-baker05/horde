@@ -1,0 +1,39 @@
+<rml>
+<head>
+	<title>Main menu</title>
+	<link type="text/rcss" href="phone.rcss"/>
+</head>
+<body data-model="menu">
+	<div class="status-bar">
+		<span class="clock">{{clock}}</span>
+	</div>
+
+	<div class="header" data-if="page != 'root'">
+		<button class="back" data-event-click="back">&lt;</button>
+		<span class="title" data-if="page == 'play'">Play</span>
+		<span class="title" data-if="page == 'dev'">Dev Ground</span>
+	</div>
+	<div class="header" data-if="page == 'root'">
+		<span class="title">horde</span>
+	</div>
+
+	<div class="list" data-if="page == 'root'">
+		<button class="row" data-event-click="open('play')">Play</button>
+		<button class="row" data-event-click="upgrades">Upgrades</button>
+		<button class="row" data-event-click="editor">Level Editor</button>
+		<button class="row" data-event-click="open('dev')">Dev Ground</button>
+		<button class="row" data-event-click="quit">Quit</button>
+	</div>
+
+	<div class="list" data-if="page == 'play'">
+		<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}</button>
+	</div>
+
+	<div class="list" data-if="page == 'dev'">
+		<button class="row" data-event-click="dev_level(-1)">Built-in level</button>
+		<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}</button>
+		<div class="section" data-if="presets.size > 0">Presets</div>
+		<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}</button>
+	</div>
+</body>
+</rml>

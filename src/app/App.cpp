@@ -80,6 +80,11 @@ bool App::init(const AppConfig& config) {
         return false;
     }
 
+    // Game-facing UI (menus); ImGui above stays for developer tooling.
+    if (!m_rml.init(m_gpu, *m_shaders)) {
+        return false;
+    }
+
     // allocated services to a scene
     scene::Services services;
     services.gpu = &m_gpu;
@@ -87,6 +92,7 @@ bool App::init(const AppConfig& config) {
     services.atlas = &m_atlas;
     services.window = m_window;
     services.frameStats = &m_stats;
+    services.ui = &m_rml;
     services.measureSimGpu = &m_measureSimGpu;
     // Benchmarks decide for themselves whether to sync the GPU.
     if (m_config.bench) {
@@ -286,6 +292,9 @@ void App::pumpEvents() {
                 const float width = static_cast<float>(event.window.data1);
                 const float height = static_cast<float>(event.window.data2);
 
+                m_rml.setContextSize(ui::DeviceKind::None, {event.window.data1, event.window.data2},
+                                     SDL_GetWindowDisplayScale(m_window));
+
                 if (scene::Scene* active = m_scenes->active()) {
                     active->onResize(width, height);
                 }
@@ -297,6 +306,11 @@ void App::pumpEvents() {
         }
 
         if (consumed) {
+            continue;
+        }
+
+        // RmlUi next, so a menu under the pointer keeps clicks from the scene.
+        if (m_rml.handleEvent(ui::DeviceKind::None, event)) {
             continue;
         }
 
@@ -313,6 +327,7 @@ void App::update(float deltaTime) {
         const Uint64 start = SDL_GetTicksNS();
         active->update(deltaTime);
         m_lastSceneUpdateNs = SDL_GetTicksNS() - start;
+        m_rml.update();
         active->debugUi();
     }
 }
@@ -413,6 +428,9 @@ void App::render() {
     // this: skipping PrepareDrawData renders nothing, silently.
     m_batch.upload(commands);
     m_imgui.prepare(commands);
+    // RmlUi uploads geometry and glyphs while rendering, so it records here
+    // and replays inside the pass.
+    m_rml.record(ui::DeviceKind::None, commands);
 
     SDL_GPUColorTargetInfo colorTarget{};
     colorTarget.texture = swapchain;
@@ -429,6 +447,7 @@ void App::render() {
             active->renderPass(commands, pass);
         }
 
+        m_rml.draw(ui::DeviceKind::None, pass, commands);
         m_imgui.draw(commands, pass);
         SDL_EndGPURenderPass(pass);
     }
@@ -450,6 +469,7 @@ void App::shutdown() {
 
     m_gpuTimer.stop();
     m_scenes.reset();
+    m_rml.shutdown();
     m_imgui.shutdown();
     m_atlas.release();
     m_batch.shutdown();

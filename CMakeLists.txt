@@ -50,6 +50,8 @@ add_executable(horde
     src/ui/DeviceLayout.cpp
     src/ui/ImGuiLayer.cpp
     src/ui/RmlInput.cpp
+    src/ui/RmlLayer.cpp
+    src/ui/RmlRenderer.cpp
     src/ui/RmlSystem.cpp
     src/ui/ScreenInput.cpp
     src/ui/ShellState.cpp

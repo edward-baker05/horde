@@ -15,6 +15,7 @@
 #include "gfx/Texture.hpp"
 #include "scene/SceneStack.hpp"
 #include "ui/ImGuiLayer.hpp"
+#include "ui/RmlLayer.hpp"
 
 namespace horde::app {
 
@@ -58,6 +59,7 @@ private:
     gfx::SpriteBatch m_batch;
     gfx::Texture m_atlas;
     ui::ImGuiLayer m_imgui;
+    ui::RmlLayer m_rml;
     std::optional<scene::SceneStack> m_scenes;
 
     bool m_running = false;

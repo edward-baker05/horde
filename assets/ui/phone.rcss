@@ -1,0 +1,88 @@
+/* Dark phone theme: near-black ground, off-white text, one accent. All sizes
+   are in dp so the layout scales with the display. */
+
+body {
+	font-family: "Liberation Sans";
+	font-size: 18dp;
+	color: #ececf0;
+	background-color: #0b0b0e;
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+.status-bar {
+	height: 32dp;
+	padding: 8dp 20dp 0 20dp;
+	font-size: 14dp;
+	color: #a4a4ae;
+	text-align: left;
+}
+
+.header {
+	height: 64dp;
+	padding: 12dp 20dp;
+}
+
+.header .title {
+	font-size: 30dp;
+	font-weight: bold;
+	line-height: 40dp;
+	color: #ececf0;
+}
+
+.header .back {
+	display: inline-block;
+	width: 40dp;
+	height: 40dp;
+	margin-right: 12dp;
+	font-size: 26dp;
+	line-height: 40dp;
+	text-align: center;
+	color: #ff8a3d;
+	background-color: transparent;
+	border-radius: 20dp;
+	transition: background-color 0.15s;
+}
+
+.header .back:hover {
+	background-color: #1c1c22;
+}
+
+.header .back:active {
+	background-color: #2a2a33;
+}
+
+.list {
+	display: block;
+	padding: 8dp 12dp;
+}
+
+.section {
+	padding: 16dp 12dp 4dp 12dp;
+	font-size: 14dp;
+	color: #a4a4ae;
+}
+
+button.row {
+	display: block;
+	height: 64dp;
+	margin-bottom: 4dp;
+	padding: 0 20dp;
+	font-size: 24dp;
+	line-height: 64dp;
+	text-align: left;
+	color: #ececf0;
+	background-color: transparent;
+	border-radius: 14dp;
+	transition: background-color 0.15s;
+}
+
+button.row:hover {
+	background-color: #1c1c22;
+}
+
+button.row:active {
+	background-color: #ff8a3d;
+	color: #0b0b0e;
+}
