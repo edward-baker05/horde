@@ -158,3 +158,51 @@ if(HORDE_BUILD_TESTS)
         unset(CMAKE_POLICY_VERSION_MINIMUM)
     endif()
 endif()
+
+# --- FreeType + RmlUi --------------------------------------------------------
+#
+# RmlUi lays out and styles the device screens. Its FreeType font engine needs
+# FreeType: use the system one if present, otherwise build a minimal copy with
+# every optional codec off (we only load TTF/OTF files).
+
+set(HORDE_FREETYPE_TAG "VER-2-13-3" CACHE STRING "FreeType tag to fetch when no system copy is found")
+set(HORDE_RMLUI_TAG "6.3" CACHE STRING "RmlUi tag to fetch")
+
+find_package(Freetype QUIET)
+
+if(Freetype_FOUND OR FREETYPE_FOUND)
+    message(STATUS "horde: using system FreeType ${FREETYPE_VERSION_STRING}")
+else()
+    message(STATUS "horde: no system FreeType, fetching ${HORDE_FREETYPE_TAG}")
+    set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(freetype
+        GIT_REPOSITORY https://github.com/freetype/freetype.git
+        GIT_TAG ${HORDE_FREETYPE_TAG}
+        GIT_SHALLOW ON
+        EXCLUDE_FROM_ALL
+        SYSTEM
+        OVERRIDE_FIND_PACKAGE)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    FetchContent_MakeAvailable(freetype)
+    unset(CMAKE_POLICY_VERSION_MINIMUM)
+    if(NOT TARGET Freetype::Freetype)
+        add_library(Freetype::Freetype ALIAS freetype)
+    endif()
+endif()
+
+set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(RMLUI_FONT_ENGINE freetype CACHE STRING "" FORCE)
+FetchContent_Declare(RmlUi
+    GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+    GIT_TAG ${HORDE_RMLUI_TAG}
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+FetchContent_MakeAvailable(RmlUi)
+unset(CMAKE_POLICY_VERSION_MINIMUM)

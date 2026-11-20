@@ -5,12 +5,16 @@ add_executable(horde_tests
     TweenTests.cpp
     DeviceLayoutTests.cpp
     ShellStateTests.cpp
+    InputTests.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/DeviceLayout.cpp
-    ${PROJECT_SOURCE_DIR}/src/ui/ShellState.cpp)
+    ${PROJECT_SOURCE_DIR}/src/ui/ShellState.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/RmlInput.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/RmlSystem.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/ScreenInput.cpp)
 
 target_compile_features(horde_tests PRIVATE cxx_std_20)
 target_include_directories(horde_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(horde_tests PRIVATE doctest::doctest glm::glm SDL3::SDL3)
+target_link_libraries(horde_tests PRIVATE doctest::doctest glm::glm SDL3::SDL3 RmlUi::RmlUi)
 
 if(MSVC)
     target_compile_options(horde_tests PRIVATE /W4 /permissive-)

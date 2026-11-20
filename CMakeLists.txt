@@ -49,6 +49,9 @@ add_executable(horde
     src/scene/TechTreeScene.cpp
     src/ui/DeviceLayout.cpp
     src/ui/ImGuiLayer.cpp
+    src/ui/RmlInput.cpp
+    src/ui/RmlSystem.cpp
+    src/ui/ScreenInput.cpp
     src/ui/ShellState.cpp
     src/logic/UnitData.hpp
     src/logic/Level.cpp
@@ -65,6 +68,7 @@ target_link_libraries(horde PRIVATE
     SDL3_image::SDL3_image
     glm::glm
     imgui::imgui
+    RmlUi::RmlUi
     nlohmann_json::nlohmann_json)
 
 if(MSVC)
