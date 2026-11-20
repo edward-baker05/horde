@@ -4,6 +4,8 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_video.h>
 
+#include "ui/ShellState.hpp"
+
 namespace horde::gfx {
 class Camera2D;
 class GpuContext;
@@ -64,6 +66,14 @@ public:
     }
 
     virtual void onExit() {}
+
+    // Which device (if any) this scene lives on. Read by SceneStack to drive
+    // the device shell; the default keeps the scene on the swapchain.
+    virtual ui::ScenePresentation presentation() const { return {}; }
+
+    // Another scene was pushed on top / that scene was popped again.
+    virtual void onCovered() {}
+    virtual void onRevealed() {}
 
     // Return true if the event was consumed and should not propagate.
     virtual bool handleEvent(const SDL_Event& event) {

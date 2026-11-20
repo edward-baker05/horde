@@ -4,7 +4,9 @@ add_executable(horde_tests
     test_main.cpp
     TweenTests.cpp
     DeviceLayoutTests.cpp
-    ${PROJECT_SOURCE_DIR}/src/ui/DeviceLayout.cpp)
+    ShellStateTests.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/DeviceLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/ShellState.cpp)
 
 target_compile_features(horde_tests PRIVATE cxx_std_20)
 target_include_directories(horde_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
