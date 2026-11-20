@@ -36,6 +36,9 @@ struct LevelOptions {
     std::uint32_t seed = 1;
     // Zoom the camera so the whole level is on screen.
     bool fitCamera = false;
+    // Plays on the tablet; off draws straight to the swapchain (benchmarks, CLI
+    // levels). Placeholder until level modes replace it.
+    bool onDevice = true;
     sim::CollisionSettings collision;
     // Physics steps per second, independent of the frame rate; drawing blends
     // between steps. 0 steps once per frame, with the frame's own dt.
@@ -73,6 +76,10 @@ public:
     void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) override;
     void debugUi() override;
     void onResize(float width, float height) override;
+    ui::ScenePresentation presentation() const override {
+        return m_options.onDevice ? ui::ScenePresentation{ui::DeviceKind::Tablet, ui::Orientation::Landscape}
+                                  : ui::ScenePresentation{};
+    }
 
     sim::PhysicsSystem& physics() {
         return *m_physics;

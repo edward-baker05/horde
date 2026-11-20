@@ -13,11 +13,6 @@ namespace horde::scene {
 bool TechTreeScene::onEnter(Services& services) {
     m_services = &services;
 
-    int width = 0;
-    int height = 0;
-    SDL_GetWindowSizeInPixels(services.window, &width, &height);
-    m_camera.setViewport(static_cast<float>(width), static_cast<float>(height));
-
     return true;
 }
 

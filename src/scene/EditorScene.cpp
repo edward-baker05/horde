@@ -17,22 +17,22 @@
 #include "logic/LevelValidation.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
+#include "ui/DeviceShell.hpp"
 
 namespace horde::scene {
 
 bool EditorScene::onEnter(Services& services) {
     m_services = &services;
 
-    int width = 0;
-    int height = 0;
-    SDL_GetWindowSizeInPixels(services.window, &width, &height);
-    m_camera.setViewport(static_cast<float>(width), static_cast<float>(height));
+    // The stack's onResize sets the viewport after this; the fit below needs it now.
+    const glm::vec2 window = services.shell != nullptr ? services.shell->windowPx() : glm::vec2(1.0f);
+    m_camera.setViewport(window.x, window.y);
 
     // Frame the whole level with a margin, so a new editor opens on something
     // sensible rather than on the origin.
     m_camera.setCenter(m_state.level.size * 0.5f);
-    const float fit = std::min(static_cast<float>(width) / (m_state.level.size.x * 1.2f),
-                               static_cast<float>(height) / (m_state.level.size.y * 1.2f));
+    const float fit = std::min(window.x / (m_state.level.size.x * 1.2f),
+                               window.y / (m_state.level.size.y * 1.2f));
     m_camera.setZoom(fit);
 
     return true;

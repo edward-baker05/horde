@@ -25,10 +25,12 @@ class MainMenuScene : public Scene {
 public:
     bool onEnter(Services& services) override;
     void onExit() override;
-    void onCovered() override;
     void onRevealed() override;
     void update(float deltaTime) override;
     void onResize(float width, float height) override;
+    ui::ScenePresentation presentation() const override {
+        return {ui::DeviceKind::Phone, ui::Orientation::Portrait};
+    }
 
     gfx::Camera2D& camera() override {
         return m_camera;

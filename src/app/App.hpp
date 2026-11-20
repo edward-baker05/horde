@@ -9,11 +9,13 @@
 
 #include "bench/Benchmark.hpp"
 #include "gfx/GpuContext.hpp"
+#include "gfx/Camera2D.hpp"
 #include "gfx/GpuTimer.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
 #include "scene/SceneStack.hpp"
+#include "ui/DeviceShell.hpp"
 #include "ui/ImGuiLayer.hpp"
 #include "ui/RmlLayer.hpp"
 
@@ -51,6 +53,12 @@ private:
     void update(float deltaTime);
     void render();
     int finishBenchmark();
+    // Fits the devices to the window and tells RmlUi and the scenes the new sizes.
+    void relayout();
+    // Pushes the devices' screen sizes to RmlUi and the scenes if they changed.
+    void syncDeviceSizes();
+    // Points the devices at what the scene stack wants and advances their slides.
+    void updateShell(float deltaTime);
 
     AppConfig m_config;
     SDL_Window* m_window = nullptr;
@@ -60,6 +68,14 @@ private:
     gfx::Texture m_atlas;
     ui::ImGuiLayer m_imgui;
     ui::RmlLayer m_rml;
+    // Phone and tablet screens; scenes on them draw offscreen and are composited
+    // through m_compositeBatch, which is in window pixels.
+    ui::DeviceShell m_shell;
+    gfx::SpriteBatch m_compositeBatch;
+    gfx::Camera2D m_compositeCamera;
+    std::vector<ui::ScenePresentation> m_presentations;
+    glm::ivec2 m_phoneSize{0};
+    glm::ivec2 m_tabletSize{0};
     std::optional<scene::SceneStack> m_scenes;
 
     bool m_running = false;

@@ -19,16 +19,10 @@ namespace horde::scene {
 bool MainMenuScene::onEnter(Services& services) {
     m_services = &services;
 
-    int width = 0;
-    int height = 0;
-    SDL_GetWindowSizeInPixels(services.window, &width, &height);
-    m_camera.setViewport(static_cast<float>(width), static_cast<float>(height));
-
     if (services.ui == nullptr) {
         return false;
     }
-    // Full window for now; the phone takes this over later.
-    m_context = services.ui->context(ui::DeviceKind::None);
+    m_context = services.ui->context(ui::DeviceKind::Phone);
     if (m_context == nullptr) {
         return false;
     }
@@ -82,12 +76,6 @@ void MainMenuScene::onExit() {
     if (m_context != nullptr) {
         m_context->RemoveDataModel("menu");
         m_context = nullptr;
-    }
-}
-
-void MainMenuScene::onCovered() {
-    if (m_document != nullptr) {
-        m_document->Hide();
     }
 }
 
@@ -145,6 +133,8 @@ void MainMenuScene::playPreset(const std::string& name) {
     std::string error;
     if (loadPreset(name, LevelOptions{}, preset, error)) {
         preset.options.fitCamera = true;
+        // Dev Ground presets stay full-window until level modes exist.
+        preset.options.onDevice = false;
         m_services->scenes->push(std::make_unique<LevelScene>(std::move(preset.options)));
     } else {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "preset '%s': %s", name.c_str(), error.c_str());

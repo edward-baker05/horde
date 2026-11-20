@@ -22,6 +22,7 @@ add_executable(horde
     src/gfx/GpuContext.cpp
     src/gfx/GpuTimer.cpp
     src/gfx/LevelRenderer.cpp
+    src/gfx/RenderTarget.cpp
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
@@ -48,6 +49,7 @@ add_executable(horde
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
     src/ui/DeviceLayout.cpp
+    src/ui/DeviceShell.cpp
     src/ui/ImGuiLayer.cpp
     src/ui/RmlInput.cpp
     src/ui/RmlLayer.cpp

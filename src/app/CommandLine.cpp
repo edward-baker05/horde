@@ -82,6 +82,8 @@ bool parseNumber(std::string_view text, T& out) {
 
 ParseResult parseCommandLine(int argc, char* argv[], AppConfig& config) {
     scene::LevelOptions level;
+    // CLI levels and benchmarks draw straight to the window, not on the tablet.
+    level.onDevice = false;
     bench::BenchConfig benchConfig;
     bool bench = false;
     bool wantsLevel = false;

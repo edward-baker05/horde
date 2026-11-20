@@ -1,5 +1,7 @@
 #include "ui/ShellState.hpp"
 
+#include <cstddef>
+
 namespace horde::ui {
 
 namespace {
@@ -26,7 +28,7 @@ ShellTargets computeTargets(std::span<const ScenePresentation> stack) {
         targets.phoneOrientation = top.orientation;
     }
 
-    if (top.overlay) {
+    if (top.overlay && top.device != DeviceKind::None) {
         // The nearest scene on another device stays visible behind the overlay.
         // Scenes on the same device are skipped: that device is already centred.
         for (size_t i = stack.size() - 1; i-- > 0;) {

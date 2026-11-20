@@ -46,13 +46,8 @@ bool LevelScene::onEnter(Services& services) {
         }
     }
 
-    int width = 0;
-    int height = 0;
-    SDL_GetWindowSizeInPixels(services.window, &width, &height);
-    m_camera.setViewport(static_cast<float>(width), static_cast<float>(height));
-    if (m_options.fitCamera) {
-        fitCameraToLevel(static_cast<float>(width), static_cast<float>(height));
-    }
+    // The camera viewport and fit come from the stack's onResize right after
+    // this, sized to the tablet screen (or the window for a device-less level).
 
     m_physics = sim::createPhysics(m_options.physics);
     if (m_physics == nullptr) {
@@ -243,6 +238,7 @@ void LevelScene::debugUi() {
                 std::string error;
                 LevelOptions base;
                 base.fitCamera = m_options.fitCamera;
+                base.onDevice = m_options.onDevice;
                 if (loadPreset(name, base, preset, error)) {
                     m_pendingOptions = std::move(preset.options);
                 } else {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <span>
 #include <vector>
 
 #include "scene/Scene.hpp"
@@ -40,6 +41,18 @@ public:
         return m_scenes.empty();
     }
 
+    // Bottom to top.
+    std::span<const std::unique_ptr<Scene>> scenes() const {
+        return m_scenes;
+    }
+
+    // The highest scene living on `device`, or null.
+    Scene* topmostOn(ui::DeviceKind device) const;
+
+    // Tells every scene the size of its viewport: its device's screen, or the
+    // window for scenes without one. Called after entering a scene and on resize.
+    void notifyResize();
+
     Services& services() {
         return m_services;
     }
@@ -51,6 +64,8 @@ private:
         Action action;
         std::unique_ptr<Scene> scene;
     };
+
+    void resizeScene(Scene& scene) const;
 
     Services m_services;
     std::vector<std::unique_ptr<Scene>> m_scenes;

@@ -397,6 +397,10 @@ void RmlRenderer::draw(DeviceKind kind, SDL_GPURenderPass* pass, SDL_GPUCommandB
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
 
+    // The target is no longer always the swapchain: match the viewport to it.
+    const SDL_GPUViewport viewport{0.0f, 0.0f, static_cast<float>(size.x), static_cast<float>(size.y), 0.0f, 1.0f};
+    SDL_SetGPUViewport(pass, &viewport);
+
     // Same convention as Camera2D: y-down pixels, zero-to-one depth.
     const glm::mat4 projection =
         glm::orthoRH_ZO(0.0f, static_cast<float>(size.x), static_cast<float>(size.y), 0.0f, -1.0f, 1.0f);

@@ -2,6 +2,7 @@
 
 #include "ui/ShellState.hpp"
 
+#include <cstddef>
 #include <vector>
 
 using namespace horde::ui;
@@ -36,6 +37,14 @@ TEST_CASE("computeTargets: phone overlay over tablet backgrounds the tablet") {
 
 TEST_CASE("computeTargets: scene without a device hides both") {
     std::vector<ScenePresentation> s{pres(DeviceKind::Phone), pres(DeviceKind::None)};
+    auto t = computeTargets(s);
+    CHECK(t.phone == Placement::Hidden);
+    CHECK(t.tablet == Placement::Hidden);
+}
+
+TEST_CASE("computeTargets: overlay without a device hides both") {
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone), pres(DeviceKind::Tablet),
+                                     pres(DeviceKind::None, Orientation::Landscape, true)};
     auto t = computeTargets(s);
     CHECK(t.phone == Placement::Hidden);
     CHECK(t.tablet == Placement::Hidden);
