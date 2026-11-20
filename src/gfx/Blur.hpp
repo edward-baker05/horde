@@ -35,7 +35,9 @@ public:
     SDL_GPUTexture* apply(SDL_GPUCommandBuffer* commands, SDL_GPUTexture* source, glm::ivec2 size);
 
     // The blurred result; valid from resize(), written by apply().
-    SDL_GPUTexture* texture() const { return m_vertical.texture(); }
+    SDL_GPUTexture* texture() const {
+        return m_vertical.texture();
+    }
 
 private:
     bool pass(SDL_GPUCommandBuffer* commands, SDL_GPUTexture* source, RenderTarget& target, glm::vec2 direction);

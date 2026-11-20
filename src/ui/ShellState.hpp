@@ -1,9 +1,9 @@
 #pragma once
 
+#include <span>
+
 #include "ui/DeviceLayout.hpp"
 #include "ui/Tween.hpp"
-
-#include <span>
 
 namespace horde::ui {
 
@@ -38,10 +38,21 @@ public:
     void setTarget(Placement placement);
     void update(float dt);
 
-    float offscreen() const { return offscreen_.value(); } // 0 on screen, 1 hidden
-    float blur() const { return blur_.value(); }           // 0..1
-    bool visible() const { return offscreen() < 1.0f; }
-    bool settled() const { return offscreen_.done() && blur_.done(); }
+    float offscreen() const {
+        return offscreen_.value();
+    } // 0 on screen, 1 hidden
+
+    float blur() const {
+        return blur_.value();
+    } // 0..1
+
+    bool visible() const {
+        return offscreen() < 1.0f;
+    }
+
+    bool settled() const {
+        return offscreen_.done() && blur_.done();
+    }
 
 private:
     // Starts Hidden and settled: duration 0 makes value() return `to`.

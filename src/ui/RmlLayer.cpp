@@ -1,7 +1,8 @@
 #include "ui/RmlLayer.hpp"
 
-#include <RmlUi/Core.h>
 #include <SDL3/SDL.h>
+
+#include <RmlUi/Core.h>
 
 #include "core/Paths.hpp"
 #include "gfx/GpuContext.hpp"

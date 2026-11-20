@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -173,7 +174,7 @@ void RmlRenderer::endRecord() {
     m_commands = nullptr;
 }
 
-template <typename Fn>
+template<typename Fn>
 void RmlRenderer::withCopyPass(Fn&& fn) {
     SDL_GPUCommandBuffer* commands = m_commands;
     const bool temporary = commands == nullptr;
@@ -261,7 +262,7 @@ void RmlRenderer::RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector
     }
 
     m_lists[m_recording].push_back({geometry->vertices, geometry->indices, geometry->indexCount, tex->texture,
-                       glm::vec2(translation.x, translation.y), m_transform, scissor});
+                                    glm::vec2(translation.x, translation.y), m_transform, scissor});
 }
 
 void RmlRenderer::ReleaseGeometry(Rml::CompiledGeometryHandle handle) {

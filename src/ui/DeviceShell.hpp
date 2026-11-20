@@ -36,7 +36,9 @@ public:
     void setTargets(const ShellTargets& targets);
     void update(float dt);
 
-    glm::vec2 windowPx() const { return m_windowPx; }
+    glm::vec2 windowPx() const {
+        return m_windowPx;
+    }
 
     // False once a device has slid fully off screen: nothing to draw or route.
     bool visible(DeviceKind kind) const;
@@ -84,8 +86,14 @@ private:
         bool drawn = false;
     };
 
-    Device& device(DeviceKind kind) { return kind == DeviceKind::Phone ? m_phone : m_tablet; }
-    const Device& device(DeviceKind kind) const { return kind == DeviceKind::Phone ? m_phone : m_tablet; }
+    Device& device(DeviceKind kind) {
+        return kind == DeviceKind::Phone ? m_phone : m_tablet;
+    }
+
+    const Device& device(DeviceKind kind) const {
+        return kind == DeviceKind::Phone ? m_phone : m_tablet;
+    }
+
     // The slide offset in window px: phones drop down, tablets leave to the right.
     glm::vec2 slideOffset(const Device& d) const;
     void layoutDevice(Device& d);

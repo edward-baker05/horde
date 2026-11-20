@@ -1,9 +1,10 @@
 #pragma once
 
-#include <RmlUi/Core/Input.h>
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_stdinc.h>
+
+#include <RmlUi/Core/Input.h>
 
 namespace Rml {
 class Context;

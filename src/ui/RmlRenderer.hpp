@@ -1,8 +1,10 @@
 #pragma once
 
-#include <RmlUi/Core/RenderInterface.h>
 #include <SDL3/SDL_gpu.h>
+
 #include <glm/glm.hpp>
+
+#include <RmlUi/Core/RenderInterface.h>
 
 #include <array>
 #include <vector>
@@ -88,7 +90,7 @@ private:
 
     // Uploads on the recording command buffer, or on a throwaway one submitted
     // at once when RmlUi loads something outside a frame (document load).
-    template <typename Fn>
+    template<typename Fn>
     void withCopyPass(Fn&& fn);
     SDL_GPUBuffer* uploadBuffer(SDL_GPUBufferUsageFlags usage, const void* data, Uint32 size);
     Rml::TextureHandle createTexture(const Rml::byte* rgba, int width, int height);

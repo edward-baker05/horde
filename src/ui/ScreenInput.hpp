@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL_events.h>
+
 #include <glm/glm.hpp>
 
 #include "ui/DeviceLayout.hpp"

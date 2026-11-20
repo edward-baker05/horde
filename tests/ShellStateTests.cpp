@@ -1,10 +1,10 @@
 #include <doctest/doctest.h>
 
-#include "scene/LevelMode.hpp"
-#include "ui/ShellState.hpp"
-
 #include <cstddef>
 #include <vector>
+
+#include "scene/LevelMode.hpp"
+#include "ui/ShellState.hpp"
 
 using namespace horde::ui;
 
@@ -66,8 +66,7 @@ TEST_CASE("computeTargets: overlay without a device hides both") {
 }
 
 TEST_CASE("computeTargets: landscape phone orientation") {
-    std::vector<ScenePresentation> s{pres(DeviceKind::Phone),
-                                     pres(DeviceKind::Phone, Orientation::Landscape)};
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone), pres(DeviceKind::Phone, Orientation::Landscape)};
     auto t = computeTargets(s);
     CHECK(t.phone == Placement::Centered);
     CHECK(t.phoneOrientation == Orientation::Landscape);
@@ -106,7 +105,8 @@ TEST_CASE("DeviceAnimator retarget mid-slide does not jump") {
 }
 
 TEST_CASE("computeTargets: a dev-mode level over the menu hides both devices") {
-    std::vector<ScenePresentation> s{pres(DeviceKind::Phone), horde::scene::levelPresentation(horde::scene::LevelMode::Dev)};
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone),
+                                     horde::scene::levelPresentation(horde::scene::LevelMode::Dev)};
     auto t = computeTargets(s);
     CHECK(t.phone == Placement::Hidden);
     CHECK(t.tablet == Placement::Hidden);

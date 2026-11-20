@@ -132,19 +132,17 @@ void DeviceShell::queue(const Device& d, gfx::SpriteBatch& compositeBatch, SDL_G
     const glm::vec2 center = glm::round(d.rect.center + slideOffset(d) - screen * 0.5f) + screen * 0.5f;
     const float bezel = d.spec.bezelLogical * d.rect.scale;
 
-    gfx::drawCentered(compositeBatch, atlas, center, screen + glm::vec2(2.0f * bezel), 0.0f,
-                      gfx::atlasCell(1, 1, 4, 4), kBezelColor);
+    gfx::drawCentered(compositeBatch, atlas, center, screen + glm::vec2(2.0f * bezel), 0.0f, gfx::atlasCell(1, 1, 4, 4),
+                      kBezelColor);
 
     // The sharp screen, then its blur over it at alpha = blur: a fade between the
     // two, both dimmed as the blur comes in.
     const float blur = d.animator.blur();
     const float shade = 1.0f - kBlurDim * blur;
     const glm::vec4 uv{0.0f, 0.0f, 1.0f, 1.0f};
-    gfx::drawCentered(compositeBatch, d.target.texture(), center, screen, 0.0f, uv,
-                      {shade, shade, shade, 1.0f});
+    gfx::drawCentered(compositeBatch, d.target.texture(), center, screen, 0.0f, uv, {shade, shade, shade, 1.0f});
     if (blur > 0.0f && d.blur.texture() != nullptr) {
-        gfx::drawCentered(compositeBatch, d.blur.texture(), center, screen, 0.0f, uv,
-                          {shade, shade, shade, blur});
+        gfx::drawCentered(compositeBatch, d.blur.texture(), center, screen, 0.0f, uv, {shade, shade, shade, blur});
     }
 }
 

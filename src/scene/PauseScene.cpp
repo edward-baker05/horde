@@ -1,7 +1,8 @@
 #include "scene/PauseScene.hpp"
 
-#include <RmlUi/Core.h>
 #include <SDL3/SDL.h>
+
+#include <RmlUi/Core.h>
 
 #include "core/Paths.hpp"
 #include "scene/SceneStack.hpp"

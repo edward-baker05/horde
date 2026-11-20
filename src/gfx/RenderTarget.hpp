@@ -23,8 +23,13 @@ public:
     bool resize(SDL_GPUDevice* device, SDL_GPUTextureFormat format, glm::ivec2 size);
     void release();
 
-    SDL_GPUTexture* texture() const { return m_texture; }
-    glm::ivec2 size() const { return m_size; }
+    SDL_GPUTexture* texture() const {
+        return m_texture;
+    }
+
+    glm::ivec2 size() const {
+        return m_size;
+    }
 
 private:
     SDL_GPUDevice* m_device = nullptr;

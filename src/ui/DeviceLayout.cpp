@@ -9,16 +9,16 @@ DeviceSpec deviceSpec(DeviceKind kind, Orientation orientation) {
     glm::vec2 screen{0.0f};
     float bezel = 0.0f;
     switch (kind) {
-    case DeviceKind::Phone:
-        screen = {390.0f, 844.0f};
-        bezel = 14.0f;
-        break;
-    case DeviceKind::Tablet:
-        screen = {800.0f, 1280.0f};
-        bezel = 24.0f;
-        break;
-    case DeviceKind::None:
-        break;
+        case DeviceKind::Phone:
+            screen = {390.0f, 844.0f};
+            bezel = 14.0f;
+            break;
+        case DeviceKind::Tablet:
+            screen = {800.0f, 1280.0f};
+            bezel = 24.0f;
+            break;
+        case DeviceKind::None:
+            break;
     }
     // Specs above are portrait; landscape swaps the axes.
     if (orientation == Orientation::Landscape) {

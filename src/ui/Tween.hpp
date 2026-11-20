@@ -29,7 +29,9 @@ struct Tween {
         elapsed = 0.0f;
     }
 
-    void update(float dt) { elapsed = std::min(elapsed + dt, duration); }
+    void update(float dt) {
+        elapsed = std::min(elapsed + dt, duration);
+    }
 
     float value() const {
         if (duration <= 0.0f) {
@@ -38,7 +40,9 @@ struct Tween {
         return from + (to - from) * easeOutCubic(std::clamp(elapsed / duration, 0.0f, 1.0f));
     }
 
-    bool done() const { return elapsed >= duration; }
+    bool done() const {
+        return elapsed >= duration;
+    }
 };
 
 } // namespace horde::ui

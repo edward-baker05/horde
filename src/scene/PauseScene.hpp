@@ -29,6 +29,7 @@ public:
     bool onEnter(Services& services) override;
     void onExit() override;
     bool handleEvent(const SDL_Event& event) override;
+
     ui::ScenePresentation presentation() const override {
         return {ui::DeviceKind::Phone, ui::Orientation::Portrait, true};
     }

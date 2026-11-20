@@ -1,7 +1,7 @@
-#include <doctest/doctest.h>
+#include <SDL3/SDL.h>
 
 #include <RmlUi/Core/Input.h>
-#include <SDL3/SDL.h>
+#include <doctest/doctest.h>
 
 #include "ui/RmlInput.hpp"
 #include "ui/ScreenInput.hpp"
