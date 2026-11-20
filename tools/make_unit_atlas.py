@@ -116,7 +116,7 @@ ALIEN_MID = {
 FAR = [".XXX.", "XXXXX", "XXXXX", "XXXXX", ".XXX."]
 
 ACCESSORIES = ["none", "cap", "sunglasses", "bow"]
-ACCESSORY_WEIGHTS = [3, 1, 1, 1]             # out of sum: most units wear nothing
+ACCESSORY_WEIGHTS = [7, 1, 2, 2]             # out of sum: most units wear nothing
 ACC_OVERLAY = {
     "cap":        {0: "..aaaaa..", 1: "..AAAAA..", 2: ".AAAAAAA.", 3: ".AAAaAAA.", 4: ".AAAAAAA.", 5: "..AAAAA.."},
     "sunglasses": {1: "..GGGGW.."},           # pushed up on the head

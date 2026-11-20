@@ -10,8 +10,8 @@ static const uint HUMAN_STYLE_COUNT = 6;
 static const uint ACCESSORY_COUNT = 4;
 static const uint ALIEN_STYLE_COUNT = 4;
 static const uint ALIEN_VARIANT_BASE = 24;
-static const uint ACCESSORY_TABLE_SIZE = 6;
-static const uint ACCESSORY_TABLE[6] = {0, 0, 0, 1, 2, 3};
+static const uint ACCESSORY_TABLE_SIZE = 12;
+static const uint ACCESSORY_TABLE[12] = {0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 3, 3};
 // Hair colour index by weight: pick HUMAN_HAIR_TABLE[hash % HUMAN_HAIR_TABLE_SIZE].
 static const uint HUMAN_HAIR_TABLE_SIZE = 82;
 static const uint HUMAN_HAIR_TABLE[82] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 10};
