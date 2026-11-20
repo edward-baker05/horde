@@ -11,8 +11,8 @@ namespace {
 
 // Placeholder bezel: the atlas's solid white cell, tinted dark grey.
 constexpr glm::vec4 kBezelColor{0.08f, 0.08f, 0.09f, 1.0f};
-// How dark a fully blurred (background) device is drawn. Real blur comes later.
-constexpr float kBackgroundDim = 0.55f;
+// A fully blurred (background) device is tinted to 1 - this, so it recedes.
+constexpr float kBlurDim = 0.35f;
 
 } // namespace
 
@@ -21,12 +21,14 @@ bool DeviceShell::init(gfx::GpuContext& gpu, const gfx::ShaderLoader& shaders) {
     m_format = gpu.swapchainFormat();
     m_phone.kind = DeviceKind::Phone;
     m_tablet.kind = DeviceKind::Tablet;
-    return m_phone.batch.init(m_gpu, shaders, m_format) && m_tablet.batch.init(m_gpu, shaders, m_format);
+    return m_phone.batch.init(m_gpu, shaders, m_format) && m_tablet.batch.init(m_gpu, shaders, m_format) &&
+           m_phone.blur.init(m_gpu, shaders, m_format) && m_tablet.blur.init(m_gpu, shaders, m_format);
 }
 
 void DeviceShell::shutdown() {
     for (Device* d : {&m_phone, &m_tablet}) {
         d->batch.shutdown();
+        d->blur.shutdown();
         d->target.release();
     }
 }
@@ -36,6 +38,8 @@ void DeviceShell::layoutDevice(Device& d) {
     d.spec = deviceSpec(d.kind, d.kind == DeviceKind::Phone ? m_phoneOrientation : Orientation::Landscape);
     d.rect = fitDevice(d.spec, m_windowPx);
     d.target.resize(m_gpu, m_format, screenPixelSize(d.rect));
+    // Sized here so the blurred texture the composite refers to is the one the blur pass writes.
+    d.blur.resize(d.target.size());
 }
 
 void DeviceShell::layout(glm::vec2 windowPx) {
@@ -81,6 +85,15 @@ gfx::SpriteBatch& DeviceShell::batch(DeviceKind kind) {
     return device(kind).batch;
 }
 
+float DeviceShell::blurAmount(DeviceKind kind) const {
+    return kind == DeviceKind::None ? 0.0f : device(kind).animator.blur();
+}
+
+void DeviceShell::applyBlur(DeviceKind kind, SDL_GPUCommandBuffer* commands) {
+    Device& d = device(kind);
+    d.blur.apply(commands, d.target.texture(), d.target.size());
+}
+
 glm::vec2 DeviceShell::slideOffset(const Device& d) const {
     const float t = d.animator.offscreen();
     return d.kind == DeviceKind::Phone ? glm::vec2(0.0f, t * m_windowPx.y) : glm::vec2(t * m_windowPx.x, 0.0f);
@@ -101,9 +114,17 @@ void DeviceShell::queue(const Device& d, gfx::SpriteBatch& compositeBatch, SDL_G
     gfx::drawCentered(compositeBatch, atlas, center, d.rect.screenSize + glm::vec2(2.0f * bezel), 0.0f,
                       gfx::atlasCell(1, 1, 4, 4), kBezelColor);
 
-    const float shade = 1.0f - (1.0f - kBackgroundDim) * d.animator.blur();
-    gfx::drawCentered(compositeBatch, d.target.texture(), center, d.rect.screenSize, 0.0f, {0.0f, 0.0f, 1.0f, 1.0f},
+    // The sharp screen, then its blur over it at alpha = blur: a fade between the
+    // two, both dimmed as the blur comes in.
+    const float blur = d.animator.blur();
+    const float shade = 1.0f - kBlurDim * blur;
+    const glm::vec4 uv{0.0f, 0.0f, 1.0f, 1.0f};
+    gfx::drawCentered(compositeBatch, d.target.texture(), center, d.rect.screenSize, 0.0f, uv,
                       {shade, shade, shade, 1.0f});
+    if (blur > 0.0f && d.blur.texture() != nullptr) {
+        gfx::drawCentered(compositeBatch, d.blur.texture(), center, d.rect.screenSize, 0.0f, uv,
+                          {shade, shade, shade, blur});
+    }
 }
 
 void DeviceShell::composite(gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas, glm::vec2 windowPx) const {

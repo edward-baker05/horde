@@ -5,6 +5,7 @@
 
 #include <glm/vec2.hpp>
 
+#include "gfx/Blur.hpp"
 #include "gfx/RenderTarget.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "ui/DeviceLayout.hpp"
@@ -47,6 +48,12 @@ public:
     // One batch per device so each frame's uploads do not overwrite each other.
     gfx::SpriteBatch& batch(DeviceKind kind);
 
+    // The device's blur fade, 0..1: above 0 its screen is drawn blurred over the sharp one.
+    float blurAmount(DeviceKind kind) const;
+    // Blurs the device's screen texture; one Blur per device, as each result
+    // must survive until the swapchain pass. Render passes: after all uploads.
+    void applyBlur(DeviceKind kind, SDL_GPUCommandBuffer* commands);
+
     // Rewrites a mouse event (already in window px) into the device's screen
     // px. False means drop it: a button press on the bezel or background.
     bool remapEvent(DeviceKind kind, SDL_Event& event) const;
@@ -64,6 +71,7 @@ private:
         DeviceAnimator animator;
         gfx::RenderTarget target;
         gfx::SpriteBatch batch;
+        gfx::Blur blur;
     };
 
     Device& device(DeviceKind kind) { return kind == DeviceKind::Phone ? m_phone : m_tablet; }

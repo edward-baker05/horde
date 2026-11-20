@@ -16,6 +16,7 @@
 #include "gfx/Texture.hpp"
 #include "logic/LevelGeometry.hpp"
 #include "logic/LevelIO.hpp"
+#include "scene/PauseScene.hpp"
 #include "scene/Presets.hpp"
 #include "scene/SceneStack.hpp"
 
@@ -112,6 +113,10 @@ bool LevelScene::onEnter(Services& services) {
     return true;
 }
 
+void LevelScene::onRevealed() {
+    m_pausePending = false;
+}
+
 void LevelScene::onExit() {
     if (m_physics) {
         m_physics->shutdown();
@@ -120,6 +125,23 @@ void LevelScene::onExit() {
 }
 
 bool LevelScene::handleEvent(const SDL_Event& event) {
+    // Esc pauses a round on the device. Only the top scene gets events, and
+    // m_pausePending covers the frame between the push and it taking effect.
+    if (m_options.onDevice && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
+        if (!m_pausePending) {
+            m_pausePending = true;
+            // The copy carries the explosion tool's live settings, as the debug restart does.
+            LevelOptions restart = m_options;
+            restart.explosionArmed = m_explosionArmed;
+            restart.explosion = m_explosion;
+            restart.flingDrag = m_flingDrag;
+            SceneStack* scenes = m_services->scenes;
+            m_services->scenes->push(std::make_unique<PauseScene>(
+                [scenes, restart = std::move(restart)] { scenes->replace(std::make_unique<LevelScene>(restart)); },
+                m_options.level.has_value()));
+        }
+        return true;
+    }
     // Right-click: the camera pans with the left and middle buttons.
     if (m_explosionArmed && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
         sim::Explosion explosion = m_explosion;

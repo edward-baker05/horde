@@ -557,6 +557,14 @@ void App::render() {
         }
     }
 
+    // Background devices blur their screen texture. These are render passes, so
+    // they follow every upload and the device passes that write what they read.
+    for (size_t i = 0; i < deviceKinds.size(); ++i) {
+        if (deviceScenes[i] != nullptr && m_shell.blurAmount(deviceKinds[i]) > 0.0f) {
+            m_shell.applyBlur(deviceKinds[i], commands);
+        }
+    }
+
     // A scene without a device keeps its own background; otherwise the devices
     // sit on black.
     const bool direct = topDevice == ui::DeviceKind::None;

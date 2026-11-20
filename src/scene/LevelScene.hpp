@@ -69,6 +69,7 @@ public:
 
     bool onEnter(Services& services) override;
     void onExit() override;
+    void onRevealed() override;
     bool handleEvent(const SDL_Event& event) override;
     void update(float dt) override;
     void compute(SDL_GPUCommandBuffer* commands) override;
@@ -115,6 +116,8 @@ private:
     void explosionUi();
 
     Services* m_services = nullptr;
+    // A pause has been pushed and not yet popped.
+    bool m_pausePending = false;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
 

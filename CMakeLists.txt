@@ -18,6 +18,7 @@ add_executable(horde
     src/bench/Benchmark.cpp
     src/bench/Quality.cpp
     src/core/Paths.cpp
+    src/gfx/Blur.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
     src/gfx/GpuTimer.cpp
@@ -45,6 +46,7 @@ add_executable(horde
     src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp
+    src/scene/PauseScene.cpp
     src/scene/Presets.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
