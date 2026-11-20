@@ -430,6 +430,7 @@ void App::render() {
     m_imgui.prepare(commands);
     // RmlUi uploads geometry and glyphs while rendering, so it records here
     // and replays inside the pass.
+    m_rml.beginFrame();
     m_rml.record(ui::DeviceKind::None, commands);
 
     SDL_GPUColorTargetInfo colorTarget{};

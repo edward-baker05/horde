@@ -4,7 +4,10 @@
 #include <SDL3/SDL_gpu.h>
 #include <glm/glm.hpp>
 
+#include <array>
 #include <vector>
+
+#include "ui/DeviceLayout.hpp"
 
 namespace horde::gfx {
 class ShaderLoader;
@@ -30,12 +33,22 @@ public:
     bool init(SDL_GPUDevice* device, const gfx::ShaderLoader& shaders, SDL_GPUTextureFormat targetFormat);
     void shutdown();
 
-    // Call before Context::Render(), outside any render pass. Uploads made by
-    // RmlUi until the matching draw() go on `commands`.
-    void beginRecord(SDL_GPUCommandBuffer* commands, glm::ivec2 targetSize);
+    // Once per frame, before any beginRecord(): frees what RmlUi released
+    // since last frame. Done here rather than per record so that one device's
+    // recorded draws never lose a buffer when another device records.
+    void beginFrame();
 
-    // Replays the draws recorded since beginRecord() into `pass`.
-    void draw(SDL_GPURenderPass* pass, SDL_GPUCommandBuffer* commands);
+    // Call before Context::Render(), outside any render pass. Uploads made by
+    // RmlUi until endRecord() go on `commands`; the draws are kept in `kind`'s
+    // own list, so every device can record before any of them draws.
+    void beginRecord(DeviceKind kind, SDL_GPUCommandBuffer* commands, glm::ivec2 targetSize);
+
+    // Ends the upload window so a stale command buffer is never touched, even
+    // if the frame never reaches draw().
+    void endRecord();
+
+    // Replays `kind`'s recorded draws into `pass`.
+    void draw(DeviceKind kind, SDL_GPURenderPass* pass, SDL_GPUCommandBuffer* commands);
 
     Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
                                                 Rml::Span<const int> indices) override;
@@ -87,15 +100,17 @@ private:
     Texture* m_white = nullptr;
 
     SDL_GPUCommandBuffer* m_commands = nullptr;
-    glm::ivec2 m_targetSize{0};
+    glm::ivec2 m_targetSize{0}; // of the list being recorded
+    std::array<glm::ivec2, 3> m_listSizes{};
+    int m_recording = 0;
 
     // Draw state as RmlUi sets it; captured into each DrawCommand.
     bool m_scissorEnabled = false;
     SDL_Rect m_scissor{};
     glm::mat4 m_transform{1.0f};
 
-    std::vector<DrawCommand> m_draws;
-    // Releases wait for the next beginRecord so a draw already recorded this
+    std::array<std::vector<DrawCommand>, 3> m_lists;
+    // Releases wait for the next beginFrame so a draw already recorded this
     // frame never points at a freed buffer.
     std::vector<SDL_GPUBuffer*> m_pendingBuffers;
     std::vector<SDL_GPUTexture*> m_pendingTextures;

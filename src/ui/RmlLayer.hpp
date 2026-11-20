@@ -44,6 +44,9 @@ public:
 
     void update();
 
+    // Once per frame before any record().
+    void beginFrame();
+
     // record() runs Context::Render(), uploading through copy passes, so it
     // goes before the render pass; draw() replays the result inside it.
     void record(DeviceKind kind, SDL_GPUCommandBuffer* commands);

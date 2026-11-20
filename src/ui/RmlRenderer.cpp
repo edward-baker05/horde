@@ -136,7 +136,9 @@ void RmlRenderer::shutdown() {
         SDL_ReleaseGPUGraphicsPipeline(m_device, m_pipeline);
         m_pipeline = nullptr;
     }
-    m_draws.clear();
+    for (auto& list : m_lists) {
+        list.clear();
+    }
     m_device = nullptr;
 }
 
@@ -151,13 +153,24 @@ void RmlRenderer::flushReleases() {
     m_pendingTextures.clear();
 }
 
-void RmlRenderer::beginRecord(SDL_GPUCommandBuffer* commands, glm::ivec2 targetSize) {
+void RmlRenderer::beginFrame() {
     flushReleases();
+}
+
+void RmlRenderer::beginRecord(DeviceKind kind, SDL_GPUCommandBuffer* commands, glm::ivec2 targetSize) {
+    m_recording = static_cast<int>(kind);
     m_commands = commands;
     m_targetSize = targetSize;
-    m_draws.clear();
+    m_listSizes[m_recording] = targetSize;
+    m_lists[m_recording].clear();
     m_scissorEnabled = false;
     m_transform = glm::mat4(1.0f);
+}
+
+void RmlRenderer::endRecord() {
+    // Copy passes are opened and closed inside withCopyPass, so none is open
+    // here; only the command buffer pointer needs dropping.
+    m_commands = nullptr;
 }
 
 template <typename Fn>
@@ -247,7 +260,7 @@ void RmlRenderer::RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector
         scissor = m_scissor;
     }
 
-    m_draws.push_back({geometry->vertices, geometry->indices, geometry->indexCount, tex->texture,
+    m_lists[m_recording].push_back({geometry->vertices, geometry->indices, geometry->indexCount, tex->texture,
                        glm::vec2(translation.x, translation.y), m_transform, scissor});
 }
 
@@ -375,19 +388,20 @@ void RmlRenderer::SetTransform(const Rml::Matrix4f* transform) {
     }
 }
 
-void RmlRenderer::draw(SDL_GPURenderPass* pass, SDL_GPUCommandBuffer* commands) {
-    if (m_draws.empty() || m_pipeline == nullptr) {
-        m_commands = nullptr;
+void RmlRenderer::draw(DeviceKind kind, SDL_GPURenderPass* pass, SDL_GPUCommandBuffer* commands) {
+    std::vector<DrawCommand>& list = m_lists[static_cast<int>(kind)];
+    const glm::ivec2 size = m_listSizes[static_cast<int>(kind)];
+    if (list.empty() || m_pipeline == nullptr) {
         return;
     }
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
 
     // Same convention as Camera2D: y-down pixels, zero-to-one depth.
-    const glm::mat4 projection = glm::orthoRH_ZO(0.0f, static_cast<float>(m_targetSize.x),
-                                                 static_cast<float>(m_targetSize.y), 0.0f, -1.0f, 1.0f);
+    const glm::mat4 projection =
+        glm::orthoRH_ZO(0.0f, static_cast<float>(size.x), static_cast<float>(size.y), 0.0f, -1.0f, 1.0f);
 
-    for (const DrawCommand& command : m_draws) {
+    for (const DrawCommand& command : list) {
         if (command.scissor.w <= 0 || command.scissor.h <= 0) {
             continue;
         }
@@ -407,8 +421,7 @@ void RmlRenderer::draw(SDL_GPURenderPass* pass, SDL_GPUCommandBuffer* commands) 
         SDL_DrawGPUIndexedPrimitives(pass, command.indexCount, 1, 0, 0, 0);
     }
 
-    m_draws.clear();
-    m_commands = nullptr;
+    list.clear();
 }
 
 } // namespace horde::ui

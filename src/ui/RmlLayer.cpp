@@ -97,13 +97,17 @@ void RmlLayer::record(DeviceKind kind, SDL_GPUCommandBuffer* commands) {
     if (ctx == nullptr) {
         return;
     }
-    m_renderer.beginRecord(commands, m_sizes[static_cast<int>(kind)]);
+    m_renderer.beginRecord(kind, commands, m_sizes[static_cast<int>(kind)]);
     ctx->Render();
+    m_renderer.endRecord();
+}
+
+void RmlLayer::beginFrame() {
+    m_renderer.beginFrame();
 }
 
 void RmlLayer::draw(DeviceKind kind, SDL_GPURenderPass* pass, SDL_GPUCommandBuffer* commands) {
-    (void)kind;
-    m_renderer.draw(pass, commands);
+    m_renderer.draw(kind, pass, commands);
 }
 
 bool RmlLayer::handleEvent(DeviceKind kind, const SDL_Event& event) {
