@@ -43,9 +43,9 @@ public:
     // LOD takes `hysteresis` pixels fewer than entering it, so zooming across
     // a threshold doesn't flicker.
     struct LodThresholds {
-        float nearPixels = 30.0f;
-        float midPixels = 12.0f;
-        float lowPixels = 5.0f; // low art is 5px across: below that it loses pixels
+        float nearPixels = 40.0f;
+        float midPixels = 14.0f;
+        float lowPixels = 8.0f; // low art is 5px across: below 5 it loses pixels
         float hysteresis = 0.0f;
     };
 
