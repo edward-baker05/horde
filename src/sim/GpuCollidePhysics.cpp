@@ -549,16 +549,18 @@ void GpuCollidePhysics::debugUi() {
     }
     // Combo index 0 is Auto (-1); the rest follow Lod's values.
     int lod = static_cast<int>(m_sprites.lod) + 1;
-    if (ImGui::Combo("LOD", &lod, "Auto\0Near\0Mid\0Far\0")) {
+    if (ImGui::Combo("LOD", &lod, "Auto\0Near\0Mid\0Low\0Circle\0")) {
         m_sprites.lod = static_cast<Renderer::Lod>(lod - 1);
     }
-    // Screen pixels a unit must span for each LOD; below mid it's far.
+    // Screen pixels a unit must span for each LOD; below low it's a circle.
     Renderer::LodThresholds& t = m_sprites.thresholds;
     ImGui::BeginDisabled(m_sprites.lod != Renderer::Lod::Auto);
     ImGui::SliderFloat("Near from", &t.nearPixels, 1.0f, 60.0f, "%.1f px");
     ImGui::SliderFloat("Mid from", &t.midPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat("Low from", &t.lowPixels, 1.0f, 60.0f, "%.1f px");
     ImGui::SliderFloat("Hysteresis", &t.hysteresis, 0.0f, 3.0f, "%.1f px");
     t.midPixels = std::min(t.midPixels, t.nearPixels); // mid can't start above near
+    t.lowPixels = std::min(t.lowPixels, t.midPixels);
     if (ImGui::Button("Reset LOD thresholds")) {
         t = Renderer::LodThresholds{};
     }
@@ -568,7 +570,7 @@ void GpuCollidePhysics::debugUi() {
     ImGui::BeginDisabled(!m_sprites.rotate);
     ImGui::SliderInt("Directions", &m_sprites.directionSteps, 0, 32, m_sprites.directionSteps == 0 ? "any" : "%d");
     ImGui::EndDisabled();
-    static const char* const kLodNames[] = {"near", "mid", "far"};
+    static const char* const kLodNames[] = {"near", "mid", "low", "circle"};
     ImGui::Text("Drawing %s, %.1f px per unit", kLodNames[static_cast<int>(m_renderer.lastLod())],
                 m_renderer.lastUnitPixels());
 }

@@ -235,7 +235,7 @@ vertex main0_out main0(constant type_UnitUniforms& UnitUniforms [[buffer(0)]], c
         bool _355;
         if (UnitUniforms.Rotate != 0u)
         {
-            _355 = _302 != 2u;
+            _355 = UnitUniforms.Lod < 3u;
         }
         else
         {

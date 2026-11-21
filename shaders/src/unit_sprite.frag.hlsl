@@ -24,7 +24,7 @@ SamplerState AtlasSampler : register(s0, space2);
 cbuffer UnitSpriteUniforms : register(b0, space3) {
     float4 Palette[PALETTE_SIZE];
     uint SpriteMode;
-    uint Lod;       // sprites: 0 near, 1 mid, 2 far
+    uint Lod;       // sprites: 0 near, 1 mid, 2 low, 3 circle
     uint2 Padding;
 };
 
@@ -52,16 +52,16 @@ float3 roleColour(uint role, uint4 pal) {
 }
 
 float4 main(Input input) : SV_Target0 {
-    if (SpriteMode != 0 && Lod == 2) {
-        // Far: a hard-edged circle filling the unit, whatever its size on
-        // screen. Texcoord is in head pixels from the centre (head = 5 across);
-        // the threshold matches the 5px art exactly at 1:1 (.XXX. / XXXXX x3).
+    if (SpriteMode != 0 && Lod >= 3) {
+        // Circle: a hard-edged circle filling the unit, whatever its size on
+        // screen. Texcoord is in low-art pixels from the centre (head = 5
+        // across); the threshold matches the 5px art at 1:1 (.XXX. / XXXXX x3).
         if (dot(input.Texcoord, input.Texcoord) > 6.25f) {
             discard;
         }
         float4 centre = Atlas.SampleLevel(AtlasSampler, input.CellCentre / ATLAS_SIZE, 0.0f);
-        uint farRole = (uint)round(centre.r * 255.0f);
-        return float4(roleColour(farRole, input.Pal) * input.Color.rgb, input.Color.a);
+        uint circleRole = (uint)round(centre.r * 255.0f);
+        return float4(roleColour(circleRole, input.Pal) * input.Color.rgb, input.Color.a);
     }
     if (SpriteMode == 0) {
         return Atlas.Sample(AtlasSampler, input.Texcoord) * input.Color;

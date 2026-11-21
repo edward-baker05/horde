@@ -240,7 +240,10 @@ UnitRenderer::Lod UnitRenderer::pickLod(float unitPixels, const LodThresholds& t
     if (reaches(Lod::Mid, thresholds.midPixels)) {
         return Lod::Mid;
     }
-    return Lod::Far;
+    if (reaches(Lod::Low, thresholds.lowPixels)) {
+        return Lod::Low;
+    }
+    return Lod::Circle;
 }
 
 } // namespace horde::gfx

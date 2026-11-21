@@ -28,13 +28,16 @@ Changing only palettes needs no art change; the headers carry the colours.
 
 Sheet layout
 ------------
-Three LOD blocks stacked vertically (near, mid, far), each a grid of
+Three LOD blocks stacked vertically (near, mid, low), each a grid of
 ATLAS_COLUMNS x VARIANT_ROWS cells of CELL x CELL pixels. Variant v sits at
 column v % ATLAS_COLUMNS, row v // ATLAS_COLUMNS of every block. A unit's head
 centre is the cell centre (CELL / 2), and its head is HEAD[lod] pixels across,
 which the renderer scales to the unit's diameter.
 
 Variants: every human hairstyle x accessory, then every alien type.
+
+Zoomed out past low, units are plain circles the unit's size, drawn in the
+colour of each low cell's centre pixel; they have no block of their own.
 """
 
 import argparse
@@ -51,9 +54,9 @@ HLSL_OUT = ROOT / "shaders" / "src" / "unit_sprites.hlsli"
 
 CELL = 13
 ATLAS_COLUMNS = 8
-LODS = ["near", "mid", "far"]
-HEAD = {"near": 7, "mid": 5, "far": 5}       # head diameter in sprite pixels
-WINDOW = {"near": 13, "mid": 11, "far": 5}   # square drawn around the cell centre; big enough
+LODS = ["near", "mid", "low"]
+HEAD = {"near": 7, "mid": 5, "low": 5}       # head diameter in sprite pixels
+WINDOW = {"near": 13, "mid": 11, "low": 5}   # square drawn around the cell centre; big enough
                                              # to hold the sprite at any rotation
 
 # ---------------------------------------------------------------------------
@@ -125,7 +128,7 @@ ACC_OVERLAY = {
 FREE_PAINT = {"cap", "bow"}                   # may paint outside the head
 
 # Placement of each LOD's template inside a CELL x CELL cell (head centre at 6.5).
-OFFSET = {"near": (2, 3), "mid": (3, 3), "far": (4, 4)}
+OFFSET = {"near": (2, 3), "mid": (3, 3), "low": (4, 4)}
 
 # ---------------------------------------------------------------------------
 # Palettes. Shades are derived (see shade()). Hair colours are picked by
@@ -199,7 +202,8 @@ def template(species, style, acc, lod):
         if acc == "cap":  # a cap wearer reads as a cap-coloured head
             return [r.replace("H", "A").replace("L", "A").replace("D", "a") for r in HUMAN_MID["short"]]
         return HUMAN_MID[style]
-    # far: one colour circle - cap colour, skin for bald heads, else hair
+    # low: one colour circle - cap colour, skin for bald heads, else hair.
+    # Its centre pixel also colours the plain circles drawn past low.
     if species == "human" and acc == "cap":
         ch = "A"
     elif species == "human" and style in ("bald", "mohawk"):

@@ -35,15 +35,17 @@ public:
 
     // Sprite level of detail. Auto picks from how many screen pixels a unit
     // covers; the rest force one, for looking at the art.
-    enum class Lod : int { Auto = -1, Near = 0, Mid = 1, Far = 2 };
+    enum class Lod : int { Auto = -1, Near = 0, Mid = 1, Low = 2, Circle = 3 };
 
     // When Auto switches LOD: a unit must span at least `nearPixels` screen
-    // pixels to draw near art and `midPixels` for mid, else far. Leaving a
+    // pixels to draw near art, `midPixels` for mid and `lowPixels` for low,
+    // else a plain circle. Leaving a
     // LOD takes `hysteresis` pixels fewer than entering it, so zooming across
     // a threshold doesn't flicker.
     struct LodThresholds {
         float nearPixels = 30.0f;
         float midPixels = 12.0f;
+        float lowPixels = 5.0f; // low art is 5px across: below that it loses pixels
         float hysteresis = 0.0f;
     };
 

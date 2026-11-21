@@ -6,8 +6,8 @@
 //   0: every unit is the same tinted atlas cell (UvRect): the flat disc.
 //   1: crowd sprites. Each unit's look - hairstyle, accessory, colours - comes
 //      from hashing its stable ID, so it costs no memory and survives the
-//      units being reordered. Lod picks the near / mid / far art; far is a
-//      hard-edged circle drawn at the unit's own size in unit_sprite.frag.
+//      units being reordered. Lod picks the near / mid / low art, or 3 for a
+//      plain hard-edged circle at the unit's own size (unit_sprite.frag).
 //      With Rotate, near and mid art turn to face the way the unit walks;
 //      unit_sprite.frag rotates which sprite pixel each screen-aligned sprite
 //      pixel shows, so the art stays crisp pixels rather than tilted squares.
@@ -51,7 +51,7 @@ cbuffer UnitUniforms : register(b0, space1) {
     uint HasIds;        // 0: no Ids buffer, a unit's ID is its index
     uint HasSlots;      // 0: no Slots buffer, draw in index order
     uint SpriteMode;    // 0: flat disc from UvRect, 1: crowd sprites
-    uint Lod;           // sprites: 0 near, 1 mid, 2 far
+    uint Lod;           // sprites: 0 near, 1 mid, 2 low, 3 circle
     uint Species;       // sprites: 0 humans, 1 aliens
     uint Seed;          // sprites: varies every unit's look per level
     uint IntegerScale;  // sprites: round sprite pixels to whole screen pixels (never below one)
@@ -158,7 +158,7 @@ Output main(uint id : SV_VertexID) {
 
         // Positions are top-left corners; sprites are drawn around the centre.
         float2 centre = pos + UnitSize * 0.5f;
-        uint lod = min(Lod, 2u);
+        uint lod = min(Lod, 2u); // the circle is coloured from the low art
         float2 cell = float2(variant % ATLAS_COLUMNS, lod * ROWS_PER_LOD + variant / ATLAS_COLUMNS) * CELL;
         float2 cellCentre = cell + CELL * 0.5f;
 
@@ -172,15 +172,16 @@ Output main(uint id : SV_VertexID) {
         float2 offset = (QuadCorners[corner] * 2.0f - 1.0f) * halfWindow;
         world = centre + offset * texel;
         snapOrigin = centre - halfWindow * texel;
-        // unit_sprite.frag works in sprite pixels from the centre. Far draws a
-        // hard-edged circle the unit's size, coloured by the far art's centre
-        // texel (hair, skin or cap): scaling the 5px art down makes a plus.
+        // unit_sprite.frag works in sprite pixels from the centre. The circle
+        // LOD is a hard-edged circle the unit's size, coloured by the low art's
+        // centre texel (hair, skin or cap): scaling 5px art below 5 screen
+        // pixels makes a plus.
         output.Texcoord = offset;
         output.CellCentre = cellCentre;
 
         // Art faces up (-y). Turn it to the way the unit walks.
         float speed = length(unit.vel);
-        if (Rotate != 0 && lod != 2 && speed > MinTurnSpeed) {
+        if (Rotate != 0 && Lod < 3 && speed > MinTurnSpeed) {
             float2 dir = unit.vel / speed;
             if (DirectionSteps > 0) {
                 float step = 6.28318530718f / float(DirectionSteps);
