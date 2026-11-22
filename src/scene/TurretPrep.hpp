@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -36,14 +37,19 @@ namespace horde::scene {
 // A newly placed turret grows in, purely as a look.
 //
 // Mouse and keys, while the cursor isn't over a panel:
-//   left click        place the armed kind; or, with none armed, grab a pending turret to drag it
+//   left click        place the armed kind; or, with none armed, grab a pending turret (or its
+//                     whole line) to drag it, or a line's end handle to stretch it
 //   left drag         with a blocker or floor trap armed, lay a line of them end to end
 //   G                 toggle snapping to the wall grid (on by default)
 //   right click       disarm or cancel a line; or, with none armed, remove the pending turret
-//                     under the cursor
-//   Q / E             rotate the ghost, the dragged turret or the pending one under the cursor:
+//                     (or line) under the cursor
+//   Q / E             rotate the ghost, the dragged turret or the pending one (or line, about
+//                     its middle) under the cursor:
 //                     45 degrees (15 with Shift) while snapping, else 15 (1 with Shift)
-//   Delete            remove the pending turret under the cursor
+//   Delete            remove the pending turret (or line) under the cursor
+//
+// A line is laid as one unit: dragging either end's handle stretches, shrinks
+// or swings it about the other end, adding or dropping turrets to fill it.
 //   Esc               cancel a line, then disarm
 //   Ctrl+Z / Ctrl+Y   undo / redo among pending turrets (Ctrl+Shift+Z redoes too)
 // Anything not used here falls through to the scene.
@@ -120,9 +126,45 @@ private:
     // The turrets a line drag from m_lineStart to the cursor would place,
     // end to end; the first is where the drag began.
     std::vector<logic::Turret> lineTurrets() const;
+    // `count` turrets of `kind` end to end from `first` (snapped) along `dir`
+    // (unit length). Directional kinds face so their long side runs along the
+    // line; the rest take `facing`.
+    std::vector<logic::Turret> layLine(logic::TurretKind kind, glm::vec2 first, glm::vec2 dir, std::size_t count,
+                                       float facing) const;
+    // How far apart layLine puts turrets of `kind` along `dir`.
+    float lineSpacing(logic::TurretKind kind, glm::vec2 dir) const;
+
+    // A pending line's ends: its first and last turrets, the direction from
+    // first to last, and the outer tips where its handles sit.
+    struct LineEnds {
+        std::size_t first = 0;
+        std::size_t last = 0;
+        std::size_t count = 0;
+        glm::vec2 dir{1.0f, 0.0f};
+        glm::vec2 startTip{0.0f};
+        glm::vec2 endTip{0.0f};
+    };
+    std::optional<LineEnds> lineEnds(std::uint32_t line) const;
+    // The pending lines' ids, each once.
+    std::vector<std::uint32_t> pendingLines() const;
+
+    // Why `turret` can't stand where it is, leaving out turret `ignore` and
+    // every turret of line `ignoreLine` (0 for none); limits aren't checked.
+    const char* siteProblem(const logic::Turret& turret, std::optional<std::size_t> ignore,
+                            std::uint32_t ignoreLine) const;
+    // Why `members` can't replace line `line`'s turrets, or null if they can.
+    const char* replaceProblem(const std::vector<logic::Turret>& members, std::uint32_t line) const;
+    // Why the drag in progress would snap back, or null.
+    const char* dragProblem() const;
+    // Puts `members` in place of line `line`'s turrets, as one undo step.
+    void replaceLine(std::uint32_t line, std::vector<logic::Turret> members);
+    // The stretch in progress, laid out from its anchor to the cursor.
+    std::vector<logic::Turret> stretchTurrets() const;
+
     // The topmost pending turret under `point`.
     std::optional<std::size_t> pendingAt(glm::vec2 point) const;
     void rotate(float radians);
+    // Removes the turret, or the whole line it belongs to.
     void remove(std::size_t index);
 
     const logic::Level* m_level = nullptr;
@@ -155,6 +197,22 @@ private:
     // A line of ground turrets being dragged out: where it began (already
     // snapped). Placed on release.
     std::optional<glm::vec2> m_lineStart;
+    // The id the next line laid takes; never reused, so undo can't mix lines.
+    std::uint32_t m_nextLine = 1;
+
+    // A line's end being dragged: the line, the turret at the other end that
+    // stays put, and where the grab was relative to the dragged end turret.
+    struct Stretch {
+        std::uint32_t line = 0;
+        logic::TurretKind kind{};
+        glm::vec2 anchor{0.0f};
+        float facing = 0.0f;
+        glm::vec2 offset{0.0f};
+    };
+    std::optional<Stretch> m_stretch;
+
+    // Line handles' radius in world units: a fixed size on screen.
+    float m_handleRadius = 6.0f;
 };
 
 // What `turret` reaches, faintly in `color`: its cone, beam, pulse or blast.

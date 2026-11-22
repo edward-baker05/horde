@@ -153,6 +153,10 @@ struct Turret {
     glm::vec2 center{0.0f, 0.0f};
     float facing = 0.0f; // radians; positive is clockwise on screen, 0 faces +x
     float hp = 0.0f;     // blockers only; starts at the kind's maxHp
+    // The dragged line it was laid as part of, or 0 for none. A line's turrets
+    // sit together in slot order, end to end, and are moved, turned, stretched
+    // and removed as one while pending. Placement only: the simulation ignores it.
+    std::uint32_t line = 0;
 };
 
 // A turret of `kind` at full health.
