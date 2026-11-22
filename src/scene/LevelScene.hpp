@@ -13,10 +13,11 @@
 #include "logic/Level.hpp"
 #include "logic/Round.hpp"
 #include "logic/WallGridShapes.hpp"
-#include "scene/LevelMode.hpp"
 #include "scene/DancingCow.hpp"
+#include "scene/LevelMode.hpp"
 #include "scene/RoundOverlay.hpp"
 #include "scene/Scene.hpp"
+#include "scene/TurretPrep.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
 #include "sim/WallColliders.hpp"
@@ -91,6 +92,7 @@ public:
     void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) override;
     void debugUi() override;
     void onResize(float width, float height) override;
+
     ui::ScenePresentation presentation() const override {
         return levelPresentation(m_options.mode);
     }
@@ -131,11 +133,19 @@ private:
     void explosionUi();
     // Player mode: the round's rules against the crowd's reports, once a frame.
     void updateRound(float dt);
-    // Player mode: a tap on the feed at `screen` (tablet screen pixels).
+    // Player mode: ends the prep phase, paying for and arming the turrets placed.
+    void startRound();
+    // Player mode: arms the tray's selection for placing, or follows the
+    // placement putting it down.
+    void syncTray();
+    // Player mode: a tap on the feed at `screen` (tablet screen pixels) that
+    // placement didn't take.
     void tapFeed(glm::vec2 screen);
-    // Player mode: towers, their zones and the placement ghost, in the feed.
+    // Player mode: turrets, their reach and the placement ghost, in the feed.
     void renderRound(gfx::SpriteBatch& batch);
-    bool siteClear(glm::vec2 world) const;
+    // Player mode: the placed turret at `world`, or the nearest within a
+    // fingertip of it, since they are small on the fitted feed.
+    std::optional<std::size_t> turretNear(glm::vec2 world) const;
 
     Services* m_services = nullptr;
     DancingCow m_cow;
@@ -145,17 +155,16 @@ private:
     bool m_pausePending = false;
     // Player mode's round: null in Dev mode.
     std::optional<logic::Round> m_round;
-    // Walls binned with reach enough to check a tower's clearance from them.
-    std::shared_ptr<sim::WallColliders> m_siteWalls = std::make_shared<sim::WallColliders>();
-    // The newest crowd map, kept until the next arrives.
-    sim::DensityMap m_density;
-    bool m_hasDensity = false;
-    // The placed tower whose panel is open, or -1.
-    int m_inspected = -1;
+    // Player mode: placing turrets, in prep and in play.
+    TurretPrep m_prep;
+    // The tray item m_prep was last armed from, or -1.
+    int m_trayArmed = -1;
+    // The placed turret whose panel is open, by slot.
+    std::optional<std::size_t> m_inspected;
     // Where the pointer last was on the tablet screen, for the ghost.
     std::optional<glm::vec2> m_cursor;
-    // Recent blasts, drawn fading for a moment: most last a single step, too
-    // short to see. Seconds since each went off.
+    // Recent click blasts, drawn fading for a moment: they last a single
+    // step, too short to see. Seconds since each went off.
     std::vector<std::pair<sim::Explosion, float>> m_recentBlasts;
     // The results card is up, and the save has been paid into.
     bool m_resultsShown = false;

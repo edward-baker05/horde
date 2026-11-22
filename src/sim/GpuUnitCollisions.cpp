@@ -34,9 +34,6 @@ struct alignas(16) GPUCollideUniforms {
     float averageOmega;
     float chebyshevOmega; // this pass's weight; 1 = a plain relaxed pass
     float smoothing;      // unit_smooth.comp
-    Uint32 towerCount;    // walls.hlsli: towers pushed out of like walls
-    Uint32 towerPadding[3];
-    glm::vec4 towers[kMaxTowers];
 };
 
 // The Chebyshev weight for each pass (Wang 2015, eq. 12): 1 for the first
@@ -52,7 +49,7 @@ float chebyshevOmega(std::uint32_t pass, std::uint32_t delay, float rho, float p
     }
     return 4.0f / (4.0f - rhoSq * previous);
 }
-static_assert(sizeof(GPUCollideUniforms) == 80 + 16 + 16 * kMaxTowers);
+static_assert(sizeof(GPUCollideUniforms) == 80);
 
 } // namespace
 
@@ -118,8 +115,6 @@ GPUCollideUniforms collideUniforms(const CollisionSettings& settings, float diam
     uniforms.averageOmega = settings.averageOmega;
     uniforms.chebyshevOmega = 1.0f;
     uniforms.smoothing = settings.velocitySmoothing;
-    uniforms.towerCount = walls.towerCount();
-    std::copy_n(walls.towerUniforms(), kMaxTowers, uniforms.towers);
     return uniforms;
 }
 

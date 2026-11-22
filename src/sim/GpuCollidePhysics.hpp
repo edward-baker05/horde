@@ -5,10 +5,10 @@
 #include "gfx/UnitRenderer.hpp"
 #include "sim/GpuSpatialGrid.hpp"
 #include "sim/GpuUnitCollisions.hpp"
-#include "sim/GpuReadback.hpp"
 #include "sim/GpuUnitReorder.hpp"
 #include "sim/GpuWalls.hpp"
 #include "sim/PhysicsSystem.hpp"
+#include "sim/TurretEffects.hpp"
 
 namespace horde::sim {
 
@@ -22,8 +22,11 @@ namespace horde::sim {
 //                         region's flow inside one; predict new positions,
 //                         then push them by any active debug explosions
 //   2. GpuSpatialGrid     bucket the predicted positions (the broadphase)
+//      turret_aim         aim any mortars firing this step
 //      GpuUnitReorder     (CollisionSettings::reorderUnits) put every
 //                         per-unit buffer in grid order
+//      turret_fire        aim any guns firing this step, and load their bullets
+//      bullet_step        move bullets, letting them hit units
 //   3. GpuUnitCollisions  N relaxation passes, each separating units then
 //                         pushing them out of walls
 //   4. unit_finalize      out of walls once more, clamp to the level,
@@ -47,6 +50,15 @@ public:
     bool readUnits(std::vector<BaseUnitData>& out) override;
     bool readHealth(std::vector<float>& out) override;
 
+    bool tally(UnitTally& out) const override {
+        out = m_tally;
+        return true;
+    }
+
+    std::uint32_t pendingSpawns() const override {
+        return m_capacity - m_unitCount;
+    }
+
     const CollisionSettings* collisionSettings() const override {
         return &m_config.collision;
     }
@@ -59,20 +71,26 @@ public:
         return true;
     }
 
-    bool supportsRounds() const override {
-        return true;
-    }
-
-    void setCrowdEffects(const CrowdEffects& effects) override;
-    bool pollCounters(RoundCounters& out) override;
-    void setSpawnRate(float perSecond) override;
-    bool pollDensity(DensityMap& out) override;
-
     bool addExplosion(const Explosion& explosion) override;
     std::vector<Explosion> activeExplosions() const override;
 
     void setFlingDrag(float perSecond) override {
         m_flingDrag = perSecond;
+    }
+
+    bool supportsRounds() const override {
+        return true;
+    }
+
+    void setSpawnRate(float perSecond) override {
+        m_config.flow.spawnRate = perSecond;
+    }
+
+    bool setTurrets(const std::vector<logic::Turret>& turrets) override;
+    bool addTurrets(const std::vector<logic::Turret>& turrets) override;
+
+    const TurretEffects* turretEffects() const override {
+        return &m_turrets;
     }
 
     bool setCollisionPasses(std::uint32_t passes) override {
@@ -88,11 +106,24 @@ public:
 
 private:
     void spawnPending(SDL_GPUCommandBuffer* commands);
+    // Picks up the last feedback download if it has landed, and starts the next.
+    void sampleFeedback();
+    // Re-uploads the walls as the level's own plus the blockers still standing.
+    void rebuildWalls();
+    // Uploads what each turret slot's hits do to units.
+    void uploadStatusTable();
+    // Records turret_aim for this step's mortar shots, on the grid just built.
+    void aimMortars(SDL_GPUCommandBuffer* commands, const std::vector<AimRequest>& aims);
+    // Records turret_fire for this step's gunshots, after the reorder.
+    void fireGuns(SDL_GPUCommandBuffer* commands, const std::vector<FireRequest>& fires);
+    // Records bullet_step, after fireGuns.
+    void stepBullets(SDL_GPUCommandBuffer* commands);
     // Starting health for `count` new units: all full.
     std::vector<float> startingHealth(std::uint32_t count) const;
 
     SDL_GPUDevice* m_device = nullptr;
     gfx::UnitRenderer m_renderer;
+
     // How units are drawn; changed from the debug UI.
     struct SpriteSettings {
         bool enabled = true;
@@ -103,6 +134,7 @@ private:
         int directionSteps = 16; // 0 = any angle
         bool integerScale = false;
     } m_sprites;
+
     GpuSpatialGrid m_grid;
     GpuUnitCollisions m_collisions;
     GpuUnitReorder m_reorder;
@@ -150,30 +182,51 @@ private:
         Explosion explosion;
         float left = 1.0f;
     };
+
     std::vector<ActiveExplosion> m_explosions;
     // Each unit's velocity from flinging explosions, on top of its (capped)
     // walking velocity. Zero for units that haven't been flung.
     SDL_GPUBuffer* m_fling = nullptr;
     float m_flingDrag = 3.0f;
 
-    // Round reports: kills, leaks and contacts per tower slot, cumulative
-    // (see Counters in unit_finalize.comp.hlsl), read back without stalling.
-    SDL_GPUBuffer* m_counters = nullptr;
-    GpuReadback m_countersReadback;
-    // The round's towers, pulls and slow zones; empty outside a round.
-    CrowdEffects m_effects;
-    bool m_effectsSet = false;
+    // Each unit's status effects (StatusEffect), and its reorder spare. Zero
+    // for every unit, including those still to spawn, until something hits it.
+    SDL_GPUBuffer* m_status = nullptr;
+    SDL_GPUBuffer* m_statusSpare = nullptr;
+    // What each source applies (TurretEffects::statusTable), uploaded when
+    // the turrets are set.
+    SDL_GPUBuffer* m_statusTable = nullptr;
 
-    // The coarse density map towers aim with (unit_density.comp): built every
-    // kDensityEverySteps steps during a round, and read back without stalling.
-    void buildDensity(SDL_GPUCommandBuffer* commands);
-    SDL_GPUComputePipeline* m_densityPipeline = nullptr;
-    SDL_GPUBuffer* m_density = nullptr;
-    GpuReadback m_densityReadback;
-    glm::ivec2 m_densityDim{0, 0};
-    std::uint32_t m_stepsSinceDensity = 0;
-    // A map was recorded and is waiting for its frame to be submitted.
-    bool m_densityPending = false;
+    // The bullet pool, kMaxBullets of each: positions as BaseUnitData (so
+    // m_renderer draws them), last step's positions, and per-bullet hits.
+    // Shots take slots round in order, from m_nextBullet.
+    SDL_GPUBuffer* m_bullets = nullptr;
+    SDL_GPUBuffer* m_bulletPrev = nullptr;
+    SDL_GPUBuffer* m_bulletParams = nullptr;
+    std::uint32_t m_nextBullet = 0;
+    // When each slot's bullet runs out of life at the latest, in simulated
+    // seconds, so the panel can say how many could still be flying.
+    std::vector<float> m_bulletExpiry;
+    // Bullet damage per unit this step, in thousandths of a hit point. Never
+    // reordered: bullet_step fills it after the reorder and unit_finalize
+    // empties it before the next.
+    SDL_GPUBuffer* m_pendingDamage = nullptr;
+    SDL_GPUComputePipeline* m_firePipeline = nullptr;
+    SDL_GPUComputePipeline* m_bulletPipeline = nullptr;
+
+    TurretEffects m_turrets;
+    // The level's own walls, without blockers; m_config.walls adds them.
+    std::shared_ptr<const WallColliders> m_baseWalls;
+
+    // Kills, leaks and what turrets need to hear back (kFeedbackWords uints,
+    // laid out as TurretEffects.hpp says). Read back on a command buffer of
+    // its own, one download in flight at a time, whose fence is polled rather
+    // than waited on, so the main thread never stalls.
+    SDL_GPUBuffer* m_feedback = nullptr;
+    SDL_GPUTransferBuffer* m_feedbackTransfer = nullptr;
+    SDL_GPUFence* m_feedbackFence = nullptr;
+    UnitTally m_tally;
+    SDL_GPUComputePipeline* m_aimPipeline = nullptr;
 
     SimConfig m_config;
     std::uint32_t m_unitCount = 0;

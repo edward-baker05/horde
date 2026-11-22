@@ -82,6 +82,11 @@ bool App::init(const AppConfig& config) {
     if (!m_atlas.loadFromFile(m_gpu.device(), paths::asset("textures/atlas.png"))) {
         return false;
     }
+    // Weapon sprites. Optional: without them weapons are drawn as plain boxes.
+    if (!m_weapons.loadFromFile(m_gpu.device(), paths::asset("textures/weapons.png"))) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "textures/weapons.png didn't load: drawing weapons as boxes (tools/make_weapon_atlas.py makes it)");
+    }
     // idk. TODO: figure this out
     if (!m_imgui.init(m_gpu)) {
         return false;
@@ -102,6 +107,7 @@ bool App::init(const AppConfig& config) {
     services.gpu = &m_gpu;
     services.shaders = m_shaders.get();
     services.atlas = &m_atlas;
+    services.weapons = m_weapons.handle() != nullptr ? &m_weapons : nullptr;
     services.ui = &m_rml;
     services.shell = &m_shell;
     // No music or cow in benchmarks; without a sound device the game runs silent.
@@ -671,6 +677,7 @@ void App::shutdown() {
     m_rml.shutdown();
     m_imgui.shutdown();
     m_atlas.release();
+    m_weapons.release();
     m_batch.shutdown();
     m_shaders.reset();
     m_gpu.shutdown();

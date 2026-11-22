@@ -10,8 +10,9 @@
 #include <string>
 #include <vector>
 
+#include "logic/Turret.hpp"
 #include "logic/UnitData.hpp"
-#include "sim/CrowdEffects.hpp"
+#include "sim/Explosion.hpp"
 
 namespace horde::scene {
 struct Services;
@@ -19,6 +20,7 @@ struct Services;
 
 namespace horde::sim {
 
+class TurretEffects;
 class WallColliders;
 
 // How a collision pass combines a unit's pair corrections. Both are Jacobi:
@@ -109,13 +111,20 @@ struct MovementSettings {
     // step with its neighbours. Steering smooths it into a gentle wobble.
     // An angle of 0 turns it off.
     float wobbleAngle = 0.2618f; // 15 degrees
-    float wobbleRate = 1.0f; // Hz
+    float wobbleRate = 1.0f;     // Hz
 };
 
 // An axis-aligned area of the level: a spawn or exit marker's band.
 struct MarkerArea {
     glm::vec2 center{0.0f, 0.0f};
     glm::vec2 halfSize{0.0f, 0.0f};
+};
+
+// What happens to a unit that reaches an exit.
+enum class ExitBehaviour {
+    Stop,    // it stays there, pressed against the level's edge
+    Respawn, // it takes HealthSettings::exitDamage and re-enters at a spawn
+    Despawn, // it leaves the level for good and counts as a leak
 };
 
 // How units enter and leave a level, for systems that support it
@@ -127,17 +136,19 @@ struct FlowSettings {
     // second; 0 brings them all in on the first frame.
     std::uint32_t toSpawn = 0;
     float spawnRate = 1000.0f;
-    // A unit that reaches an exit re-enters at a spawn, keeping the flow
-    // going. Otherwise it stops there.
-    bool respawnAtExit = true;
-    // A round: a unit reaching an exit leaves the level for good and counts
-    // as leaked (RoundCounters::leaked). Wins over respawnAtExit.
-    bool removeAtExit = false;
+    ExitBehaviour onExit = ExitBehaviour::Respawn;
     std::uint32_t seed = 1;
 };
 
+// How many units have left play so far, by how they left. Sampled from the
+// GPU without waiting for it, so a frame or two behind.
+struct UnitTally {
+    std::uint32_t kills = 0; // ran out of hit points
+    std::uint32_t leaks = 0; // despawned at an exit (ExitBehaviour::Despawn)
+};
+
 // Unit hit points. Units start at maxHp, are drawn from full colour at maxHp
-// down to black at 0, and lose exitDamage each time they reach an exit.
+// down to black at 0, and lose exitDamage each time they respawn at an exit.
 // Health is a float so damage can be fractional; maxHp is a whole number.
 struct HealthSettings {
     std::uint32_t maxHp = 30;
@@ -172,7 +183,6 @@ inline constexpr float kDeadPosition = -1.0e30f;
 inline bool isDeadUnit(glm::vec2 pos) {
     return pos.x < -1.0e29f;
 }
-
 
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
@@ -246,6 +256,18 @@ public:
         return false;
     }
 
+    // The latest kills and leaks sample. Cheap: never waits for the GPU.
+    // Returns false for systems that don't count them.
+    virtual bool tally(UnitTally& out) const {
+        (void)out;
+        return false;
+    }
+
+    // Units still to spawn, for systems that stream them in.
+    virtual std::uint32_t pendingSpawns() const {
+        return 0;
+    }
+
     // The collision settings actually in use. Null for systems that don't use
     // CollisionSettings.
     virtual const CollisionSettings* collisionSettings() const {
@@ -289,23 +311,9 @@ public:
         (void)perSecond;
     }
 
-    // Whether the system can run a round: setCrowdEffects, pollCounters,
-    // pollDensity and setSpawnRate all do something.
+    // Whether the system can run a round: setTurrets, addTurrets, tally and
+    // setSpawnRate all do something.
     virtual bool supportsRounds() const {
-        return false;
-    }
-
-    // What a round asks of the crowd, from the next step on: tower bodies,
-    // pulls and slow zones.
-    virtual void setCrowdEffects(const CrowdEffects& effects) {
-        (void)effects;
-    }
-
-    // A fresh map of where the crowd is, if one has come back from the GPU
-    // since the last call. Only made while a round has set crowd effects.
-    // Never waits.
-    virtual bool pollDensity(DensityMap& out) {
-        (void)out;
         return false;
     }
 
@@ -315,20 +323,34 @@ public:
         (void)perSecond;
     }
 
-    // A newer report of kills, leaks and tower contacts than the last call
-    // returned, if one has come back from the GPU. Never waits.
-    virtual bool pollCounters(RoundCounters& out) {
-        (void)out;
+    // Arms these turrets from the next step, replacing any before. Returns
+    // false for systems without turrets.
+    virtual bool setTurrets(const std::vector<logic::Turret>& turrets) {
+        (void)turrets;
         return false;
+    }
+
+    // Arms more turrets alongside those already in play, which keep their
+    // timers and wear. Returns false for systems without turrets, or if
+    // they would go past logic::kMaxTurrets.
+    virtual bool addTurrets(const std::vector<logic::Turret>& turrets) {
+        (void)turrets;
+        return false;
+    }
+
+    // The turrets in play and their timers, for drawing. Null for systems
+    // without turrets.
+    virtual const TurretEffects* turretEffects() const {
+        return nullptr;
     }
 };
 
 // How starting units are laid out. All are deterministic for a given seed, so
 // two benchmark runs with the same settings start from the same state.
 enum class SpawnPattern {
-    Column, // the original wrapping column from the middle of the level
-    Random, // uniform over the level
-    Grid,   // an even lattice over the level
+    Column,  // the original wrapping column from the middle of the level
+    Random,  // uniform over the level
+    Grid,    // an even lattice over the level
     Markers, // at the level's spawn markers, streamed in over time where the system supports it
 };
 

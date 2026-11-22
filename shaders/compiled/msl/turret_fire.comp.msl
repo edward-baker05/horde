@@ -1,0 +1,379 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_StructuredBuffer_v2uint
+{
+    uint2 _m0[1];
+};
+
+struct UnitData
+{
+    float2 pos;
+    float2 vel;
+};
+
+struct type_StructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_RWStructuredBuffer_UnitData
+{
+    UnitData _m0[1];
+};
+
+struct type_RWStructuredBuffer_v2float
+{
+    float2 _m0[1];
+};
+
+struct BulletParams
+{
+    float damage;
+    float life;
+    uint pierce;
+    uint status;
+    uint lastHit;
+    float radius;
+    uint clear;
+    uint padding;
+};
+
+struct type_RWStructuredBuffer_BulletParams
+{
+    BulletParams _m0[1];
+};
+
+struct type_FireParams
+{
+    uint2 GridDim;
+    float CellSize;
+    uint ShotCount;
+    float UnitRadius;
+    float BulletRadius;
+    float Spread;
+    uint Seed;
+    float4 ShotAim[64];
+    float4 ShotHit[64];
+    uint4 ShotIds[64];
+};
+
+kernel void main0(constant type_FireParams& FireParams [[buffer(0)]], device type_StructuredBuffer_uint& CellRanges [[buffer(1)]], device type_StructuredBuffer_v2uint& SortedKeys [[buffer(2)]], device type_StructuredBuffer_UnitData& Units [[buffer(3)]], device type_RWStructuredBuffer_UnitData& Bullets [[buffer(4)]], device type_RWStructuredBuffer_v2float& BulletPrev [[buffer(5)]], device type_RWStructuredBuffer_BulletParams& Params [[buffer(6)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    do
+    {
+        if (gl_GlobalInvocationID.x >= FireParams.ShotCount)
+        {
+            break;
+        }
+        int2 _111 = int2(floor(FireParams.ShotAim[gl_GlobalInvocationID.x].xy / float2(FireParams.CellSize)));
+        int _115 = int(ceil(FireParams.ShotAim[gl_GlobalInvocationID.x].z / FireParams.CellSize)) + 1;
+        float _116 = FireParams.ShotAim[gl_GlobalInvocationID.x].z * FireParams.ShotAim[gl_GlobalInvocationID.x].z;
+        uint _121;
+        _121 = 4294967295u;
+        float _119;
+        uint _122;
+        float _118 = _116;
+        int _123 = 0;
+        for (; _123 <= _115; _118 = _119, _121 = _122, _123++)
+        {
+            int _128 = _123 - 1;
+            float _131 = float(max(_128, 0)) * FireParams.CellSize;
+            bool _137;
+            if (_121 != 4294967295u)
+            {
+                _137 = (_131 * _131) > _118;
+            }
+            else
+            {
+                _137 = false;
+            }
+            if (_137)
+            {
+                break;
+            }
+            if (_123 == 0)
+            {
+                float _196;
+                uint _197;
+                do
+                {
+                    bool _155;
+                    if (!any(_111 < int2(0)))
+                    {
+                        _155 = any(_111 >= int2(FireParams.GridDim));
+                    }
+                    else
+                    {
+                        _155 = true;
+                    }
+                    if (_155)
+                    {
+                        _196 = _118;
+                        _197 = _121;
+                        break;
+                    }
+                    uint _166 = (uint(_111.x) + (uint(_111.y) * FireParams.GridDim.x)) * 2u;
+                    if (CellRanges._m0[_166] == 4294967295u)
+                    {
+                        _196 = _118;
+                        _197 = _121;
+                        break;
+                    }
+                    uint _172 = _166 + 1u;
+                    float _176;
+                    uint _181;
+                    _176 = _118;
+                    _181 = _121;
+                    for (uint _179 = CellRanges._m0[_166]; _179 < CellRanges._m0[_172]; )
+                    {
+                        float2 _193 = (Units._m0[((device uint*)&SortedKeys._m0[_179])[1]].pos + float2(FireParams.UnitRadius)) - FireParams.ShotAim[gl_GlobalInvocationID.x].xy;
+                        float _194 = dot(_193, _193);
+                        bool _195 = _194 < _176;
+                        _176 = _195 ? _194 : _176;
+                        _179++;
+                        _181 = _195 ? ((device uint*)&SortedKeys._m0[_179])[1] : _181;
+                        continue;
+                    }
+                    _196 = _176;
+                    _197 = _181;
+                    break;
+                } while(false);
+                _119 = _196;
+                _122 = _197;
+                continue;
+            }
+            int _198 = -_123;
+            float _200;
+            uint _205;
+            _200 = _118;
+            _205 = _121;
+            float _201;
+            uint _206;
+            for (int _203 = _198; _203 <= _123; _200 = _201, _203++, _205 = _206)
+            {
+                int2 _211 = _111 + int2(_203, _198);
+                uint _265;
+                float _266;
+                do
+                {
+                    bool _224;
+                    if (!any(_211 < int2(0)))
+                    {
+                        _224 = any(_211 >= int2(FireParams.GridDim));
+                    }
+                    else
+                    {
+                        _224 = true;
+                    }
+                    if (_224)
+                    {
+                        _265 = _205;
+                        _266 = _200;
+                        break;
+                    }
+                    uint _235 = (uint(_211.x) + (uint(_211.y) * FireParams.GridDim.x)) * 2u;
+                    if (CellRanges._m0[_235] == 4294967295u)
+                    {
+                        _265 = _205;
+                        _266 = _200;
+                        break;
+                    }
+                    uint _241 = _235 + 1u;
+                    float _245;
+                    uint _250;
+                    _245 = _200;
+                    _250 = _205;
+                    for (uint _248 = CellRanges._m0[_235]; _248 < CellRanges._m0[_241]; )
+                    {
+                        float2 _262 = (Units._m0[((device uint*)&SortedKeys._m0[_248])[1]].pos + float2(FireParams.UnitRadius)) - FireParams.ShotAim[gl_GlobalInvocationID.x].xy;
+                        float _263 = dot(_262, _262);
+                        bool _264 = _263 < _245;
+                        _245 = _264 ? _263 : _245;
+                        _248++;
+                        _250 = _264 ? ((device uint*)&SortedKeys._m0[_248])[1] : _250;
+                        continue;
+                    }
+                    _265 = _250;
+                    _266 = _245;
+                    break;
+                } while(false);
+                int2 _268 = _111 + int2(_203, _123);
+                do
+                {
+                    bool _281;
+                    if (!any(_268 < int2(0)))
+                    {
+                        _281 = any(_268 >= int2(FireParams.GridDim));
+                    }
+                    else
+                    {
+                        _281 = true;
+                    }
+                    if (_281)
+                    {
+                        _201 = _266;
+                        _206 = _265;
+                        break;
+                    }
+                    uint _292 = (uint(_268.x) + (uint(_268.y) * FireParams.GridDim.x)) * 2u;
+                    if (CellRanges._m0[_292] == 4294967295u)
+                    {
+                        _201 = _266;
+                        _206 = _265;
+                        break;
+                    }
+                    uint _298 = _292 + 1u;
+                    float _302;
+                    uint _307;
+                    _302 = _266;
+                    _307 = _265;
+                    for (uint _305 = CellRanges._m0[_292]; _305 < CellRanges._m0[_298]; )
+                    {
+                        float2 _319 = (Units._m0[((device uint*)&SortedKeys._m0[_305])[1]].pos + float2(FireParams.UnitRadius)) - FireParams.ShotAim[gl_GlobalInvocationID.x].xy;
+                        float _320 = dot(_319, _319);
+                        bool _321 = _320 < _302;
+                        _302 = _321 ? _320 : _302;
+                        _305++;
+                        _307 = _321 ? ((device uint*)&SortedKeys._m0[_305])[1] : _307;
+                        continue;
+                    }
+                    _201 = _302;
+                    _206 = _307;
+                    break;
+                } while(false);
+            }
+            int _322 = 1 - _123;
+            float _324;
+            uint _329;
+            _324 = _200;
+            _329 = _205;
+            float _325;
+            uint _330;
+            for (int _327 = _322; _327 <= _128; _324 = _325, _327++, _329 = _330)
+            {
+                int2 _335 = _111 + int2(_198, _327);
+                uint _389;
+                float _390;
+                do
+                {
+                    bool _348;
+                    if (!any(_335 < int2(0)))
+                    {
+                        _348 = any(_335 >= int2(FireParams.GridDim));
+                    }
+                    else
+                    {
+                        _348 = true;
+                    }
+                    if (_348)
+                    {
+                        _389 = _329;
+                        _390 = _324;
+                        break;
+                    }
+                    uint _359 = (uint(_335.x) + (uint(_335.y) * FireParams.GridDim.x)) * 2u;
+                    if (CellRanges._m0[_359] == 4294967295u)
+                    {
+                        _389 = _329;
+                        _390 = _324;
+                        break;
+                    }
+                    uint _365 = _359 + 1u;
+                    float _369;
+                    uint _374;
+                    _369 = _324;
+                    _374 = _329;
+                    for (uint _372 = CellRanges._m0[_359]; _372 < CellRanges._m0[_365]; )
+                    {
+                        float2 _386 = (Units._m0[((device uint*)&SortedKeys._m0[_372])[1]].pos + float2(FireParams.UnitRadius)) - FireParams.ShotAim[gl_GlobalInvocationID.x].xy;
+                        float _387 = dot(_386, _386);
+                        bool _388 = _387 < _369;
+                        _369 = _388 ? _387 : _369;
+                        _372++;
+                        _374 = _388 ? ((device uint*)&SortedKeys._m0[_372])[1] : _374;
+                        continue;
+                    }
+                    _389 = _374;
+                    _390 = _369;
+                    break;
+                } while(false);
+                int2 _392 = _111 + int2(_123, _327);
+                do
+                {
+                    bool _405;
+                    if (!any(_392 < int2(0)))
+                    {
+                        _405 = any(_392 >= int2(FireParams.GridDim));
+                    }
+                    else
+                    {
+                        _405 = true;
+                    }
+                    if (_405)
+                    {
+                        _325 = _390;
+                        _330 = _389;
+                        break;
+                    }
+                    uint _416 = (uint(_392.x) + (uint(_392.y) * FireParams.GridDim.x)) * 2u;
+                    if (CellRanges._m0[_416] == 4294967295u)
+                    {
+                        _325 = _390;
+                        _330 = _389;
+                        break;
+                    }
+                    uint _422 = _416 + 1u;
+                    float _426;
+                    uint _431;
+                    _426 = _390;
+                    _431 = _389;
+                    for (uint _429 = CellRanges._m0[_416]; _429 < CellRanges._m0[_422]; )
+                    {
+                        float2 _443 = (Units._m0[((device uint*)&SortedKeys._m0[_429])[1]].pos + float2(FireParams.UnitRadius)) - FireParams.ShotAim[gl_GlobalInvocationID.x].xy;
+                        float _444 = dot(_443, _443);
+                        bool _445 = _444 < _426;
+                        _426 = _445 ? _444 : _426;
+                        _429++;
+                        _431 = _445 ? ((device uint*)&SortedKeys._m0[_429])[1] : _431;
+                        continue;
+                    }
+                    _325 = _426;
+                    _330 = _431;
+                    break;
+                } while(false);
+            }
+            _119 = _324;
+            _122 = _329;
+        }
+        if (_121 == 4294967295u)
+        {
+            Bullets._m0[FireParams.ShotIds[gl_GlobalInvocationID.x].x].pos = float2(-1000000015047466219876688855040.0);
+            Bullets._m0[FireParams.ShotIds[gl_GlobalInvocationID.x].x].vel = float2(0.0);
+            break;
+        }
+        float2 _452 = Units._m0[_121].pos;
+        float2 _454 = Units._m0[_121].vel;
+        float2 _458 = _452 + float2(FireParams.UnitRadius);
+        float2 _465 = (_458 + (_454 * (length(_458 - FireParams.ShotAim[gl_GlobalInvocationID.x].xy) / precise::max(FireParams.ShotAim[gl_GlobalInvocationID.x].w, 1.0)))) - FireParams.ShotAim[gl_GlobalInvocationID.x].xy;
+        uint _472 = (FireParams.Seed * 747796405u) + 2891336453u;
+        uint _478 = ((_472 >> (((_472 >> 28u) + 4u) & 31u)) ^ _472) * 277803737u;
+        uint _483 = ((FireParams.ShotIds[gl_GlobalInvocationID.x].x ^ ((_478 >> 22u) ^ _478)) * 747796405u) + 2891336453u;
+        uint _489 = ((_483 >> (((_483 >> 28u) + 4u) & 31u)) ^ _483) * 277803737u;
+        float _499 = precise::atan2(_465.y, _465.x) + (((float(((_489 >> 22u) ^ _489) & 65535u) * 3.05180437862873077392578125e-05) - 1.0) * FireParams.Spread);
+        float2 _506 = FireParams.ShotAim[gl_GlobalInvocationID.x].xy - float2(FireParams.BulletRadius);
+        Bullets._m0[FireParams.ShotIds[gl_GlobalInvocationID.x].x].pos = _506;
+        Bullets._m0[FireParams.ShotIds[gl_GlobalInvocationID.x].x].vel = float2(cos(_499), sin(_499)) * FireParams.ShotAim[gl_GlobalInvocationID.x].w;
+        BulletPrev._m0[FireParams.ShotIds[gl_GlobalInvocationID.x].x] = _506;
+        Params._m0[FireParams.ShotIds[gl_GlobalInvocationID.x].x] = BulletParams{ FireParams.ShotHit[gl_GlobalInvocationID.x].x, FireParams.ShotHit[gl_GlobalInvocationID.x].y, FireParams.ShotIds[gl_GlobalInvocationID.x].y, FireParams.ShotIds[gl_GlobalInvocationID.x].z, 4294967295u, FireParams.BulletRadius, 0u, 0u };
+        break;
+    } while(false);
+}
+

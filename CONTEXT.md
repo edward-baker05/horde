@@ -84,3 +84,59 @@ A level with no condition that blocks saving. A wall lying outside the level's
 bounds, or one with degenerate geometry, makes a level invalid; it must be
 corrected or deleted before the level can be written to disk.
 _Avoid_: clean level, well-formed level
+
+**Turret**:
+Something the player buys and places, in the prep phase or during a round,
+that damages or obstructs units. Every turret is a mount, a blocker or a floor trap.
+_Avoid_: tower, defence, weapon
+
+**Mount**:
+A turret placed on top of a wall, out of the horde's reach. Units cannot harm
+it.
+_Avoid_: emplacement
+
+**Blocker**:
+A solid turret placed on open ground. Units collide with it and wear it down;
+it is removed when it has no hit points left.
+_Avoid_: obstacle, barrier
+
+**Floor trap**:
+A turret placed on open ground that units walk over rather than collide with.
+_Avoid_: hazard
+
+**Prep phase**:
+The start of a round, before START, when turrets are bought and placed and no
+units spawn.
+_Avoid_: build phase, setup
+
+**Leak**:
+A unit that reaches an exit during a round. It leaves the level and is counted.
+_Avoid_: escape
+
+**Status effect**:
+A timed condition a weapon puts on a unit. Re-applying one refreshes it
+rather than adding to it.
+_Avoid_: debuff, condition, ailment
+
+**Stun**:
+A status effect under which a unit stops walking. It can still be pushed by
+the crowd and by blasts.
+_Avoid_: freeze, paralyse
+
+**Slow**:
+A status effect under which a unit walks at a fraction of its speed.
+_Avoid_: snare, chill
+
+**Burning**:
+A status effect under which a unit loses hit points over time. It does not
+spread between units.
+_Avoid_: on fire, ignite, damage over time
+
+**Bullet**:
+A projectile a weapon fires, which travels across the level, stops at walls
+and blockers, and hits units it touches.
+_Avoid_: projectile, shot, round
+
+**Pierce**:
+How many more units a bullet can hit after its first before it is spent.
+_Avoid_: penetration

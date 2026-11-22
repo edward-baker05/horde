@@ -4,6 +4,8 @@
 
 #include <glm/glm.hpp>
 
+#include <optional>
+
 #include "gfx/Texture.hpp"
 
 struct SDL_Window;
@@ -79,13 +81,20 @@ public:
     // `slots` (one uint per unit, by ID) is where each unit is now, for systems
     // that reorder: units are then drawn in ID order, so the one on top of an
     // overlap stays on top however the units are reordered.
+    //
+    // `status` (one sim::StatusEffect per unit) tints stunned, slowed and
+    // burning units; `time` drives the burning flicker.
+    //
+    // `color` is the full-health colour, and `markFirst` draws the unit with
+    // ID 0 red. The defaults are the horde's (green, or Lowicz blue in Polish
+    // mode); bullets use their own.
     struct DrawOptions {
         SDL_GPUBuffer* previous = nullptr; // null: draw current positions as they are
         float alpha = 1.0f;
         float maxJump = 0.0f;
         SDL_GPUBuffer* health = nullptr; // null: everyone at full health
         float maxHealth = 1.0f;
-        SDL_GPUBuffer* ids = nullptr; // null: a unit's ID is its index
+        SDL_GPUBuffer* ids = nullptr;   // null: a unit's ID is its index
         SDL_GPUBuffer* slots = nullptr; // null: draw in index order
         // Pixel size of the render target, for picking the sprite LOD.
         glm::vec2 viewportPx{0.0f};
@@ -106,6 +115,11 @@ public:
         Uint32 directionSteps = 16;
         float minTurnSpeed = 1.0f;
         Uint32 seed = 0;
+
+        SDL_GPUBuffer* status = nullptr; // null: no status tints
+        float time = 0.0f;
+        std::optional<glm::vec4> color; // none: the horde's
+        bool markFirst = true;
     };
 
     // `units` holds at least `count` BaseUnitData entries.

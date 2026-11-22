@@ -1,15 +1,17 @@
 #include "scene/RoundOverlay.hpp"
 
-#include <RmlUi/Core.h>
 #include <SDL3/SDL.h>
 
+#include <RmlUi/Core.h>
+
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <optional>
 #include <utility>
 
 #include "core/Paths.hpp"
-#include "logic/TowerStats.hpp"
 #include "scene/Scene.hpp"
 #include "ui/RmlLayer.hpp"
 
@@ -25,7 +27,74 @@ std::string twoDigits(int value) {
     return text;
 }
 
+std::string upper(std::string text) {
+    for (char& c : text) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    return text;
+}
+
+// "#rrggbb" for an RCSS colour.
+std::string hexColor(glm::vec4 color) {
+    char text[8];
+    const auto channel = [](float value) {
+        return static_cast<int>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
+    };
+    std::snprintf(text, sizeof(text), "#%02x%02x%02x", channel(color.r), channel(color.g), channel(color.b));
+    return text;
+}
+
+// Two letters for a kind with no sprite: the initials of a two-word name,
+// else its first two letters. "Spike block" is SB, "Flamer" FL.
+std::string initials(const char* name) {
+    const std::string text = name;
+    const std::size_t space = text.find(' ');
+    std::string out;
+    if (space != std::string::npos && space + 1 < text.size()) {
+        out = {text[0], text[space + 1]};
+    } else {
+        out = text.substr(0, 2);
+    }
+    return upper(out);
+}
+
 } // namespace
+
+const std::vector<logic::TurretKind>& RoundOverlay::trayKinds() {
+    static const std::vector<logic::TurretKind> kinds = [] {
+        std::vector<logic::TurretKind> out;
+        // A group per weapon category, then the kinds that have none.
+        for (std::size_t group = 0; group <= logic::kWeaponCategoryCount; ++group) {
+            const std::optional<logic::WeaponCategory> category =
+                group == logic::kWeaponCategoryCount ? std::nullopt
+                                                     : std::optional(static_cast<logic::WeaponCategory>(group));
+            for (std::size_t i = 0; i < logic::kTurretKindCount; ++i) {
+                const auto kind = static_cast<logic::TurretKind>(i);
+                if (logic::turretDef(kind).category == category) {
+                    out.push_back(kind);
+                }
+            }
+        }
+        return out;
+    }();
+    return kinds;
+}
+
+std::string turretKindLine(const logic::TurretDef& def) {
+    std::string line;
+    if (def.category) {
+        line = logic::weaponCategoryName(*def.category);
+        for (std::size_t c = 0; c < logic::kWeaponCategoryCount; ++c) {
+            const auto other = static_cast<logic::WeaponCategory>(c);
+            if ((def.secondaryCategories & logic::categoryBit(other)) != 0) {
+                line += std::string(" + ") + logic::weaponCategoryName(other);
+            }
+        }
+        line += " \xC2\xB7 ";
+    }
+    line += logic::turretClassName(def.placement);
+    return upper(line);
+}
 
 RoundOverlay::~RoundOverlay() {
     hide();
@@ -43,24 +112,33 @@ bool RoundOverlay::show(Services& services) {
         return false;
     }
 
-    // In tray order: the four towers, then the two abilities. Colours match
-    // the towers in the feed (towerColor in LevelScene.cpp).
-    using logic::AbilityKind;
-    using logic::TowerKind;
-    m_towers = {
-        {"Sniper", logic::towerStats(TowerKind::Sniper, 1).cost, "diamond", "", "#f4ca84", false, ""},
-        {"Gunner", logic::towerStats(TowerKind::Gunner, 1).cost, "bar", "", "#90d7ff", false, ""},
-        {"Pulse", logic::towerStats(TowerKind::Pulse, 1).cost, "ring", "", "#76e2e2", false, ""},
-        {"Frost", logic::towerStats(TowerKind::Frost, 1).cost, "tri", "\xE2\x96\xB2", "#a1e4ae", false, ""},
-        {"Bomb", logic::abilityStats(AbilityKind::Bomb).cost, "circle", "", "#ffa8a0", false, ""},
-        {"Gravity", logic::abilityStats(AbilityKind::Gravity).cost, "square", "", "#d4bcff", false, ""},
-    };
+    // In tray order, coloured as in the feed: a sprite keeps its own
+    // colours, and the rest are tinted by category or placement class.
+    m_items.clear();
+    std::optional<logic::WeaponCategory> lastCategory;
+    for (const logic::TurretKind kind : trayKinds()) {
+        const logic::TurretDef& def = logic::turretDef(kind);
+        Item item;
+        item.name = def.name;
+        item.cost = static_cast<int>(def.cost);
+        item.color = hexColor(logic::turretColor(def));
+        item.sprite = def.spriteId != 0 ? "weapon-" + std::to_string(def.spriteId) : "";
+        item.glyph = initials(def.name);
+        item.group = !m_items.empty() && def.category != lastCategory;
+        lastCategory = def.category;
+        m_items.push_back(std::move(item));
+    }
     m_basePips.assign(kBasePips, 1);
     m_horde.clear();
     m_money.clear();
     m_selected = -1;
+    m_hovered = -1;
+    m_prep = false;
+    m_startPressed = false;
+    m_problem.clear();
+    m_hintName.clear();
+    m_hintText.clear();
     m_panelOpen = false;
-    m_offerPressed = false;
     m_ended = false;
     m_resultAction = ResultAction::None;
 
@@ -69,18 +147,18 @@ bool RoundOverlay::show(Services& services) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "round: could not create the data model");
         return false;
     }
-    if (auto tower = constructor.RegisterStruct<Tower>()) {
-        tower.RegisterMember("name", &Tower::name);
-        tower.RegisterMember("cost", &Tower::cost);
-        tower.RegisterMember("shape", &Tower::shape);
-        tower.RegisterMember("glyph", &Tower::glyph);
-        tower.RegisterMember("color", &Tower::color);
-        tower.RegisterMember("disabled", &Tower::disabled);
-        tower.RegisterMember("cooldown", &Tower::cooldown);
+    if (auto item = constructor.RegisterStruct<Item>()) {
+        item.RegisterMember("name", &Item::name);
+        item.RegisterMember("cost", &Item::cost);
+        item.RegisterMember("color", &Item::color);
+        item.RegisterMember("sprite", &Item::sprite);
+        item.RegisterMember("glyph", &Item::glyph);
+        item.RegisterMember("group", &Item::group);
+        item.RegisterMember("disabled", &Item::disabled);
     }
-    constructor.RegisterArray<Rml::Vector<Tower>>();
+    constructor.RegisterArray<Rml::Vector<Item>>();
     constructor.RegisterArray<Rml::Vector<int>>();
-    constructor.Bind("towers", &m_towers);
+    constructor.Bind("items", &m_items);
     constructor.Bind("base_pips", &m_basePips);
     constructor.Bind("selected", &m_selected);
     constructor.Bind("date", &m_date);
@@ -91,12 +169,14 @@ bool RoundOverlay::show(Services& services) {
     constructor.Bind("money", &m_money);
     constructor.Bind("horde", &m_horde);
     constructor.Bind("rec", &m_rec);
+    constructor.Bind("prep", &m_prep);
+    constructor.Bind("hint_name", &m_hintName);
+    constructor.Bind("hint_text", &m_hintText);
+    constructor.Bind("problem", &m_problem);
     constructor.Bind("panel_open", &m_panelOpen);
     constructor.Bind("panel_name", &m_panelName);
-    constructor.Bind("panel_level", &m_panelLevel);
-    constructor.Bind("panel_hp", &m_panelHp);
-    constructor.Bind("panel_action", &m_panelAction);
-    constructor.Bind("panel_affordable", &m_panelAffordable);
+    constructor.Bind("panel_kind", &m_panelKind);
+    constructor.Bind("panel_detail", &m_panelDetail);
     constructor.Bind("panel_x", &m_panelX);
     constructor.Bind("panel_y", &m_panelY);
     constructor.Bind("ended", &m_ended);
@@ -108,7 +188,8 @@ bool RoundOverlay::show(Services& services) {
     constructor.Bind("result_earned", &m_resultEarned);
     constructor.Bind("result_total", &m_resultTotal);
     constructor.BindEventCallback("pick", &RoundOverlay::onPick, this);
-    constructor.BindEventCallback("offer", &RoundOverlay::onOffer, this);
+    constructor.BindEventCallback("hover", &RoundOverlay::onHover, this);
+    constructor.BindEventCallback("start", &RoundOverlay::onStart, this);
     constructor.BindEventCallback("retry", &RoundOverlay::onRetry, this);
     constructor.BindEventCallback("quit", &RoundOverlay::onQuit, this);
     m_model = constructor.GetModelHandle();
@@ -116,6 +197,7 @@ bool RoundOverlay::show(Services& services) {
     m_roundSeconds = 0.0f;
     m_tick = 0.0f;
     refreshClock();
+    refreshHint();
     setCamera(0, 1);
 
     const std::string path = paths::asset("ui/round.rml").string();
@@ -177,7 +259,7 @@ void RoundOverlay::refreshClock() {
     }
 }
 
-template <typename T>
+template<typename T>
 void RoundOverlay::setValue(const char* name, T& field, T value) {
     if (field != value) {
         field = std::move(value);
@@ -213,44 +295,66 @@ void RoundOverlay::setHud(const Hud& hud) {
     }
 }
 
-void RoundOverlay::setTrayState(int index, bool affordable, float cooldown) {
-    if (!m_model || index < 0 || index >= static_cast<int>(m_towers.size())) {
+void RoundOverlay::setTrayState(int index, bool affordable) {
+    if (!m_model || index < 0 || index >= static_cast<int>(m_items.size())) {
         return;
     }
-    Tower& tower = m_towers[static_cast<std::size_t>(index)];
-    const bool disabled = !affordable || cooldown > 0.0f;
-    const Rml::String text = cooldown > 0.0f ? std::to_string(static_cast<int>(std::ceil(cooldown))) + "s" : "";
-    if (tower.disabled != disabled || tower.cooldown != text) {
-        tower.disabled = disabled;
-        tower.cooldown = text;
-        m_model.DirtyVariable("towers");
+    Item& item = m_items[static_cast<std::size_t>(index)];
+    if (item.disabled != !affordable) {
+        item.disabled = !affordable;
+        m_model.DirtyVariable("items");
     }
     // Can't hold a selection it could no longer use.
-    if (disabled && m_selected == index) {
+    if (!affordable && m_selected == index) {
         clearSelection();
     }
 }
 
-void RoundOverlay::showTowerPanel(const TowerPanel& panel) {
+void RoundOverlay::setProblem(const char* problem) {
+    set("problem", m_problem, problem != nullptr ? upper(problem) : std::string());
+}
+
+void RoundOverlay::setPrep(bool prep) {
+    setValue("prep", m_prep, prep);
+    refreshHint();
+}
+
+bool RoundOverlay::takeStartPressed() {
+    return std::exchange(m_startPressed, false);
+}
+
+void RoundOverlay::refreshHint() {
+    const int index = m_hovered >= 0 ? m_hovered : m_selected;
+    if (index < 0 || index >= static_cast<int>(trayKinds().size())) {
+        set("hint_name", m_hintName, "");
+        set("hint_text", m_hintText,
+            m_prep ? "PICK A TURRET, PLACE IT ON THE FEED, THEN START"
+                   : "TAP THE FEED TO STRIKE, OR A TURRET TO INSPECT");
+        return;
+    }
+    const logic::TurretDef& def = logic::turretDef(trayKinds()[static_cast<std::size_t>(index)]);
+    set("hint_name", m_hintName, upper(def.name) + "  " + turretKindLine(def));
+    std::string text = def.blurb;
+    if (text.empty()) {
+        text = def.placement == logic::TurretClass::Mount ? "Goes on top of a wall." : "Goes on open ground.";
+    }
+    if (def.directional) {
+        text += " Q/E to turn.";
+    }
+    set("hint_text", m_hintText, text);
+}
+
+void RoundOverlay::showTurretPanel(const TurretPanel& panel) {
     setValue("panel_open", m_panelOpen, true);
     set("panel_name", m_panelName, std::string(panel.name));
-    set("panel_level", m_panelLevel, "LV " + std::to_string(panel.level));
-    set("panel_hp", m_panelHp, "HP " + std::to_string(panel.hp) + "/" + std::to_string(panel.maxHp));
-    set("panel_action", m_panelAction, std::string(panel.action) + " $" + std::to_string(panel.cost));
-    setValue("panel_affordable", m_panelAffordable, panel.affordable);
+    set("panel_kind", m_panelKind, std::string(panel.kind));
+    set("panel_detail", m_panelDetail, std::string(panel.detail));
     setValue("panel_x", m_panelX, panel.screen.x);
     setValue("panel_y", m_panelY, panel.screen.y);
 }
 
-void RoundOverlay::hideTowerPanel() {
+void RoundOverlay::hideTurretPanel() {
     setValue("panel_open", m_panelOpen, false);
-    // A press on a panel that has gone (its tower destroyed that frame)
-    // mustn't carry over and buy for the next tower opened.
-    m_offerPressed = false;
-}
-
-bool RoundOverlay::takeOfferPressed() {
-    return std::exchange(m_offerPressed, false);
 }
 
 void RoundOverlay::showResults(const Results& results) {
@@ -263,7 +367,8 @@ void RoundOverlay::showResults(const Results& results) {
     set("result_leaked", m_resultLeaked, "LEAKED " + std::to_string(results.leaked));
     set("result_earned", m_resultEarned, "+$" + std::to_string(results.earned));
     set("result_total", m_resultTotal, "TOTAL $" + std::to_string(results.total));
-    hideTowerPanel();
+    setPrep(false);
+    hideTurretPanel();
     clearSelection();
 }
 
@@ -271,9 +376,17 @@ RoundOverlay::ResultAction RoundOverlay::takeResultAction() {
     return std::exchange(m_resultAction, ResultAction::None);
 }
 
-void RoundOverlay::onOffer(Rml::DataModelHandle, Rml::Event&, const Args&) {
-    if (m_panelOpen && m_panelAffordable) {
-        m_offerPressed = true;
+void RoundOverlay::onStart(Rml::DataModelHandle, Rml::Event&, const Args&) {
+    if (m_prep) {
+        m_startPressed = true;
+    }
+}
+
+void RoundOverlay::onHover(Rml::DataModelHandle, Rml::Event&, const Args& args) {
+    const int index = args.empty() ? -1 : args[0].Get<int>(-1);
+    if (index != m_hovered) {
+        m_hovered = index;
+        refreshHint();
     }
 }
 
@@ -300,18 +413,20 @@ void RoundOverlay::clearSelection() {
         if (m_model) {
             m_model.DirtyVariable("selected");
         }
+        refreshHint();
     }
 }
 
 void RoundOverlay::onPick(Rml::DataModelHandle, Rml::Event&, const Args& args) {
     // Picking the selected tower again puts it back.
     const int index = args.empty() ? -1 : args[0].Get<int>(-1);
-    if (index < 0 || index >= static_cast<int>(m_towers.size()) || m_ended ||
-        m_towers[static_cast<std::size_t>(index)].disabled) {
+    if (index < 0 || index >= static_cast<int>(m_items.size()) || m_ended ||
+        m_items[static_cast<std::size_t>(index)].disabled) {
         return;
     }
     m_selected = m_selected == index ? -1 : index;
     m_model.DirtyVariable("selected");
+    refreshHint();
 }
 
 } // namespace horde::scene

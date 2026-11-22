@@ -36,10 +36,9 @@ add_executable(horde
     src/sim/GpuWalls.cpp
     src/sim/PhysicsRegistry.cpp
     src/sim/Spawn.cpp
+    src/sim/TurretEffects.cpp
     src/sim/UnitBuffers.cpp
     src/sim/WallColliders.cpp
-    src/sim/TowerSite.cpp
-    src/sim/GpuReadback.cpp
     src/editor/Actions.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp
@@ -55,6 +54,7 @@ add_executable(horde
     src/scene/RoundOverlay.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
+    src/scene/TurretPrep.cpp
     src/ui/DeviceLayout.cpp
     src/ui/DeviceShell.cpp
     src/ui/FrameStatsOverlay.cpp
@@ -74,8 +74,8 @@ add_executable(horde
     src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
     src/logic/LevelValidation.cpp
+    src/logic/Turret.cpp
     src/logic/WallGridShapes.cpp
-    src/logic/TowerStats.cpp
     src/logic/Round.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)

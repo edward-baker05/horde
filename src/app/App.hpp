@@ -67,6 +67,7 @@ private:
     std::unique_ptr<gfx::ShaderLoader> m_shaders;
     gfx::SpriteBatch m_batch;
     gfx::Texture m_atlas;
+    gfx::Texture m_weapons; // optional: empty if textures/weapons.png didn't load
     ui::ImGuiLayer m_imgui;
     ui::RmlLayer m_rml;
     audio::MusicPlayer m_music;

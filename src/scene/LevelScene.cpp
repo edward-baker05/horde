@@ -23,7 +23,7 @@
 #include "scene/PauseScene.hpp"
 #include "scene/Presets.hpp"
 #include "scene/SceneStack.hpp"
-#include "sim/TowerSite.hpp"
+#include "sim/TurretEffects.hpp"
 
 namespace horde::scene {
 
@@ -102,9 +102,12 @@ bool LevelScene::onEnter(Services& services) {
             {region.center, region.halfExtents, logic::fieldRegionDirection(region), region.strength});
     }
     config.flow.spawnRate = m_options.spawnRate;
-    config.flow.respawnAtExit = m_options.respawnAtExit;
     // In a round, whoever gets through is gone, and counts against the player.
-    config.flow.removeAtExit = m_options.mode == LevelMode::Player;
+    if (m_options.mode == LevelMode::Player) {
+        config.flow.onExit = sim::ExitBehaviour::Despawn;
+    } else {
+        config.flow.onExit = m_options.respawnAtExit ? sim::ExitBehaviour::Respawn : sim::ExitBehaviour::Stop;
+    }
     config.health = m_options.health;
     config.flow.seed = m_options.seed;
     // Systems that don't steer to exits head for the first exit's centre, or
@@ -135,13 +138,18 @@ bool LevelScene::onEnter(Services& services) {
     }
     m_physics->setFlingDrag(m_flingDrag);
     if (m_options.mode == LevelMode::Player) {
-        const float step = m_options.physicsRate > 0.0f ? 1.0f / m_options.physicsRate : 1.0f / 60.0f;
-        m_round.emplace(m_level.round, step);
-        m_siteWalls->build(m_level, logic::kTowerBodyRadius + enemy_size);
+        // The round opens in prep: turrets are placed and nothing moves.
+        m_round.emplace(m_level.round);
+        m_prep.init(m_level, *m_walls);
+        m_prep.setBudget(m_round->money());
     }
-    if (m_options.mode == LevelMode::Player && !m_overlay.show(services)) {
-        // The round still plays without its overlay.
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "LevelScene: no tablet overlay");
+    if (m_options.mode == LevelMode::Player) {
+        if (m_overlay.show(services)) {
+            m_overlay.setPrep(true);
+        } else {
+            // The round still plays without its overlay.
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "LevelScene: no tablet overlay");
+        }
     }
     m_cow.show(services);
     return true;
@@ -166,6 +174,22 @@ void LevelScene::onExit() {
 }
 
 bool LevelScene::handleEvent(const SDL_Event& event) {
+    // Placement first: it has its own use for Esc (cancel, disarm), clicks
+    // and keys. Nothing is placed once the round is over.
+    if (m_round && m_round->outcome() == logic::RoundOutcome::Playing) {
+        const std::size_t before = m_prep.turrets().size();
+        if (m_prep.handleEvent(event, m_camera)) {
+            if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                m_cursor = glm::vec2(event.motion.x, event.motion.y);
+            }
+            // Placing puts the tray's selection back, as picking does.
+            if (m_prep.turrets().size() > before) {
+                m_overlay.clearSelection();
+                syncTray();
+            }
+            return true;
+        }
+    }
     // Esc pauses a round on the device. Only the top scene gets events, and
     // m_pausePending covers the frame between the push and it taking effect.
     if (m_options.mode == LevelMode::Player && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE &&
@@ -187,6 +211,12 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
         return true;
     }
     if (m_options.mode == LevelMode::Player) {
+        // Enter starts the round from prep, as START does.
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) && m_round && !m_round->started()) {
+            startRound();
+            return true;
+        }
         if (event.type == SDL_EVENT_MOUSE_MOTION) {
             m_cursor = glm::vec2(event.motion.x, event.motion.y);
         } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
@@ -214,9 +244,11 @@ void LevelScene::update(float dt) {
     m_overlay.update(dt);
     if (m_round) {
         updateRound(dt);
-        // Over: the feed freezes on its last frame behind the results.
-        if (m_round->outcome() != logic::RoundOutcome::Playing) {
+        // Nothing moves in prep; once over, the feed freezes on its last
+        // frame behind the results.
+        if (!m_round->started() || m_round->outcome() != logic::RoundOutcome::Playing) {
             m_stepsThisFrame = 0;
+            m_stepAccumulator = 0.0f;
             return;
         }
     }
@@ -596,59 +628,6 @@ constexpr float kShockwaveSeconds = 0.35f;
 constexpr float kBlastKeepSeconds = std::max(kBlastFadeSeconds, kShockwaveSeconds);
 constexpr float kPi = 3.14159265f;
 
-// Each tower's tint in the feed; the tray's icons use the same colours.
-glm::vec4 towerColor(logic::TowerKind kind) {
-    switch (kind) {
-        case logic::TowerKind::Sniper:
-            return {0.957f, 0.792f, 0.518f, 1.0f}; // #f4ca84
-        case logic::TowerKind::Gunner:
-            return {0.565f, 0.843f, 1.0f, 1.0f}; // #90d7ff
-        case logic::TowerKind::Pulse:
-            return {0.463f, 0.886f, 0.886f, 1.0f}; // #76e2e2
-        case logic::TowerKind::Frost:
-            return {0.631f, 0.894f, 0.682f, 1.0f}; // #a1e4ae
-    }
-    return glm::vec4(1.0f);
-}
-
-// A tower's body, `radius` across the middle, in its kind's shape.
-void drawTower(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, logic::TowerKind kind, glm::vec2 center, float radius,
-               glm::vec4 color) {
-    const float d = radius * 2.0f;
-    switch (kind) {
-        case logic::TowerKind::Sniper: // a diamond: a square on its corner
-            gfx::drawCentered(batch, atlas, center, glm::vec2(d * 0.7071f), 0.7853982f, gfx::cellSolid(), color);
-            break;
-        case logic::TowerKind::Gunner:
-            gfx::drawCentered(batch, atlas, center, glm::vec2(d * 0.85f), 0.0f, gfx::cellSquare(), color);
-            break;
-        case logic::TowerKind::Pulse: // a ring
-            gfx::drawCentered(batch, atlas, center, glm::vec2(d), 0.0f, gfx::cellDisc(), color);
-            gfx::drawCentered(batch, atlas, center, glm::vec2(d * 0.55f), 0.0f, gfx::cellDisc(),
-                              {0.1f, 0.12f, 0.15f, color.a});
-            break;
-        case logic::TowerKind::Frost:
-            gfx::drawCentered(batch, atlas, center, glm::vec2(d), 0.0f, gfx::cellTriangle(), color);
-            break;
-    }
-}
-
-glm::vec4 withAlpha(glm::vec4 color, float alpha) {
-    return {color.r, color.g, color.b, alpha};
-}
-
-// A straight bar from `a` to `b`, `thickness` wide.
-void drawLine(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec2 a, glm::vec2 b, float thickness,
-              glm::vec4 color) {
-    const glm::vec2 delta = b - a;
-    const float length = glm::length(delta);
-    if (length <= 0.0f) {
-        return;
-    }
-    gfx::drawCentered(batch, atlas, (a + b) * 0.5f, {length, thickness}, std::atan2(delta.y, delta.x), gfx::cellSolid(),
-                      color);
-}
-
 // A hollow circle, as a loop of bars: the atlas has no ring.
 void drawRing(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec2 center, float radius, float thickness,
               glm::vec4 color) {
@@ -666,193 +645,169 @@ void drawRing(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec2 center, 
     }
 }
 
-// How long a tower's muzzle flash and recoil last after it fires.
-constexpr float kMuzzleSeconds = 0.07f;
-
-// One shot in the air, drawn as its tower's kind of round.
-void drawShot(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const logic::Shot& shot) {
-    const glm::vec2 delta = shot.to - shot.from;
-    const float distance = glm::length(delta);
-    if (distance <= 0.0f || shot.flight <= 0.0f) {
-        return;
+// What the placed turrets in `turrets` cost in all.
+int costOf(const std::vector<logic::Turret>& turrets) {
+    int cost = 0;
+    for (const logic::Turret& turret : turrets) {
+        cost += static_cast<int>(logic::turretDef(turret.kind).cost);
     }
-    const glm::vec2 dir = delta / distance;
-    const glm::vec2 side{-dir.y, dir.x};
-    const float t = std::clamp(shot.age / shot.flight, 0.0f, 1.0f);
-    const glm::vec4 color = towerColor(shot.kind);
-    const float muzzle = 1.0f - std::clamp(shot.age / kMuzzleSeconds, 0.0f, 1.0f);
-
-    switch (shot.kind) {
-        case logic::TowerKind::Sniper: {
-            // A high-velocity round: a long bright streak, the faint line of
-            // its path left behind it, and a sharp flash at the muzzle.
-            const glm::vec2 muzzleAt = shot.from + dir * logic::kTowerBodyRadius * 0.75f;
-            const glm::vec2 head = glm::mix(muzzleAt, shot.to, t);
-            const float travelled = glm::distance(muzzleAt, head);
-            const glm::vec2 tail = head - dir * std::min(travelled, 90.0f);
-            drawLine(batch, atlas, muzzleAt, head, 1.0f, withAlpha(color, 0.25f));
-            drawLine(batch, atlas, tail, head, 2.5f, withAlpha(color, 0.9f));
-            gfx::drawCentered(batch, atlas, head, glm::vec2(4.0f), 0.0f, gfx::cellDisc(), {1.0f, 0.98f, 0.9f, 1.0f});
-            if (muzzle > 0.0f) {
-                gfx::drawCentered(batch, atlas, muzzleAt, glm::vec2(22.0f * muzzle), 0.0f, gfx::cellDisc(),
-                                  {1.0f, 0.95f, 0.75f, 0.9f * muzzle});
-                drawLine(batch, atlas, muzzleAt, muzzleAt + dir * 18.0f * muzzle, 5.0f * muzzle,
-                         {1.0f, 0.95f, 0.75f, 0.8f * muzzle});
-            }
-            break;
-        }
-        case logic::TowerKind::Gunner: {
-            // Tracer rounds from two barrels side by side, in turn.
-            const float barrel =
-                (static_cast<int>(std::floor(shot.to.x * 7.0f + shot.to.y * 13.0f)) & 1) ? 5.0f : -5.0f;
-            const glm::vec2 muzzleAt = shot.from + dir * logic::kTowerBodyRadius * 0.8f + side * barrel;
-            const glm::vec2 head = glm::mix(muzzleAt, shot.to, t);
-            const glm::vec2 tail = head - dir * std::min(glm::distance(muzzleAt, head), 16.0f);
-            drawLine(batch, atlas, tail, head, 2.5f, withAlpha(color, 0.95f));
-            gfx::drawCentered(batch, atlas, head, glm::vec2(3.0f), 0.0f, gfx::cellDisc(), {1.0f, 1.0f, 1.0f, 1.0f});
-            if (muzzle > 0.0f) {
-                gfx::drawCentered(batch, atlas, muzzleAt, glm::vec2(10.0f * muzzle), 0.0f, gfx::cellDisc(),
-                                  {1.0f, 0.95f, 0.7f, 0.9f * muzzle});
-            }
-            break;
-        }
-        case logic::TowerKind::Pulse: {
-            // A charge lobbed in an arc: its shadow runs along the ground while
-            // the glowing orb rises and falls above it, pulsing as it goes.
-            const glm::vec2 ground = glm::mix(shot.from, shot.to, t);
-            const float lift = std::sin(kPi * t);
-            const float height = std::clamp(distance * 0.35f, 25.0f, 80.0f) * lift;
-            gfx::drawCentered(batch, atlas, ground, glm::vec2(12.0f * (1.0f - 0.4f * lift)), 0.0f, gfx::cellDisc(),
-                              {0.0f, 0.0f, 0.0f, 0.35f});
-            // Screen up is world -y.
-            const glm::vec2 orb = ground - glm::vec2(0.0f, height);
-            const float size = 10.0f + 6.0f * lift;
-            const float throb = 0.5f + 0.5f * std::sin(shot.age * 40.0f);
-            gfx::drawCentered(batch, atlas, orb, glm::vec2(size * (2.0f + 0.4f * throb)), 0.0f, gfx::cellDisc(),
-                              withAlpha(color, 0.25f));
-            gfx::drawCentered(batch, atlas, orb, glm::vec2(size), 0.0f, gfx::cellDisc(), withAlpha(color, 0.95f));
-            gfx::drawCentered(batch, atlas, orb, glm::vec2(size * 0.45f), 0.0f, gfx::cellDisc(),
-                              {1.0f, 1.0f, 1.0f, 0.9f});
-            if (muzzle > 0.0f) {
-                drawRing(batch, atlas, shot.from, logic::kTowerBodyRadius * (1.0f + 0.6f * (1.0f - muzzle)), 3.0f,
-                         withAlpha(color, 0.8f * muzzle));
-            }
-            break;
-        }
-        case logic::TowerKind::Frost:
-            break; // never fires
-    }
+    return cost;
 }
 
-// Frost's chill, which never fires: a cold wave rolling out to the edge of
-// its zone every couple of seconds, and frost glinting as it drifts round.
-void drawChill(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec2 center, float range, float seconds,
-               std::size_t slot) {
-    constexpr float kPeriod = 2.2f;
-    constexpr float kWaveSeconds = 1.4f;
-    const glm::vec4 ice{0.75f, 0.95f, 1.0f, 1.0f};
-    // Towers placed together don't all breathe in step.
-    const float phase = std::fmod(seconds + static_cast<float>(slot) * 0.73f, kPeriod);
-    if (phase < kWaveSeconds) {
-        const float t = phase / kWaveSeconds;
-        const float eased = 1.0f - (1.0f - t) * (1.0f - t);
-        const float radius = glm::mix(logic::kTowerBodyRadius, range, eased);
-        drawRing(batch, atlas, center, radius, 2.5f, withAlpha(ice, 0.35f * (1.0f - t)));
+// A turret's numbers in a line, for the panel: what it does and how far.
+std::string turretStats(const logic::TurretDef& def) {
+    char text[96];
+    switch (def.delivery) {
+        case logic::TurretDelivery::None:
+            return def.damage > 0.0f ? "HURTS ON CONTACT" : "HARMLESS";
+        case logic::TurretDelivery::Cone:
+        case logic::TurretDelivery::Sweep:
+            if (def.damage <= 0.0f) {
+                std::snprintf(text, sizeof(text), "RANGE %.0f", def.range);
+            } else {
+                std::snprintf(text, sizeof(text), "%.0f DPS \xC2\xB7 RANGE %.0f", def.damage, def.range);
+            }
+            return text;
+        case logic::TurretDelivery::Mine:
+            std::snprintf(text, sizeof(text), "%.0f DMG \xC2\xB7 BLAST %.0f", def.damage, def.blastRadius);
+            return text;
+        case logic::TurretDelivery::Pulse:
+        case logic::TurretDelivery::Shell:
+        case logic::TurretDelivery::Gun:
+            std::snprintf(text, sizeof(text), "%.0f DMG / %.2gs \xC2\xB7 RANGE %.0f", def.damage, def.period,
+                          def.range);
+            return text;
     }
-    constexpr int kMotes = 10;
-    for (int i = 0; i < kMotes; ++i) {
-        const float seed = static_cast<float>(i) * 2.399963f + static_cast<float>(slot) * 1.1f; // golden angle
-        const float orbit = range * (0.3f + 0.65f * std::fmod(seed * 0.618034f, 1.0f));
-        const float angle = seed + seconds * (0.15f + 0.1f * std::fmod(seed, 1.0f));
-        const glm::vec2 at = center + orbit * glm::vec2(std::cos(angle), std::sin(angle));
-        const float glint = 0.5f + 0.5f * std::sin(seconds * 2.5f + seed * 3.0f);
-        gfx::drawCentered(batch, atlas, at, glm::vec2(3.0f + 2.0f * glint), seconds * 1.5f + seed, gfx::cellSolid(),
-                          withAlpha(ice, 0.2f + 0.5f * glint));
-    }
+    return "";
 }
 
 } // namespace
 
-bool LevelScene::siteClear(glm::vec2 world) const {
-    return sim::towerSiteClear(m_level, *m_siteWalls, world, enemy_size);
+void LevelScene::syncTray() {
+    const int selected = m_overlay.selected();
+    const std::vector<logic::TurretKind>& kinds = RoundOverlay::trayKinds();
+    if (selected != m_trayArmed) {
+        // The tray changed: arm what it now has selected.
+        m_prep.arm(selected >= 0 && selected < static_cast<int>(kinds.size())
+                       ? std::optional(kinds[static_cast<std::size_t>(selected)])
+                       : std::nullopt);
+        m_trayArmed = selected;
+    } else if (selected >= 0 && !m_prep.armed()) {
+        // Placement disarmed itself (right click, Esc): the tray follows.
+        m_overlay.clearSelection();
+        m_trayArmed = -1;
+    }
+}
+
+void LevelScene::startRound() {
+    logic::Round& round = *m_round;
+    if (round.started()) {
+        return;
+    }
+    const std::vector<logic::Turret> placed = m_prep.takePlaced(true);
+    // Placement kept them within the budget, which was the round's money.
+    round.spend(costOf(placed));
+    m_physics->setTurrets(placed);
+    round.start();
+    m_overlay.setPrep(false);
+    m_overlay.clearSelection();
+    m_trayArmed = -1;
 }
 
 void LevelScene::updateRound(float dt) {
     logic::Round& round = *m_round;
-    if (round.outcome() == logic::RoundOutcome::Playing) {
-        sim::RoundCounters counters;
-        if (m_physics->pollCounters(counters)) {
-            round.applyCounters(counters);
+    syncTray();
+    if (m_overlay.takeStartPressed()) {
+        startRound();
+    }
+
+    if (round.started() && round.outcome() == logic::RoundOutcome::Playing) {
+        sim::UnitTally tally;
+        if (m_physics->tally(tally)) {
+            round.applyCounters({tally.kills, tally.leaks});
         }
-        if (m_physics->pollDensity(m_density)) {
-            m_hasDensity = true;
-        } else {
-            m_density.age += dt;
-        }
-        // The last map until a newer one comes: a tenth of a second old at
-        // most, and towers lead their targets by its age.
-        round.update(dt, m_hasDensity ? &m_density : nullptr);
+        round.update(dt);
         for (const sim::Explosion& blast : round.takeBlasts()) {
             m_physics->addExplosion(blast);
             m_recentBlasts.emplace_back(blast, 0.0f);
         }
-        m_physics->setCrowdEffects(round.effects());
         m_physics->setSpawnRate(round.spawnRate());
+
+        // In play, a turret is paid for and in action the moment it lands.
+        const std::vector<logic::Turret> placed = m_prep.takePlaced(false);
+        if (!placed.empty()) {
+            round.spend(costOf(placed));
+            m_physics->addTurrets(placed);
+        }
+        // Spent mines and broken blockers free their ground.
+        if (const sim::TurretEffects* effects = m_physics->turretEffects()) {
+            for (std::size_t i = 0; i < effects->turrets().size(); ++i) {
+                if (effects->spent(i)) {
+                    m_prep.markGone(i);
+                }
+            }
+        }
     }
+    // Pending turrets count against what the round has.
+    m_prep.setBudget(round.money());
+
     for (auto& [blast, age] : m_recentBlasts) {
         age += dt;
     }
     std::erase_if(m_recentBlasts, [](const auto& recent) { return recent.second >= kBlastKeepSeconds; });
 
-    // A destroyed tower takes its panel with it.
-    if (m_inspected >= 0 && !round.towers()[static_cast<std::size_t>(m_inspected)]) {
-        m_inspected = -1;
+    // A turret gone from play takes its panel with it.
+    if (m_inspected && m_prep.gone(*m_inspected)) {
+        m_inspected.reset();
     }
     presentRound();
 }
 
 void LevelScene::presentRound() {
     logic::Round& round = *m_round;
+    const bool playing = round.outcome() == logic::RoundOutcome::Playing;
 
-    // Always taken, so a press is never left over for another tower.
-    if (m_overlay.takeOfferPressed() && m_inspected >= 0) {
-        round.buyOffer(m_inspected);
-    }
-
+    // In prep, what is left once the turrets laid out so far are paid for.
+    const int money = round.money() - m_prep.pendingCost();
     const logic::RoundSettings& settings = round.settings();
-    m_overlay.setHud({round.money(), round.killed() + round.leaked(), settings.totalUnits, round.leaked(),
-                      settings.leakLimit, round.seconds()});
-    for (int i = 0; i < logic::kTowerKindCount; ++i) {
-        m_overlay.setTrayState(i, round.money() >= logic::towerStats(static_cast<logic::TowerKind>(i), 1).cost, 0.0f);
+    m_overlay.setHud({money, round.killed() + round.leaked(), settings.totalUnits, round.leaked(), settings.leakLimit,
+                      round.seconds()});
+    const std::vector<logic::TurretKind>& kinds = RoundOverlay::trayKinds();
+    for (std::size_t i = 0; i < kinds.size(); ++i) {
+        m_overlay.setTrayState(static_cast<int>(i),
+                               playing && money >= static_cast<int>(logic::turretDef(kinds[i]).cost));
     }
-    for (int i = 0; i < logic::kAbilityKindCount; ++i) {
-        const auto kind = static_cast<logic::AbilityKind>(i);
-        m_overlay.setTrayState(logic::kTowerKindCount + i, round.money() >= logic::abilityStats(kind).cost,
-                               round.abilityCooldown(kind));
-    }
+    // Only while the pointer is over the feed: over the tray, the line above
+    // it is about the tray.
+    const float feedBottom = m_camera.viewport().y * (1.0f - kRoundTrayFraction);
+    const bool overFeed = m_cursor && m_cursor->y < feedBottom;
+    m_overlay.setProblem(playing && overFeed ? m_prep.ghostProblem() : nullptr);
 
-    if (m_inspected >= 0 && round.outcome() == logic::RoundOutcome::Playing) {
-        const logic::Tower& tower = *round.towers()[static_cast<std::size_t>(m_inspected)];
-        const logic::Offer offer = round.offer(m_inspected);
-        RoundOverlay::TowerPanel panel;
-        panel.name = logic::towerName(tower.kind);
-        panel.level = tower.level;
-        panel.hp = static_cast<int>(std::ceil(tower.hp));
-        panel.maxHp = static_cast<int>(logic::towerStats(tower.kind, tower.level).maxHp);
-        panel.action = offer.kind == logic::Offer::Kind::Repair ? "REPAIR" : "UPGRADE";
-        panel.cost = offer.cost;
-        panel.affordable = round.money() >= offer.cost;
-        // Above the tower, kept on the screen: the card is about 190 x 110.
-        const glm::vec2 above =
-            m_camera.worldToScreen(tower.center - glm::vec2(0.0f, logic::kTowerBodyRadius)) - glm::vec2(95.0f, 120.0f);
-        const glm::vec2 limit = m_camera.viewport() - glm::vec2(200.0f, 120.0f);
+    const sim::TurretEffects* effects = m_physics->turretEffects();
+    if (m_inspected && round.started() && playing && *m_inspected < m_prep.turrets().size()) {
+        const std::size_t slot = *m_inspected;
+        const logic::Turret& turret = m_prep.turrets()[slot];
+        const logic::TurretDef& def = logic::turretDef(turret.kind);
+        RoundOverlay::TurretPanel panel;
+        panel.name = def.name;
+        panel.kind = turretKindLine(def);
+        if (def.maxHp > 0.0f && effects != nullptr && slot < effects->turrets().size()) {
+            panel.detail = "HP " + std::to_string(static_cast<int>(std::ceil(effects->hp(slot)))) + "/" +
+                           std::to_string(static_cast<int>(def.maxHp));
+        } else {
+            panel.detail = turretStats(def);
+        }
+        // Above the turret, kept on the screen: the card is about 190 x 90.
+        const float top = std::max(def.halfSize.x, def.halfSize.y);
+        const glm::vec2 above = m_camera.worldToScreen(turret.center - glm::vec2(0.0f, top)) - glm::vec2(95.0f, 100.0f);
+        const glm::vec2 limit = m_camera.viewport() - glm::vec2(200.0f, 100.0f);
         panel.screen = glm::clamp(above, glm::vec2(8.0f), glm::max(limit, glm::vec2(8.0f)));
-        m_overlay.showTowerPanel(panel);
+        m_overlay.showTurretPanel(panel);
     } else {
-        m_overlay.hideTowerPanel();
+        m_overlay.hideTurretPanel();
     }
 
-    if (round.outcome() != logic::RoundOutcome::Playing && !m_resultsShown) {
+    if (!playing && !m_resultsShown) {
         m_resultsShown = true;
         // Upgrade money is banked the moment the round is won, results card
         // or not, so quitting straight away loses nothing.
@@ -864,7 +819,8 @@ void LevelScene::presentRound() {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "LevelScene: could not save upgrade money");
             }
         }
-        m_inspected = -1;
+        m_inspected.reset();
+        m_prep.arm(std::nullopt);
         m_overlay.showResults({round.outcome() == logic::RoundOutcome::Won, round.seconds(), round.killed(),
                                round.leaked(), earned, saved.upgradeMoney});
     }
@@ -881,45 +837,46 @@ void LevelScene::presentRound() {
     }
 }
 
+std::optional<std::size_t> LevelScene::turretNear(glm::vec2 world) const {
+    if (const std::optional<std::size_t> hit = m_prep.turretAt(world)) {
+        return hit;
+    }
+    // Turrets are small on the fitted feed: never less than a fingertip to tap.
+    float best = 12.0f / m_camera.zoom();
+    std::optional<std::size_t> nearest;
+    const std::vector<logic::Turret>& turrets = m_prep.turrets();
+    for (std::size_t i = 0; i < turrets.size(); ++i) {
+        const float distance = glm::distance(turrets[i].center, world);
+        if (!m_prep.gone(i) && distance <= best) {
+            best = distance;
+            nearest = i;
+        }
+    }
+    return nearest;
+}
+
 void LevelScene::tapFeed(glm::vec2 screen) {
     if (!m_round || m_round->outcome() != logic::RoundOutcome::Playing) {
         return;
     }
-    logic::Round& round = *m_round;
+    // In prep there is nothing to strike yet, and placement has the taps.
+    if (!m_round->started()) {
+        return;
+    }
     const glm::vec2 world = m_camera.screenToWorld(screen);
-    const int selected = m_overlay.selected();
-
-    if (selected >= 0 && selected < logic::kTowerKindCount) {
-        // A refused spot keeps the selection, so the player can try nearby.
-        if (round.place(static_cast<logic::TowerKind>(selected), world, siteClear(world)) >= 0) {
-            m_overlay.clearSelection();
-        }
+    if (const std::optional<std::size_t> turret = turretNear(world)) {
+        m_inspected = turret;
         return;
     }
-    if (selected >= logic::kTowerKindCount && selected < logic::kTowerKindCount + logic::kAbilityKindCount) {
-        if (round.useAbility(static_cast<logic::AbilityKind>(selected - logic::kTowerKindCount), world)) {
-            m_overlay.clearSelection();
-        }
-        return;
-    }
-
-    // Towers are small on the fitted feed: never less than a fingertip to tap.
-    const float pick = std::max(logic::kTowerBodyRadius, 12.0f / m_camera.zoom());
-    const int tower = round.towerAt(world, pick);
-    if (tower >= 0) {
-        m_inspected = tower;
-        return;
-    }
-    m_inspected = -1;
-    round.click(world);
+    m_inspected.reset();
+    m_round->click(world);
 }
 
 void LevelScene::renderRound(gfx::SpriteBatch& batch) {
     SDL_GPUTexture* atlas = m_services->atlas->handle();
-    const logic::Round& round = *m_round;
+    SDL_GPUTexture* weapons = m_services->weapons ? m_services->weapons->handle() : nullptr;
 
-    // Blasts fading out, red for pushes and damage, blue for pulls. A big
-    // push (a Pulse charge, a bomb) also throws a shockwave out to its edge.
+    // Click blasts fading out. A big push also throws a shockwave out to its edge.
     for (const auto& [blast, age] : m_recentBlasts) {
         if (age < kBlastFadeSeconds) {
             const float alpha = 0.35f * (1.0f - age / kBlastFadeSeconds);
@@ -935,90 +892,24 @@ void LevelScene::renderRound(gfx::SpriteBatch& batch) {
         }
     }
 
-    // Zones first, under everything.
-    for (std::size_t slot = 0; slot < round.towers().size(); ++slot) {
-        const std::optional<logic::Tower>& tower = round.towers()[slot];
-        if (!tower) {
-            continue;
-        }
-        const logic::TowerStats stats = logic::towerStats(tower->kind, tower->level);
-        if (stats.speedFactor < 1.0f && tower->grow >= 1.0f) {
-            gfx::drawCentered(batch, atlas, tower->center, glm::vec2(stats.range * 2.0f), 0.0f, gfx::cellDisc(),
-                              {0.63f, 0.89f, 0.68f, 0.07f});
-            drawChill(batch, atlas, tower->center, stats.range, round.seconds(), slot);
-        }
-        if (static_cast<int>(slot) == m_inspected) {
-            gfx::drawCentered(batch, atlas, tower->center, glm::vec2(stats.range * 2.0f), 0.0f, gfx::cellDisc(),
-                              {1.0f, 1.0f, 1.0f, 0.08f});
-        }
+    // The inspected turret's reach, under it.
+    if (m_inspected && *m_inspected < m_prep.turrets().size()) {
+        renderTurretReach(batch, atlas, m_prep.turrets()[*m_inspected], {1.0f, 1.0f, 1.0f, 0.1f});
     }
-
-    // A tower that has just fired kicks back from its shot.
-    std::array<glm::vec2, sim::kMaxTowers> recoil{};
-    for (const logic::Shot& shot : round.shots()) {
-        const glm::vec2 delta = shot.to - shot.from;
-        if (shot.age >= kMuzzleSeconds || shot.slot < 0 || glm::length(delta) <= 0.0f) {
-            continue;
-        }
-        const float kick = shot.kind == logic::TowerKind::Sniper   ? 4.0f
-                           : shot.kind == logic::TowerKind::Gunner ? 1.5f
-                                                                   : 0.0f;
-        recoil[static_cast<std::size_t>(shot.slot)] =
-            -glm::normalize(delta) * kick * (1.0f - shot.age / kMuzzleSeconds);
+    // Turrets in play, as the simulation has them; then the ones still being
+    // placed, and the ghost.
+    if (const sim::TurretEffects* effects = m_physics->turretEffects(); effects != nullptr && m_round->started()) {
+        renderWaveTurrets(batch, atlas, weapons, *effects);
     }
-
-    for (std::size_t slot = 0; slot < round.towers().size(); ++slot) {
-        const std::optional<logic::Tower>& tower = round.towers()[slot];
-        if (!tower) {
-            continue;
-        }
-        drawTower(batch, atlas, tower->kind, tower->center + recoil[slot], logic::kTowerBodyRadius * tower->grow,
-                  towerColor(tower->kind));
-        const float maxHp = logic::towerStats(tower->kind, tower->level).maxHp;
-        if (tower->hp < maxHp) {
-            const float width = logic::kTowerBodyRadius * 2.0f;
-            const glm::vec2 at = tower->center - glm::vec2(0.0f, logic::kTowerBodyRadius + 8.0f);
-            const float fraction = std::clamp(tower->hp / maxHp, 0.0f, 1.0f);
-            gfx::drawCentered(batch, atlas, at, {width, 5.0f}, 0.0f, gfx::cellSolid(), {0.0f, 0.0f, 0.0f, 0.7f});
-            gfx::drawCentered(batch, atlas, at - glm::vec2(width * (1.0f - fraction) * 0.5f, 0.0f),
-                              {width * fraction, 5.0f}, 0.0f, gfx::cellSolid(),
-                              {1.0f - fraction, 0.3f + 0.6f * fraction, 0.2f, 1.0f});
-        }
-    }
-
-    // Shots over the towers that fired them.
-    for (const logic::Shot& shot : round.shots()) {
-        drawShot(batch, atlas, shot);
-    }
-
-    // What the selected tray item would do where the pointer is.
-    const int selected = m_overlay.selected();
-    if (!m_cursor || selected < 0 || round.outcome() != logic::RoundOutcome::Playing) {
-        return;
-    }
-    const glm::vec2 world = m_camera.screenToWorld(*m_cursor);
-    if (selected < logic::kTowerKindCount) {
-        const auto kind = static_cast<logic::TowerKind>(selected);
-        const bool ok = round.canPlace(kind, world, siteClear(world)) == logic::PlaceError::None;
-        const float range = logic::towerStats(kind, 1).range;
-        gfx::drawCentered(batch, atlas, world, glm::vec2(range * 2.0f), 0.0f, gfx::cellDisc(),
-                          {1.0f, 1.0f, 1.0f, 0.08f});
-        const glm::vec4 tint =
-            ok ? towerColor(kind) * glm::vec4(1.0f, 1.0f, 1.0f, 0.6f) : glm::vec4(1.0f, 0.25f, 0.2f, 0.6f);
-        drawTower(batch, atlas, kind, world, logic::kTowerBodyRadius, tint);
-    } else if (selected < logic::kTowerKindCount + logic::kAbilityKindCount) {
-        const logic::AbilityStats stats =
-            logic::abilityStats(static_cast<logic::AbilityKind>(selected - logic::kTowerKindCount));
-        gfx::drawCentered(batch, atlas, world, glm::vec2(stats.blast.radius * 2.0f), 0.0f, gfx::cellDisc(),
-                          stats.blast.strength < 0.0f ? glm::vec4(0.3f, 0.5f, 1.0f, 0.15f)
-                                                      : glm::vec4(1.0f, 0.35f, 0.2f, 0.15f));
+    if (m_round->outcome() == logic::RoundOutcome::Playing) {
+        m_prep.render(batch, atlas, weapons);
     }
 }
 
 void LevelScene::onResize(float width, float height) {
     m_camera.setViewport(width, height);
     if (m_options.mode == LevelMode::Player) {
-        // One static view fitted to the level above the tower tray, rebuilt for
+        // One static view fitted to the level above the turret tray, rebuilt for
         // the new screen size.
         const FeedFit fit = fitFeed(m_level.size, {width, height}, height * kRoundTrayFraction);
         m_camera.setZoomLimits(std::min(fit.zoom, 0.1f), 10.0f);

@@ -49,6 +49,9 @@ struct Services {
     gfx::GpuContext* gpu = nullptr;
     gfx::ShaderLoader* shaders = nullptr;
     gfx::Texture* atlas = nullptr; // shared sprite atlas
+    // The weapon sprites (textures/weapons.png), by TurretDef::spriteId. Null
+    // if it didn't load: weapons are then drawn as plain boxes.
+    gfx::Texture* weapons = nullptr;
     SceneStack* scenes = nullptr;
     ui::RmlLayer* ui = nullptr;
     ui::DeviceShell* shell = nullptr;

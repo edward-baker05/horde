@@ -1,0 +1,186 @@
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+template<typename T, size_t Num>
+struct spvUnsafeArray
+{
+    T elements[Num ? Num : 1];
+    
+    thread T& operator [] (size_t pos) thread
+    {
+        return elements[pos];
+    }
+    constexpr const thread T& operator [] (size_t pos) const thread
+    {
+        return elements[pos];
+    }
+    
+    device T& operator [] (size_t pos) device
+    {
+        return elements[pos];
+    }
+    constexpr const device T& operator [] (size_t pos) const device
+    {
+        return elements[pos];
+    }
+    
+    constexpr const constant T& operator [] (size_t pos) const constant
+    {
+        return elements[pos];
+    }
+    
+    threadgroup T& operator [] (size_t pos) threadgroup
+    {
+        return elements[pos];
+    }
+    constexpr const threadgroup T& operator [] (size_t pos) const threadgroup
+    {
+        return elements[pos];
+    }
+};
+
+struct type_StructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_RWStructuredBuffer_uint
+{
+    uint _m0[1];
+};
+
+struct type_AimParams
+{
+    uint2 GridDim;
+    float CellSize;
+    uint RequestCount;
+    float4 Requests[64];
+    uint4 RequestIds[64];
+};
+
+kernel void main0(constant type_AimParams& AimParams [[buffer(0)]], device type_StructuredBuffer_uint& CellRanges [[buffer(1)]], device type_RWStructuredBuffer_uint& Feedback [[buffer(2)]], uint3 gl_WorkGroupID [[threadgroup_position_in_grid]], uint gl_LocalInvocationIndex [[thread_index_in_threadgroup]])
+{
+    threadgroup spvUnsafeArray<uint, 256> BestScore;
+    threadgroup spvUnsafeArray<uint, 256> BestCell;
+    do
+    {
+        if (gl_WorkGroupID.x >= AimParams.RequestCount)
+        {
+            break;
+        }
+        float2 _81 = float2(AimParams.Requests[gl_WorkGroupID.x].z);
+        float2 _85 = float2(AimParams.CellSize);
+        int2 _89 = max(int2(floor((AimParams.Requests[gl_WorkGroupID.x].xy - _81) / _85)), int2(0));
+        int2 _96 = int2(AimParams.GridDim);
+        uint2 _103 = uint2(max((((min(int2(floor((AimParams.Requests[gl_WorkGroupID.x].xy + _81) / _85)), (_96 - int2(1))) - _89) / int2(2)) + int2(1)), int2(0)));
+        uint _104 = _103.x;
+        uint _106 = _104 * _103.y;
+        uint _108;
+        uint _111;
+        _108 = 0u;
+        _111 = 0u;
+        uint _109;
+        uint _112;
+        for (uint _113 = gl_LocalInvocationIndex; _113 < _106; _108 = _109, _111 = _112, _113 += 256u)
+        {
+            int2 _124 = _89 + (int2(int(_113 % _104), int(_113 / _104)) * int2(2));
+            if (length(((float2(_124) + float2(0.5)) * AimParams.CellSize) - AimParams.Requests[gl_WorkGroupID.x].xy) > AimParams.Requests[gl_WorkGroupID.x].z)
+            {
+                _109 = _108;
+                _112 = _111;
+                continue;
+            }
+            uint _134;
+            _134 = 0u;
+            uint _135;
+            for (int _137 = -2; _137 <= 2; _134 = _135, _137++)
+            {
+                _135 = _134;
+                uint _143;
+                for (int _145 = -2; _145 <= 2; _135 = _143, _145++)
+                {
+                    int2 _151 = _124 + int2(_145, _137);
+                    uint _184;
+                    do
+                    {
+                        bool _161;
+                        if (!any(_151 < int2(0)))
+                        {
+                            _161 = any(_151 >= _96);
+                        }
+                        else
+                        {
+                            _161 = true;
+                        }
+                        if (_161)
+                        {
+                            _184 = 0u;
+                            break;
+                        }
+                        uint _172 = (uint(_151.x) + (uint(_151.y) * AimParams.GridDim.x)) * 2u;
+                        uint _183;
+                        if (CellRanges._m0[_172] == 4294967295u)
+                        {
+                            _183 = 0u;
+                        }
+                        else
+                        {
+                            _183 = CellRanges._m0[_172 + 1u] - CellRanges._m0[_172];
+                        }
+                        _184 = _183;
+                        break;
+                    } while(false);
+                    _143 = _135 + _184;
+                }
+            }
+            bool _185 = _134 > _111;
+            uint _196;
+            if (_185)
+            {
+                _196 = uint(_124.x) + (uint(_124.y) * AimParams.GridDim.x);
+            }
+            else
+            {
+                _196 = _108;
+            }
+            _109 = _196;
+            _112 = _185 ? _134 : _111;
+        }
+        BestScore[gl_LocalInvocationIndex] = _111;
+        BestCell[gl_LocalInvocationIndex] = _108;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint _201 = 128u; _201 > 0u; _201 = _201 >> 1u)
+        {
+            bool _215;
+            if (gl_LocalInvocationIndex < _201)
+            {
+                _215 = BestScore[gl_LocalInvocationIndex + _201] > BestScore[gl_LocalInvocationIndex];
+            }
+            else
+            {
+                _215 = false;
+            }
+            if (_215)
+            {
+                uint _218 = gl_LocalInvocationIndex + _201;
+                BestScore[gl_LocalInvocationIndex] = BestScore[_218];
+                BestCell[gl_LocalInvocationIndex] = BestCell[_218];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (gl_LocalInvocationIndex == 0u)
+        {
+            uint _228 = AimParams.RequestIds[gl_WorkGroupID.x].x * 4u;
+            Feedback._m0[4u + _228] = AimParams.RequestIds[gl_WorkGroupID.x].y;
+            Feedback._m0[_228 + 5u] = BestCell[0];
+            Feedback._m0[_228 + 6u] = BestScore[0];
+        }
+        break;
+    } while(false);
+}
+

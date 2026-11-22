@@ -1,5 +1,5 @@
-/* Tablet round app: a camera OSD over the feed and a labelled tower tray along
-   the bottom. Sizes are in dp on the 1280x800 landscape tablet. The feed shows
+/* Tablet round app: a camera OSD over the feed and a turret tray along the
+   bottom, with a line over it about the turret under the pointer. Sizes are in dp on the 1280x800 landscape tablet. The feed shows
    through the body, which ignores the pointer so clicks reach the scene; only
    the tray takes them. Same renderer limits as phone_normal.rcss: flat colours,
    vertex gradients, radii, opacity and transforms. */
@@ -87,7 +87,7 @@ body {
 .crosshair .v { left: 16dp; top: 0; width: 2dp; height: 34dp; }
 .crosshair .h { left: 0; top: 16dp; width: 34dp; height: 2dp; }
 
-/* --- Tower tray --------------------------------------------------------- */
+/* --- Turret tray --------------------------------------------------------- */
 
 /* Height must match kRoundTrayFraction in src/scene/LevelMode.hpp. */
 .tray {
@@ -107,7 +107,7 @@ body {
 
 .slots {
 	display: flex;
-	padding: 8dp;
+	padding: 6dp 8dp;
 	background-color: #ffffff0d;
 	border: 1dp #ffffff14;
 	border-radius: 22dp;
@@ -119,9 +119,9 @@ body {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	width: 100dp;
-	height: 76dp;
-	margin: 0 4dp;
+	width: 62dp;
+	height: 80dp;
+	margin: 0 2dp;
 	border: 1dp #00000000;
 	border-radius: 16dp;
 	transition: background-color 0.12s;
@@ -140,8 +140,9 @@ body {
 	border-color: #ffffff59;
 }
 
-.tower.ability {
-	margin-left: 14dp;
+/* The first of a weapon category, set apart from the group before. */
+.tower.group {
+	margin-left: 12dp;
 }
 
 .tower.disabled {
@@ -152,21 +153,40 @@ body {
 	background-color: #00000000;
 }
 
-.tower .cooldown {
-	position: absolute;
-	top: 6dp;
-	right: 10dp;
-	font-size: 12dp;
-	font-weight: bold;
-	color: #ffffff;
-}
-
 .tower .icon {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	width: 36dp;
-	height: 36dp;
+	width: 42dp;
+	height: 42dp;
+	border-radius: 10dp;
+}
+
+/* Placeholder weapon sprites: textures/weapons.png, 64px cells in a 4x4 grid,
+   weapon n in cell n - 1. Real art replaces the cells, not these rects. */
+@spritesheet weapons {
+	src: ../textures/weapons.png;
+	weapon-1: 0px 0px 64px 64px;
+	weapon-2: 64px 0px 64px 64px;
+	weapon-3: 128px 0px 64px 64px;
+	weapon-4: 192px 0px 64px 64px;
+	weapon-5: 0px 64px 64px 64px;
+	weapon-6: 64px 64px 64px 64px;
+	weapon-7: 128px 64px 64px 64px;
+	weapon-8: 192px 64px 64px 64px;
+	weapon-9: 0px 128px 64px 64px;
+	weapon-10: 64px 128px 64px 64px;
+	weapon-11: 128px 128px 64px 64px;
+	weapon-12: 192px 128px 64px 64px;
+	weapon-13: 0px 192px 64px 64px;
+	weapon-14: 64px 192px 64px 64px;
+	weapon-15: 128px 192px 64px 64px;
+	weapon-16: 192px 192px 64px 64px;
+}
+
+.tower .sprite {
+	width: 42dp;
+	height: 42dp;
 	border-radius: 10dp;
 }
 
@@ -177,23 +197,56 @@ body {
 	color: #dfe3e7;
 }
 
-/* Tower glyphs: dark marks on the tinted icon. Shapes radii can't make use
-   a font glyph (tri). */
+/* Kinds without a sprite: their initials, dark on the tinted icon. */
 .glyph {
 	display: block;
-	width: 14dp;
-	height: 14dp;
+	font-size: 15dp;
+	font-weight: bold;
 	color: #0c0e10;
 }
 
-.glyph.circle { background-color: #0c0e10; border-radius: 7dp; }
-.glyph.square { background-color: #0c0e10; border-radius: 2dp; }
-.glyph.diamond { width: 12dp; height: 12dp; background-color: #0c0e10; border-radius: 2dp; transform: rotate(45deg); }
-.glyph.bar { height: 5dp; background-color: #0c0e10; border-radius: 1dp; }
-.glyph.ring { box-sizing: border-box; border: 3dp #0c0e10; border-radius: 7dp; }
-.glyph.tri { font-size: 22dp; line-height: 13dp; text-align: center; }
+/* --- Hint and start ------------------------------------------------------ */
 
-/* --- Tower panel -------------------------------------------------------- */
+/* Over the tray: what the turret under the pointer does, or why the one
+   selected can't go where the pointer is. */
+.hint {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 122dp;
+	display: block;
+	text-align: center;
+	font-size: 13dp;
+	font-weight: bold;
+	font-effect: outline(1dp #000000);
+}
+
+.hint .name {
+	color: #ffffff;
+	margin-right: 10dp;
+}
+
+.hint .text {
+	color: #dfe3e7;
+}
+
+.hint .problem {
+	color: #ff6b5e;
+}
+
+.start {
+	position: absolute;
+	left: 50%;
+	bottom: 150dp;
+	width: 160dp;
+	margin-left: -80dp;
+	padding: 10dp 0;
+	font-size: 17dp;
+	letter-spacing: 2dp;
+	pointer-events: auto;
+}
+
+/* --- Turret panel -------------------------------------------------------- */
 
 /* Placed by LevelScene in screen pixels, above the tower it describes. */
 .panel {
@@ -208,8 +261,16 @@ body {
 }
 
 .panel .title,
+.panel .kind,
 .panel .stat {
 	display: block;
+}
+
+.panel .kind {
+	font-size: 11dp;
+	font-weight: bold;
+	color: #9aa3ab;
+	margin-top: 2dp;
 }
 
 .panel .title {
@@ -220,7 +281,7 @@ body {
 .panel .stat {
 	font-size: 13dp;
 	color: #c8cdd2;
-	margin: 3dp 0 8dp 0;
+	margin-top: 5dp;
 }
 
 .act {

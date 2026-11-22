@@ -164,18 +164,34 @@ void WallColliders::build(const logic::Level& level, float reach) {
         m_primitives.push_back({corners[0], corners[1], corners[2], WallPrimitive::Triangle, 0.0f});
     }
 
+    m_size = level.size;
+    m_reach = reach;
+    bin();
+}
+
+WallColliders WallColliders::withExtra(const std::vector<WallPrimitive>& extra) const {
+    WallColliders out;
+    out.m_size = m_size;
+    out.m_reach = m_reach;
+    out.m_primitives = m_primitives;
+    out.m_primitives.insert(out.m_primitives.end(), extra.begin(), extra.end());
+    out.bin();
+    return out;
+}
+
+void WallColliders::bin() {
     // Bins a few unit-widths across: small enough that a unit tests only the
     // walls near it, big enough that a wall lands in few bins.
-    m_binSize = std::max(32.0f, reach * 8.0f);
-    m_binDim = glm::uvec2(static_cast<std::uint32_t>(std::max(1.0f, std::ceil(level.size.x / m_binSize))),
-                          static_cast<std::uint32_t>(std::max(1.0f, std::ceil(level.size.y / m_binSize))));
+    m_binSize = std::max(32.0f, m_reach * 8.0f);
+    m_binDim = glm::uvec2(static_cast<std::uint32_t>(std::max(1.0f, std::ceil(m_size.x / m_binSize))),
+                          static_cast<std::uint32_t>(std::max(1.0f, std::ceil(m_size.y / m_binSize))));
 
     const auto binRange = [&](const WallPrimitive& p, glm::ivec2& lo, glm::ivec2& hi) {
         glm::vec2 a;
         glm::vec2 b;
         primitiveBounds(p, a, b);
-        a -= glm::vec2(reach + 1.0f);
-        b += glm::vec2(reach + 1.0f);
+        a -= glm::vec2(m_reach + 1.0f);
+        b += glm::vec2(m_reach + 1.0f);
         const glm::ivec2 maxBin = glm::ivec2(m_binDim) - 1;
         lo = glm::clamp(glm::ivec2(glm::floor(a / m_binSize)), glm::ivec2(0), maxBin);
         hi = glm::clamp(glm::ivec2(glm::floor(b / m_binSize)), glm::ivec2(0), maxBin);

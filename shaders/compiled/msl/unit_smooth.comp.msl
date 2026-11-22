@@ -47,9 +47,6 @@ struct type_CollideParams
     float AverageOmega;
     float ChebyshevOmega;
     float Smoothing;
-    uint TowerCount;
-    packed_uint3 TowerPadding;
-    float4 Towers[32];
 };
 
 struct WallPrimitive
@@ -74,114 +71,114 @@ kernel void main0(constant type_CollideParams& CollideParams [[buffer(0)]], devi
         {
             break;
         }
-        float2 _81 = InUnits._m0[gl_GlobalInvocationID.x].pos;
-        float2 _83 = InUnits._m0[gl_GlobalInvocationID.x].vel;
-        if (_81.x < (-100000001504746621987668885504.0))
+        float2 _78 = InUnits._m0[gl_GlobalInvocationID.x].pos;
+        float2 _80 = InUnits._m0[gl_GlobalInvocationID.x].vel;
+        if (_78.x < (-100000001504746621987668885504.0))
         {
-            OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _81, _83 };
+            OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _78, _80 };
             break;
         }
-        int2 _98 = clamp(int2(_81 * CollideParams.InvCellSize), int2(0), int2(CollideParams.GridDim) - int2(1));
-        float2 _100;
-        float _103;
-        _100 = float2(0.0);
-        _103 = 0.0;
-        float2 _101;
-        float _104;
-        for (int _105 = -1; _105 <= 1; _100 = _101, _103 = _104, _105++)
+        int2 _95 = clamp(int2(_78 * CollideParams.InvCellSize), int2(0), int2(CollideParams.GridDim) - int2(1));
+        float2 _97;
+        float _100;
+        _97 = float2(0.0);
+        _100 = 0.0;
+        float2 _98;
+        float _101;
+        for (int _102 = -1; _102 <= 1; _97 = _98, _100 = _101, _102++)
         {
-            uint _160;
-            uint _161;
+            uint _157;
+            uint _158;
             do
             {
-                int _113 = _98.y + _105;
-                bool _121;
-                if (_113 >= 0)
+                int _110 = _95.y + _102;
+                bool _118;
+                if (_110 >= 0)
                 {
-                    _121 = _113 >= int(CollideParams.GridDim.y);
+                    _118 = _110 >= int(CollideParams.GridDim.y);
                 }
                 else
                 {
-                    _121 = true;
+                    _118 = true;
                 }
-                if (_121)
+                if (_118)
                 {
-                    _160 = 0u;
-                    _161 = 4294967295u;
+                    _157 = 0u;
+                    _158 = 4294967295u;
                     break;
                 }
-                int _124 = _98.x;
-                uint _127 = uint(max((_124 - 1), 0));
-                uint _134 = uint(min((_124 + 1), (int(CollideParams.GridDim.x) - 1)));
-                uint _136 = uint(_113) * CollideParams.GridDim.x;
+                int _121 = _95.x;
+                uint _124 = uint(max((_121 - 1), 0));
+                uint _131 = uint(min((_121 + 1), (int(CollideParams.GridDim.x) - 1)));
+                uint _133 = uint(_110) * CollideParams.GridDim.x;
+                uint _135;
                 uint _138;
-                uint _141;
-                _138 = 0u;
-                _141 = 4294967295u;
+                _135 = 0u;
+                _138 = 4294967295u;
+                uint _136;
                 uint _139;
-                uint _142;
-                for (uint _143 = _127; _143 <= _134; _138 = _139, _141 = _142, _143++)
+                for (uint _140 = _124; _140 <= _131; _135 = _136, _138 = _139, _140++)
                 {
-                    uint _149 = (_136 + _143) * 2u;
-                    if (GridB._m0[_149] != 4294967295u)
+                    uint _146 = (_133 + _140) * 2u;
+                    if (GridB._m0[_146] != 4294967295u)
                     {
-                        _139 = max(_138, GridB._m0[_149 + 1u]);
-                        _142 = min(_141, GridB._m0[_149]);
+                        _136 = max(_135, GridB._m0[_146 + 1u]);
+                        _139 = min(_138, GridB._m0[_146]);
                     }
                     else
                     {
+                        _136 = _135;
                         _139 = _138;
-                        _142 = _141;
                     }
                 }
-                _160 = _138;
-                _161 = _141;
+                _157 = _135;
+                _158 = _138;
                 break;
             } while(false);
-            _104 = _103;
             _101 = _100;
-            float _163;
-            float2 _165;
-            for (uint _166 = _161; _166 < _160; _104 = _163, _101 = _165, _166++)
+            _98 = _97;
+            float _160;
+            float2 _162;
+            for (uint _163 = _158; _163 < _157; _101 = _160, _98 = _162, _163++)
             {
-                uint _179;
+                uint _176;
                 if (CollideParams.UnitsSorted != 0u)
                 {
-                    _179 = _166;
+                    _176 = _163;
                 }
                 else
                 {
-                    _179 = ((device uint*)&GridA._m0[_166])[1];
+                    _176 = ((device uint*)&GridA._m0[_163])[1];
                 }
-                if (_179 == gl_GlobalInvocationID.x)
+                if (_176 == gl_GlobalInvocationID.x)
                 {
-                    _163 = _104;
-                    _165 = _101;
+                    _160 = _101;
+                    _162 = _98;
                     continue;
                 }
-                float2 _187 = _81 - InUnits._m0[_179].pos;
-                float _188 = dot(_187, _187);
-                if (_188 >= (CollideParams.Diameter * CollideParams.Diameter))
+                float2 _184 = _78 - InUnits._m0[_176].pos;
+                float _185 = dot(_184, _184);
+                if (_185 >= (CollideParams.Diameter * CollideParams.Diameter))
                 {
-                    _163 = _104;
-                    _165 = _101;
+                    _160 = _101;
+                    _162 = _98;
                     continue;
                 }
-                float _197 = 1.0 - (sqrt(_188) / CollideParams.Diameter);
-                _163 = _104 + _197;
-                _165 = _101 + (InUnits._m0[_179].vel * _197);
+                float _194 = 1.0 - (sqrt(_185) / CollideParams.Diameter);
+                _160 = _101 + _194;
+                _162 = _98 + (InUnits._m0[_176].vel * _194);
             }
         }
-        float2 _211;
-        if (_103 > 0.0)
+        float2 _208;
+        if (_100 > 0.0)
         {
-            _211 = _83 + (((_100 / float2(_103)) - _83) * CollideParams.Smoothing);
+            _208 = _80 + (((_97 / float2(_100)) - _80) * CollideParams.Smoothing);
         }
         else
         {
-            _211 = _83;
+            _208 = _80;
         }
-        OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _81, _211 };
+        OutUnits._m0[gl_GlobalInvocationID.x] = UnitData{ _78, _208 };
         break;
     } while(false);
 }

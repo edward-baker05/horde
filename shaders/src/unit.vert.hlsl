@@ -39,6 +39,10 @@ StructuredBuffer<uint> Slots : register(t4, space0);
 
 #include "unit_state.hlsli"
 #include "unit_sprites.hlsli"
+#include "unit_status.hlsli"
+
+// Each unit's status effects, when HasStatus: tinted on top of the health fade.
+StructuredBuffer<UnitStatus> Status : register(t5, space0);
 
 cbuffer UnitUniforms : register(b0, space1) {
     float4x4 ViewProjection;
@@ -60,7 +64,10 @@ cbuffer UnitUniforms : register(b0, space1) {
     uint Rotate;         // sprites: face the direction of travel
     uint DirectionSteps; // sprites: snap facing to this many directions; 0 = free
     float MinTurnSpeed;  // sprites: slower than this, keep facing up (no direction to read)
-    float2 Padding;
+    float Time;         // seconds, for burning units' flicker
+    uint HasStatus;     // 0: no Status buffer
+    uint MarkFirst;     // nonzero: draw the unit with ID 0 red, so it can be followed
+    float3 Padding;
 };
 
 struct Output {
@@ -210,12 +217,24 @@ Output main(uint id : SV_VertexID) {
     // Full health draws in Color (white for sprites, so the palette shows
     // true), fading linearly to black at 0.
     float health = InvMaxHealth > 0.0f ? saturate(Health[unitIndex] * InvMaxHealth) : 1.0f;
-    if (SpriteMode == 0) {
-        float4 tint = float4(Color.rgb * health, Color.a);
-        // Unit 0 is drawn red so it can be followed; sprites are crowd texture, so they don't.
-        output.Color = (unitId == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
-    } else {
-        output.Color = float4(health, health, health, 1.0f);
+    // Disc: the tint itself. Sprites: a multiplier on the palette colour, so
+    // the status tints below colour them the same way.
+    float4 tint = SpriteMode == 0 ? float4(Color.rgb * health, Color.a) : float4(health, health, health, 1.0f);
+    if (HasStatus != 0) {
+        UnitStatus status = Status[unitIndex];
+        if (status.slow > 0.0f) {
+            tint.rgb = lerp(tint.rgb, float3(0.6f, 0.4f, 1.0f), 0.55f);
+        }
+        if (status.stun > 0.0f) {
+            tint.rgb = lerp(tint.rgb, float3(0.75f, 0.88f, 1.0f), 0.7f);
+        }
+        if (status.burn > 0.0f) {
+            // Each unit flickers out of step with the next.
+            float flicker = 0.5f + 0.5f * sin(Time * 18.0f + float(unitId) * 1.7f);
+            tint.rgb = lerp(tint.rgb, float3(1.0f, 0.45f, 0.08f), 0.55f + 0.35f * flicker);
+        }
     }
+    // Unit 0 can be drawn red so it can be followed; sprites are crowd texture, so they never are.
+    output.Color = (SpriteMode == 0 && MarkFirst != 0 && unitId == 0) ? float4(1.0f, 0.0f, 0.0f, 1.0f) : tint;
     return output;
 }

@@ -44,9 +44,9 @@ inline glm::vec4 atlasCell(int column, int row, int columns, int rows, float tex
 //
 // There is no vertex buffer: the vertex shader builds each quad from
 // SV_VertexID and reads transforms out of a storage buffer. Adding a sprite is
-// therefore just appending to a vector. Because SV_VertexID includes the
-// draw's first_vertex, a run starting at sprite N draws correctly with
-// first_vertex = N * 6 and no rebinding beyond the texture.
+// therefore just appending to a vector. A run starting at sprite N passes N
+// in the uniforms rather than as first_vertex: on D3D12 SV_VertexID restarts
+// at 0 for every draw, so first_vertex never reaches the shader.
 //
 // Sort by texture before drawing to keep the number of runs down.
 class SpriteBatch {

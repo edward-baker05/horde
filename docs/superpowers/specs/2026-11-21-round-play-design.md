@@ -1,5 +1,15 @@
 # Round play — design
 
+> **Superseded in part (2026-11-22).** The towers, abilities, tower attraction,
+> grow-in, contact counters and density-map aiming below were replaced by the
+> turrets from `bailen-weapon-categories` (`2026-11-03-turrets-design.md`,
+> `2026-11-21-weapon-categories-design.md`). A round now opens in a prep phase:
+> turrets are bought from the tray with round money and placed, then START.
+> More can be bought during play. The round rules (money, kill reward, spawn
+> boost, leak limit, win and loss, upgrade money), the click, the tablet UI and
+> the results stay as written. The tower panel only describes a turret: no
+> upgrades or repairs. Bomb and Gravity are gone.
+
 ## Intent
 
 horde has a crowd simulation that can move up to a million units smoothly, a level editor, and a tablet UI for rounds, but no game. This pass makes one **round** playable from start to finish: place towers, upgrade them, click to do damage, and win or lose.

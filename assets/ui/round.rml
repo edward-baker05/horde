@@ -28,19 +28,28 @@
 		<span class="line">{{channel}}</span>
 	</div>
 
+	<div class="hint">
+		<span class="problem" data-if="problem != ''">{{problem}}</span>
+		<span class="name" data-if="problem == ''">{{hint_name}}</span>
+		<span class="text" data-if="problem == ''">{{hint_text}}</span>
+	</div>
+	<button class="act start" data-if="prep" data-event-click="start">START</button>
+
 	<div class="tray">
 		<div class="slots">
-			<div class="tower" data-for="t, i : towers" data-class-selected="i == selected" data-class-disabled="t.disabled" data-class-ability="i >= 4" data-event-click="pick(i)">
-				<div class="icon" data-style-background-color="t.color"><span data-attr-class="'glyph ' + t.shape">{{t.glyph}}</span></div>
-				<span class="label">{{t.name}} · ${{t.cost}}</span>
-				<span class="cooldown" data-if="t.cooldown != ''">{{t.cooldown}}</span>
+			<div class="tower" data-for="t, i : items" data-class-selected="i == selected" data-class-disabled="t.disabled" data-class-group="t.group" data-event-click="pick(i)" data-event-mouseover="hover(i)" data-event-mouseout="hover(-1)">
+				<div class="icon" data-style-background-color="t.color">
+					<img class="sprite" data-if="t.sprite != ''" data-attr-sprite="t.sprite"/>
+					<span class="glyph" data-if="t.sprite == ''">{{t.glyph}}</span>
+				</div>
+				<span class="label">${{t.cost}}</span>
 			</div>
 		</div>
 	</div>
 	<div class="panel" data-if="panel_open" data-style-left="panel_x + 'px'" data-style-top="panel_y + 'px'">
 		<span class="title">{{panel_name}}</span>
-		<span class="stat">{{panel_level}} · {{panel_hp}}</span>
-		<button class="act" data-class-disabled="!panel_affordable" data-event-click="offer">{{panel_action}}</button>
+		<span class="kind">{{panel_kind}}</span>
+		<span class="stat">{{panel_detail}}</span>
 	</div>
 
 	<div class="results" data-if="ended">

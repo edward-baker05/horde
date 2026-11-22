@@ -62,10 +62,12 @@ struct type_StructuredBuffer_Sprite
 struct type_CameraUniforms
 {
     float4x4 ViewProjection;
+    uint FirstSprite;
+    packed_uint3 Padding;
 };
 
-constant spvUnsafeArray<uint, 6> _49 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
-constant spvUnsafeArray<float2, 4> _50 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
+constant spvUnsafeArray<uint, 6> _52 = spvUnsafeArray<uint, 6>({ 0u, 1u, 2u, 3u, 2u, 1u });
+constant spvUnsafeArray<float2, 4> _53 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0) });
 
 struct main0_out
 {
@@ -77,18 +79,18 @@ struct main0_out
 vertex main0_out main0(constant type_CameraUniforms& CameraUniforms [[buffer(0)]], const device type_StructuredBuffer_Sprite& Sprites [[buffer(1)]], uint gl_VertexIndex [[vertex_id]])
 {
     main0_out out = {};
-    uint _59 = gl_VertexIndex / 6u;
-    uint _60 = gl_VertexIndex % 6u;
-    spvUnsafeArray<float2, 4> _81 = spvUnsafeArray<float2, 4>({ float2(Sprites._m0[_59].uv.xy), float2(Sprites._m0[_59].uv.zy), float2(Sprites._m0[_59].uv.xw), float2(Sprites._m0[_59].uv.zw) });
-    spvUnsafeArray<float2, 4> _57 = _81;
-    float _82 = cos(Sprites._m0[_59].rotation);
-    float _83 = sin(Sprites._m0[_59].rotation);
-    float2 _86 = _50[_49[_60]] * Sprites._m0[_59].size;
-    float _87 = _86.x;
-    float _89 = _86.y;
-    out.out_var_TEXCOORD0 = Sprites._m0[_59].color;
-    out.out_var_TEXCOORD1 = _57[_49[_60]];
-    out.gl_Position = CameraUniforms.ViewProjection * float4(float2((_87 * _82) - (_89 * _83), (_87 * _83) + (_89 * _82)) + float2(Sprites._m0[_59].position[0], Sprites._m0[_59].position[1]), Sprites._m0[_59].position[2], 1.0);
+    uint _65 = CameraUniforms.FirstSprite + (gl_VertexIndex / 6u);
+    uint _66 = gl_VertexIndex % 6u;
+    spvUnsafeArray<float2, 4> _87 = spvUnsafeArray<float2, 4>({ float2(Sprites._m0[_65].uv.xy), float2(Sprites._m0[_65].uv.zy), float2(Sprites._m0[_65].uv.xw), float2(Sprites._m0[_65].uv.zw) });
+    spvUnsafeArray<float2, 4> _60 = _87;
+    float _88 = cos(Sprites._m0[_65].rotation);
+    float _89 = sin(Sprites._m0[_65].rotation);
+    float2 _92 = _53[_52[_66]] * Sprites._m0[_65].size;
+    float _93 = _92.x;
+    float _95 = _92.y;
+    out.out_var_TEXCOORD0 = Sprites._m0[_65].color;
+    out.out_var_TEXCOORD1 = _60[_52[_66]];
+    out.gl_Position = CameraUniforms.ViewProjection * float4(float2((_93 * _88) - (_95 * _89), (_93 * _89) + (_95 * _88)) + float2(Sprites._m0[_65].position[0], Sprites._m0[_65].position[1]), Sprites._m0[_65].position[2], 1.0);
     return out;
 }
 

@@ -20,7 +20,7 @@ inline ui::ScenePresentation levelPresentation(LevelMode mode) {
                                      : ui::ScenePresentation{};
 }
 
-// The round's tower tray across the bottom of the tablet, as a fraction of the
+// The round's turret tray across the bottom of the tablet, as a fraction of the
 // screen height: 116dp of the landscape tablet's 800. Matches .tray in
 // assets/ui/tablet.rcss.
 inline constexpr float kRoundTrayFraction = 116.0f / 800.0f;
