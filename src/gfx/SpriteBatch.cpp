@@ -199,7 +199,14 @@ void SpriteBatch::flush(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
     SDL_BindGPUVertexStorageBuffers(pass, 0, &m_spriteBuffer, 1);
-    SDL_PushGPUVertexUniformData(commands, 0, &viewProjection, sizeof(viewProjection));
+
+    // Matches CameraUniforms in sprite.vert.hlsl.
+    struct alignas(16) CameraUniforms {
+        glm::mat4 viewProjection;
+        Uint32 firstSprite;
+        Uint32 padding[3];
+    };
+    static_assert(sizeof(CameraUniforms) == 80);
 
     for (const Run& run : m_runs) {
         SDL_GPUTextureSamplerBinding binding{};
@@ -207,10 +214,15 @@ void SpriteBatch::flush(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
         binding.sampler = m_sampler;
         SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
 
-        // Six vertices per sprite; the vertex shader turns them into two
-        // triangles. first_vertex feeds through to SV_VertexID, so the shader
-        // still indexes the storage buffer correctly.
-        SDL_DrawGPUPrimitives(pass, run.count * 6, 1, run.first * 6, 0);
+        // SV_VertexID restarts at 0 for every draw on D3D12 (first_vertex
+        // doesn't reach it), so the run's first sprite goes in the uniforms.
+        CameraUniforms uniforms{};
+        uniforms.viewProjection = viewProjection;
+        uniforms.firstSprite = run.first;
+        SDL_PushGPUVertexUniformData(commands, 0, &uniforms, sizeof(uniforms));
+
+        // Six vertices per sprite; the vertex shader turns them into two triangles.
+        SDL_DrawGPUPrimitives(pass, run.count * 6, 1, 0, 0);
     }
 }
 

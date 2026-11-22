@@ -23,6 +23,11 @@ StructuredBuffer<Sprite> Sprites : register(t0, space0);
 
 cbuffer CameraUniforms : register(b0, space1) {
     float4x4 ViewProjection;
+    // The first sprite of this draw. SV_VertexID starts at 0 on every draw on
+    // D3D12, whatever first_vertex is, so a batch drawing one run per texture
+    // has to say where each run starts.
+    uint FirstSprite;
+    uint3 Padding;
 };
 
 struct Output {
@@ -41,7 +46,7 @@ static const float2 QuadCorners[4] = {
 };
 
 Output main(uint id : SV_VertexID) {
-    uint spriteIndex = id / 6;
+    uint spriteIndex = FirstSprite + id / 6;
     uint corner = TriangleIndices[id % 6];
 
     Sprite sprite = Sprites[spriteIndex];
