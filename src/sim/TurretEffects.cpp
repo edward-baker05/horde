@@ -14,10 +14,6 @@ constexpr float kPulseDuration = 0.15f;
 constexpr float kShellFlight = 0.8f;
 // How soon a mortar that found nobody in range looks again.
 constexpr float kRetryDelay = 0.5f;
-// How hard a shell or mine throws units, in world units per second at the
-// centre.
-constexpr float kShellFling = 80.0f;
-constexpr float kMineFling = 150.0f;
 constexpr float kBlastDuration = 0.2f;
 // How much further than its range a bullet flies before it is spent.
 constexpr float kBulletReach = 1.5f;
@@ -42,7 +38,7 @@ Explosion blast(glm::vec2 center, float radius, float damage, float fling, std::
     e.center = center;
     e.radius = radius;
     e.strength = fling;
-    e.fling = true;
+    e.fling = fling > 0.0f;
     e.duration = kBlastDuration;
     e.falloff = ExplosionFalloff::Linear;
     e.damage = damage;
@@ -111,7 +107,7 @@ std::vector<StatusEffect> TurretEffects::statusTable() const {
 float TurretEffects::aimOf(std::size_t index) const {
     const logic::Turret& turret = m_turrets[index];
     const logic::TurretDef& def = logic::turretDef(turret.kind);
-    if (turret.kind != logic::TurretKind::Beam || def.period <= 0.0f) {
+    if (def.delivery != logic::TurretDelivery::Sweep || def.period <= 0.0f) {
         return turret.facing;
     }
     // Smoothly back and forth across the arc, once per period.
@@ -122,8 +118,20 @@ void TurretEffects::readFeedback(const std::uint32_t* perTurret, float cellSize,
     for (std::size_t i = 0; i < m_turrets.size(); ++i) {
         const std::uint32_t* words = perTurret + i * kFeedbackPerTurret;
         State& state = m_states[i];
-        switch (m_turrets[i].kind) {
-            case logic::TurretKind::Mortar:
+        const logic::TurretDef& def = logic::turretDef(m_turrets[i].kind);
+        if (def.placement == logic::TurretClass::Blocker) {
+            if (state.phase == Phase::Spent) {
+                continue;
+            }
+            state.hp = std::max(def.maxHp - static_cast<float>(words[3]) / kMilliHp, 0.0f);
+            if (state.hp <= 0.0f) {
+                state.phase = Phase::Spent;
+                m_blockersChanged = true;
+            }
+            continue;
+        }
+        switch (def.delivery) {
+            case logic::TurretDelivery::Shell:
                 // Only the answer to the shot still waiting; older ones are stale.
                 if (state.phase != Phase::Aiming || words[0] != state.shotId) {
                     break;
@@ -140,21 +148,9 @@ void TurretEffects::readFeedback(const std::uint32_t* perTurret, float cellSize,
                 state.landsIn = std::max(kShellFlight - state.aimedFor, 0.0f);
                 state.phase = Phase::Flying;
                 break;
-            case logic::TurretKind::Mine:
+            case logic::TurretDelivery::Mine:
                 if (state.phase == Phase::Ready && words[3] > 0) {
                     state.phase = Phase::Triggered;
-                }
-                break;
-            case logic::TurretKind::SpikeBlock:
-            case logic::TurretKind::Barricade:
-                if (state.phase == Phase::Spent) {
-                    break;
-                }
-                state.hp = std::max(logic::turretDef(m_turrets[i].kind).maxHp - static_cast<float>(words[3]) / kMilliHp,
-                                    0.0f);
-                if (state.hp <= 0.0f) {
-                    state.phase = Phase::Spent;
-                    m_blockersChanged = true;
                 }
                 break;
             default:
@@ -174,25 +170,26 @@ std::uint32_t TurretEffects::step(float dt, glm::vec4* out, std::vector<Explosio
         const float aim = aimOf(i);
         const glm::vec2 dir{std::cos(aim), std::sin(aim)};
 
-        glm::vec4 shape;
-        switch (turret.kind) {
-            case logic::TurretKind::Flamer:
+        glm::vec4 shape{0.0f}; // set by every case that doesn't `continue`
+        switch (def.delivery) {
+            case logic::TurretDelivery::Cone:
                 shape = effect(def.range, std::cos(def.arc * 0.5f), def.damage * dt, TurretShape::Cone, i);
                 break;
-            case logic::TurretKind::Beam:
+            case logic::TurretDelivery::Sweep:
                 shape = effect(def.range, def.blastRadius * 0.5f, def.damage * dt, TurretShape::Beam, i);
                 break;
-            case logic::TurretKind::Zapper: {
+            case logic::TurretDelivery::Pulse: {
                 state.cooldown -= dt;
                 if (state.cooldown > 0.0f) {
                     continue;
                 }
                 state.cooldown += std::max(def.period, dt);
-                // All damage, no push, the same all the way out.
+                // The same damage all the way out, and a push only if it has one.
                 Explosion pulse;
                 pulse.center = turret.center;
                 pulse.radius = def.range;
-                pulse.strength = 0.0f;
+                pulse.strength = def.blastPush;
+                pulse.fling = def.blastPush > 0.0f;
                 pulse.duration = kPulseDuration;
                 pulse.falloff = ExplosionFalloff::Constant;
                 pulse.damage = def.damage;
@@ -200,7 +197,7 @@ std::uint32_t TurretEffects::step(float dt, glm::vec4* out, std::vector<Explosio
                 blasts.push_back(pulse);
                 continue;
             }
-            case logic::TurretKind::Mortar:
+            case logic::TurretDelivery::Shell:
                 // Reloads while a shell is in the air, so shots stay a period apart.
                 state.cooldown -= dt;
                 if (state.phase == Phase::Ready) {
@@ -216,14 +213,14 @@ std::uint32_t TurretEffects::step(float dt, glm::vec4* out, std::vector<Explosio
                 } else if (state.phase == Phase::Flying) {
                     state.landsIn -= dt;
                     if (state.landsIn <= 0.0f) {
-                        blasts.push_back(blast(state.target, def.blastRadius, def.damage, kShellFling, i));
+                        blasts.push_back(blast(state.target, def.blastRadius, def.damage, def.blastPush, i));
                         state.phase = Phase::Ready;
                     }
                 }
                 continue;
-            case logic::TurretKind::Mine:
+            case logic::TurretDelivery::Mine:
                 if (state.phase == Phase::Triggered) {
-                    blasts.push_back(blast(turret.center, def.blastRadius, def.damage, kMineFling, i));
+                    blasts.push_back(blast(turret.center, def.blastRadius, def.damage, def.blastPush, i));
                     state.phase = Phase::Spent;
                 }
                 if (state.phase != Phase::Ready) {
@@ -232,7 +229,7 @@ std::uint32_t TurretEffects::step(float dt, glm::vec4* out, std::vector<Explosio
                 // Still armed: the GPU counts units that come near.
                 shape = effect(def.range, 0.0f, 0.0f, TurretShape::Mine, i);
                 break;
-            case logic::TurretKind::Gunner: {
+            case logic::TurretDelivery::Gun: {
                 // At most one shot a step, however short the period.
                 state.cooldown -= dt;
                 if (state.cooldown > 0.0f || def.bulletSpeed <= 0.0f) {
@@ -250,7 +247,7 @@ std::uint32_t TurretEffects::step(float dt, glm::vec4* out, std::vector<Explosio
                 fires.push_back(shot);
                 continue;
             }
-            default:
+            case logic::TurretDelivery::None:
                 // Blockers collide rather than act.
                 continue;
         }

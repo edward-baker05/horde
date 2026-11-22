@@ -44,9 +44,31 @@ enum class TurretKind : std::uint8_t {
     Barricade,  // blocker: tough, harmless, there to herd the horde
     Mine,       // floor trap: explodes the first time a unit comes near
     Gunner,     // mount: fires bullets at the nearest unit
+
+    // Weapons, numbered as their placeholder sprites and in the weapon
+    // categories spec, section 4.
+    TShirtCannon, // 1 merch, mount: lobs a bundle of shirts at the thickest crowd
+    MerchSlinger, // 2 merch, mount: signed photos and frisbees at the nearest fan
+    MerchStand,   // 3 merch, blocker: hands merch to fans pressed against it
+    JazzSpeaker,  // 4 sound, mount: slows everything around it
+    BassStack,    // 5 sound, mount: a booming damage pulse
+    FeedbackAmp,  // 6 sound, mount: a shockwave that stuns and shoves
+    PepperSpray,  // 7 chemical, mount: a short cone that sets fans burning
+    CrowdBarrier, // 11 physical, blocker: very tough, harmless
 };
 
-inline constexpr std::size_t kTurretKindCount = 8;
+inline constexpr std::size_t kTurretKindCount = 16;
+
+// How a turret reaches units, which decides how TurretEffects runs it.
+enum class TurretDelivery : std::uint8_t {
+    None,  // nothing of its own: a blocker, which only collides (and may hurt on contact)
+    Cone,  // continuous, within range and the arc; an arc of a full turn is an aura
+    Pulse, // every period, a burst over its range around it
+    Shell, // every period, a blast at the thickest crowd in range, after a flight
+    Sweep, // continuous along a line that sweeps back and forth across the arc
+    Mine,  // a blast the first time a unit comes near, then spent
+    Gun,   // every period, a bullet at the nearest unit in range
+};
 
 // Where a turret may go. Mounts sit on top of walls, out of the horde's
 // reach; blockers and floor traps sit on open ground in its way.
@@ -61,6 +83,7 @@ enum class TurretClass : std::uint8_t {
 struct TurretDef {
     const char* name = "";
     TurretClass placement = TurretClass::Mount;
+    TurretDelivery delivery = TurretDelivery::None;
     // Half the footprint's width and height, before rotating by the facing.
     glm::vec2 halfSize{6.0f, 6.0f};
     // Whether the player sets a facing. Omnidirectional turrets ignore it.
@@ -79,6 +102,9 @@ struct TurretDef {
     float damage = 0.0f;
     // A shell's or mine's blast radius, and a beam's width.
     float blastRadius = 0.0f;
+    // How hard a pulse, shell or mine throws units, in world units per second
+    // at the centre; 0 for damage alone.
+    float blastPush = 0.0f;
     // Blockers' hit points; 0 for anything units can't hurt.
     float maxHp = 0.0f;
     // Status effects on the units it hits, each lasting this many seconds; 0
@@ -94,6 +120,8 @@ struct TurretDef {
     std::uint32_t pierce = 0;
     // Not charged yet: the economy is undecided.
     std::uint32_t cost = 0;
+    // A short description for the palette's tooltip.
+    const char* blurb = "";
     // The weapon category it is coloured and grouped by. None for the
     // original eight kinds, which predate categories.
     std::optional<WeaponCategory> category;

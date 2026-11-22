@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include "gfx/Camera2D.hpp"
 #include "gfx/LevelRenderer.hpp"
@@ -48,13 +49,18 @@ float projectedRadius(const Box& box, glm::vec2 axis) {
            box.half.y * std::abs(glm::dot(perpendicular(box.axis), axis));
 }
 
+// How far two footprints may sink into each other and still count as only
+// touching, in world units: rounding in the sines and cosines would otherwise
+// make turrets placed edge to edge overlap.
+constexpr float kTouchTolerance = 0.05f;
+
 // Separating axis test: two rectangles overlap unless one of their four edge
-// directions separates them.
+// directions separates them. Rectangles that only touch don't overlap.
 bool boxesOverlap(const Box& a, const Box& b) {
     const glm::vec2 axes[4] = {a.axis, perpendicular(a.axis), b.axis, perpendicular(b.axis)};
     const glm::vec2 d = b.center - a.center;
     for (const glm::vec2 axis : axes) {
-        if (std::abs(glm::dot(d, axis)) > projectedRadius(a, axis) + projectedRadius(b, axis)) {
+        if (std::abs(glm::dot(d, axis)) >= projectedRadius(a, axis) + projectedRadius(b, axis) - kTouchTolerance) {
             return false;
         }
     }
@@ -71,6 +77,24 @@ constexpr float kWallSampleSpacing = 2.0f;
 
 constexpr float kRotateStep = glm::radians(15.0f);
 constexpr float kFineRotateStep = glm::radians(1.0f);
+constexpr float kSnapRotateStep = glm::radians(45.0f);
+
+// The grid placement snaps to: the wall grid's cells, so turrets line up with
+// painted walls.
+constexpr float kSnapGrid = logic::kCellSize;
+
+// Half the width and height of the axis-aligned box around a footprint turned
+// by `facing`.
+glm::vec2 boundsHalf(glm::vec2 halfSize, float facing) {
+    const float c = std::abs(std::cos(facing));
+    const float s = std::abs(std::sin(facing));
+    return {halfSize.x * c + halfSize.y * s, halfSize.x * s + halfSize.y * c};
+}
+
+// Whether a kind goes on open ground, where a line of them can be dragged out.
+bool placedOnGround(logic::TurretKind kind) {
+    return logic::turretDef(kind).placement != logic::TurretClass::Mount;
+}
 
 glm::vec4 classColor(logic::TurretClass placement) {
     switch (placement) {
@@ -89,6 +113,11 @@ glm::vec4 classColor(logic::TurretClass placement) {
 // `length` further along.
 void drawCone(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec2 apex, float facing, float length, float arc,
               glm::vec4 color) {
+    // An arc of a full turn is an aura: a disc around the apex.
+    if (arc >= glm::radians(359.0f)) {
+        gfx::drawCentered(batch, atlas, apex, glm::vec2(length * 2.0f), 0.0f, gfx::cellDisc(), color);
+        return;
+    }
     const glm::vec2 dir{std::cos(facing), std::sin(facing)};
     const float width = 2.0f * length * std::tan(std::min(arc, glm::radians(170.0f)) * 0.5f);
     gfx::drawCentered(batch, atlas, apex + dir * (length * 0.5f), {width, length}, facing - 1.5707964f,
@@ -99,27 +128,26 @@ void drawCone(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, glm::vec2 apex, fl
 void drawReach(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const logic::Turret& turret, glm::vec4 color) {
     const logic::TurretDef& def = logic::turretDef(turret.kind);
     const glm::vec2 dir{std::cos(turret.facing), std::sin(turret.facing)};
-    switch (turret.kind) {
-        case logic::TurretKind::Flamer:
+    switch (def.delivery) {
+        case logic::TurretDelivery::Cone:
             drawCone(batch, atlas, turret.center, turret.facing, def.range, def.arc, color);
             break;
-        case logic::TurretKind::Beam:
+        case logic::TurretDelivery::Sweep:
             // The arc it sweeps over, and the beam itself at the middle of it.
             drawCone(batch, atlas, turret.center, turret.facing, def.range, def.arc, color * glm::vec4(1, 1, 1, 0.4f));
             gfx::drawCentered(batch, atlas, turret.center + dir * (def.range * 0.5f), {def.range, def.blastRadius},
                               turret.facing, gfx::cellSolid(), color);
             break;
-        case logic::TurretKind::Zapper:
-        case logic::TurretKind::Mortar:
-        case logic::TurretKind::Gunner:
+        case logic::TurretDelivery::Pulse:
+        case logic::TurretDelivery::Shell:
+        case logic::TurretDelivery::Gun:
             gfx::drawCentered(batch, atlas, turret.center, glm::vec2(def.range * 2.0f), 0.0f, gfx::cellDisc(), color);
             break;
-        case logic::TurretKind::Mine:
+        case logic::TurretDelivery::Mine:
             gfx::drawCentered(batch, atlas, turret.center, glm::vec2(def.blastRadius * 2.0f), 0.0f, gfx::cellDisc(),
                               color);
             break;
-        case logic::TurretKind::SpikeBlock:
-        case logic::TurretKind::Barricade:
+        case logic::TurretDelivery::None:
             break;
     }
 }
@@ -258,10 +286,79 @@ const char* TurretPrep::placementProblem(const logic::Turret& turret, std::optio
 
 void TurretPrep::finish() {
     m_armed.reset();
+    m_lineStart.reset();
     if (m_dragging) {
         m_turrets = m_beforeDrag;
         m_dragging.reset();
     }
+}
+
+glm::vec2 TurretPrep::snapCenter(logic::TurretKind kind, glm::vec2 point, float facing) const {
+    if (!m_snap) {
+        return point;
+    }
+    // Snap the footprint's low edges, not its centre: footprints aren't all a
+    // whole number of cells across, and it's the edges that should meet walls.
+    const glm::vec2 half = boundsHalf(logic::turretDef(kind).halfSize, facing);
+    const glm::vec2 low = glm::round((point - half) / kSnapGrid) * kSnapGrid;
+    return low + half;
+}
+
+logic::Turret TurretPrep::ghost() const {
+    return logic::makeTurret(*m_armed, snapCenter(*m_armed, m_cursor, m_ghostFacing), m_ghostFacing);
+}
+
+std::vector<logic::Turret> TurretPrep::lineTurrets() const {
+    const logic::TurretKind kind = *m_armed;
+    const logic::TurretDef& def = logic::turretDef(kind);
+    const glm::vec2 start = *m_lineStart;
+    glm::vec2 span = m_cursor - start;
+    bool alongGrid = false; // horizontal or vertical
+    if (m_snap && glm::length(span) > 0.0f) {
+        // The nearest of eight directions: along the grid, or diagonally across it.
+        const float step = glm::radians(45.0f);
+        const float angle = std::round(std::atan2(span.y, span.x) / step) * step;
+        const glm::vec2 dir{std::cos(angle), std::sin(angle)};
+        span = dir * glm::dot(span, dir);
+        alongGrid = std::abs(dir.x) < 1.0e-3f || std::abs(dir.y) < 1.0e-3f;
+    }
+    const float length = glm::length(span);
+
+    float facing = m_ghostFacing;
+    std::vector<logic::Turret> line;
+    if (length < 1.0e-3f) {
+        line.push_back(logic::makeTurret(kind, start, facing));
+        return line;
+    }
+    const glm::vec2 along = span / length;
+    if (def.directional) {
+        // Long side along the line, so a line of barriers is one long wall.
+        facing = std::atan2(along.y, along.x);
+        if (def.halfSize.y > def.halfSize.x) {
+            facing += glm::radians(90.0f);
+        }
+    }
+    // The first turret stays where the drag began, re-snapped for the new facing.
+    const glm::vec2 first = snapCenter(kind, start, facing);
+
+    // How far apart: the footprint's length along the line, so they meet end
+    // to end. Along the grid that's rounded up to whole cells so every one
+    // stays on it; a diagonal keeps it exact, as cell-sized steps would leave
+    // gaps the crowd could slip through.
+    const glm::vec2 axisX{std::cos(facing), std::sin(facing)};
+    const glm::vec2 axisY{-axisX.y, axisX.x};
+    float spacing = 2.0f * (def.halfSize.x * std::abs(glm::dot(along, axisX)) +
+                            def.halfSize.y * std::abs(glm::dot(along, axisY)));
+    if (alongGrid) {
+        spacing = std::ceil(spacing / kSnapGrid - 1.0e-3f) * kSnapGrid;
+    }
+    spacing = std::max(spacing, 1.0f);
+
+    const auto count = std::min(static_cast<std::size_t>(length / spacing) + 1, logic::kMaxTurrets);
+    for (std::size_t i = 0; i < count; ++i) {
+        line.push_back(logic::makeTurret(kind, first + along * (spacing * static_cast<float>(i)), facing));
+    }
+    return line;
 }
 
 std::optional<std::size_t> TurretPrep::turretAt(glm::vec2 point) const {
@@ -279,9 +376,15 @@ void TurretPrep::remove(std::size_t index) {
 }
 
 void TurretPrep::rotate(float radians) {
+    // While snapping, land on a whole number of steps, so a turret turned
+    // with snapping off comes back into line.
+    const float step = std::abs(radians);
+    auto turned = [&](float facing) {
+        return m_snap ? std::round((facing + radians) / step) * step : facing + radians;
+    };
     if (m_armed) {
         if (logic::turretDef(*m_armed).directional) {
-            m_ghostFacing += radians;
+            m_ghostFacing = turned(m_ghostFacing);
         }
         return;
     }
@@ -289,7 +392,8 @@ void TurretPrep::rotate(float radians) {
         // Part of the drag: undone with it.
         logic::Turret& turret = m_turrets[*m_dragging];
         if (logic::turretDef(turret.kind).directional) {
-            turret.facing += radians;
+            turret.facing = turned(turret.facing);
+            turret.center = snapCenter(turret.kind, m_cursor + m_dragOffset, turret.facing);
         }
         return;
     }
@@ -298,7 +402,8 @@ void TurretPrep::rotate(float radians) {
         if (!logic::turretDef(rotated.kind).directional) {
             return;
         }
-        rotated.facing += radians;
+        rotated.facing = turned(rotated.facing);
+        rotated.center = snapCenter(rotated.kind, rotated.center, rotated.facing);
         if (placementProblem(rotated, hovered) == nullptr) {
             m_undo.push(m_turrets);
             m_turrets[*hovered] = rotated;
@@ -312,17 +417,21 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
             m_cursor = camera.screenToWorld({event.motion.x, event.motion.y});
             m_cursorInWorld = true;
             if (m_dragging) {
-                m_turrets[*m_dragging].center = m_cursor + m_dragOffset;
+                logic::Turret& turret = m_turrets[*m_dragging];
+                turret.center = snapCenter(turret.kind, m_cursor + m_dragOffset, turret.facing);
                 return true;
             }
-            return false;
+            return m_lineStart.has_value();
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
             m_cursor = camera.screenToWorld({event.button.x, event.button.y});
             if (event.button.button == SDL_BUTTON_LEFT) {
                 if (m_armed) {
-                    const logic::Turret turret = logic::makeTurret(*m_armed, m_cursor, m_ghostFacing);
-                    if (placementProblem(turret, std::nullopt) == nullptr) {
+                    const logic::Turret turret = ghost();
+                    if (placedOnGround(*m_armed)) {
+                        // Placed on release: a drag lays a line of them.
+                        m_lineStart = turret.center;
+                    } else if (placementProblem(turret, std::nullopt) == nullptr) {
                         m_undo.push(m_turrets);
                         m_turrets.push_back(turret);
                     }
@@ -337,6 +446,10 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
                 return false;
             }
             if (event.button.button == SDL_BUTTON_RIGHT) {
+                if (m_lineStart) {
+                    m_lineStart.reset(); // cancels the line, keeps the kind armed
+                    return true;
+                }
                 if (m_armed) {
                     m_armed.reset();
                     return true;
@@ -350,6 +463,22 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
         }
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (event.button.button == SDL_BUTTON_LEFT && m_lineStart) {
+                m_cursor = camera.screenToWorld({event.button.x, event.button.y});
+                // Every one that fits goes down, as one undo step; ones in the
+                // way (a wall, a turret, the level's edge) are skipped.
+                const std::vector<logic::Turret> before = m_turrets;
+                for (const logic::Turret& turret : lineTurrets()) {
+                    if (placementProblem(turret, std::nullopt) == nullptr) {
+                        m_turrets.push_back(turret);
+                    }
+                }
+                if (m_turrets.size() != before.size()) {
+                    m_undo.push(before);
+                }
+                m_lineStart.reset();
+                return true;
+            }
             if (event.button.button == SDL_BUTTON_LEFT && m_dragging) {
                 // Somewhere it can't go snaps back; a real move is one undo step.
                 const logic::Turret& moved = m_turrets[*m_dragging];
@@ -368,13 +497,17 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
         case SDL_EVENT_KEY_DOWN: {
             const bool ctrl = (event.key.mod & SDL_KMOD_CTRL) != 0;
             const bool shift = (event.key.mod & SDL_KMOD_SHIFT) != 0;
-            if (m_dragging && event.key.key != SDLK_Q && event.key.key != SDLK_E) {
+            if ((m_dragging || m_lineStart) && event.key.key != SDLK_Q && event.key.key != SDLK_E) {
                 return false; // undoing mid-drag would leave the drag pointing at the wrong turret
             }
             switch (event.key.key) {
+                case SDLK_G:
+                    m_snap = !m_snap;
+                    return true;
                 case SDLK_Q:
                 case SDLK_E: {
-                    const float step = shift ? kFineRotateStep : kRotateStep;
+                    const float step = m_snap ? (shift ? kRotateStep : kSnapRotateStep)
+                                              : (shift ? kFineRotateStep : kRotateStep);
                     rotate(event.key.key == SDLK_Q ? -step : step);
                     return true;
                 }
@@ -386,6 +519,10 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
                     }
                     return false;
                 case SDLK_ESCAPE:
+                    if (m_lineStart) {
+                        m_lineStart.reset();
+                        return true;
+                    }
                     if (m_armed) {
                         m_armed.reset();
                         return true;
@@ -431,15 +568,19 @@ void TurretPrep::render(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUT
     }
 
     // Hidden while the cursor is over a panel: ImGui would get the click.
-    if (m_armed && m_cursorInWorld && !ImGui::GetIO().WantCaptureMouse) {
-        const logic::Turret ghost = logic::makeTurret(*m_armed, m_cursor, m_ghostFacing);
-        const logic::TurretDef& def = logic::turretDef(ghost.kind);
-        const bool ok = placementProblem(ghost, std::nullopt) == nullptr;
-        const glm::vec4 color = previewColor(def, weapons, ok);
-        // The reach shows where it can go even when the sprite keeps its colours.
-        const glm::vec4 reach = ok ? glm::vec4(0.3f, 0.9f, 0.4f, 0.15f) : glm::vec4(0.9f, 0.2f, 0.2f, 0.15f);
-        drawReach(batch, atlas, ghost, reach);
-        drawTurret(batch, atlas, weapons, ghost, color);
+    // A line being dragged shows every turret it would place, even over a panel.
+    const bool showGhost = m_cursorInWorld && !ImGui::GetIO().WantCaptureMouse;
+    if (m_armed && (m_lineStart || showGhost)) {
+        const std::vector<logic::Turret> previews = m_lineStart ? lineTurrets() : std::vector{ghost()};
+        for (const logic::Turret& preview : previews) {
+            const logic::TurretDef& def = logic::turretDef(preview.kind);
+            const bool ok = placementProblem(preview, std::nullopt) == nullptr;
+            const glm::vec4 color = previewColor(def, weapons, ok);
+            // The reach shows where it can go even when the sprite keeps its colours.
+            const glm::vec4 reach = ok ? glm::vec4(0.3f, 0.9f, 0.4f, 0.15f) : glm::vec4(0.9f, 0.2f, 0.2f, 0.15f);
+            drawReach(batch, atlas, preview, reach);
+            drawTurret(batch, atlas, weapons, preview, color);
+        }
     }
 }
 
@@ -459,19 +600,18 @@ void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTe
             color = glm::vec4(glm::vec3(color) * (0.33f + 0.67f * left), 1.0f);
         }
         // What is firing all the time shows; pulses and shells show as explosions.
-        if (turret.kind == logic::TurretKind::Flamer || turret.kind == logic::TurretKind::Beam) {
-            logic::Turret aimed = turret;
-            aimed.facing = effects.aimOf(i);
-            if (turret.kind == logic::TurretKind::Beam) {
-                const glm::vec2 dir{std::cos(aimed.facing), std::sin(aimed.facing)};
-                gfx::drawCentered(batch, atlas, turret.center + dir * (def.range * 0.5f),
-                                  {def.range, def.blastRadius}, aimed.facing, gfx::cellSolid(),
-                                  glm::vec4(1.0f, 0.3f, 0.9f, 0.7f));
-            } else {
-                drawCone(batch, atlas, turret.center, turret.facing, def.range, def.arc,
-                         glm::vec4(1.0f, 0.5f, 0.1f, 0.25f));
-            }
-            turret.facing = aimed.facing;
+        if (def.delivery == logic::TurretDelivery::Sweep) {
+            turret.facing = effects.aimOf(i);
+            const glm::vec2 dir{std::cos(turret.facing), std::sin(turret.facing)};
+            gfx::drawCentered(batch, atlas, turret.center + dir * (def.range * 0.5f), {def.range, def.blastRadius},
+                              turret.facing, gfx::cellSolid(), glm::vec4(1.0f, 0.3f, 0.9f, 0.7f));
+        } else if (def.delivery == logic::TurretDelivery::Cone) {
+            // Weapons in their category's colour; an aura fainter, as it covers so much.
+            const bool aura = def.arc >= glm::radians(359.0f);
+            const glm::vec4 cone = def.category
+                                       ? glm::vec4(glm::vec3(logic::weaponCategoryColor(*def.category)), aura ? 0.12f : 0.25f)
+                                       : glm::vec4(1.0f, 0.5f, 0.1f, 0.25f);
+            drawCone(batch, atlas, turret.center, turret.facing, def.range, def.arc, cone);
         }
         drawTurret(batch, atlas, weapons, turret, color);
     }
@@ -480,47 +620,89 @@ void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTe
 void TurretPrep::ui() {
     ImGui::SeparatorText("Turrets");
     ImGui::Text("%zu / %zu placed", m_turrets.size(), logic::kMaxTurrets);
+    ImGui::SameLine();
+    ImGui::Checkbox("Snap to grid (G)", &m_snap);
 
-    for (std::size_t i = 0; i < logic::kTurretKindCount; ++i) {
-        const auto kind = static_cast<logic::TurretKind>(i);
-        const logic::TurretDef& def = logic::turretDef(kind);
-        if (i % 4 != 0) {
-            ImGui::SameLine();
-        }
-        const bool armed = m_armed && *m_armed == kind;
-        if (armed) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        }
-        if (ImGui::Button(def.name, ImVec2(96.0f, 0.0f))) {
-            if (armed) {
-                m_armed.reset();
-            } else {
-                m_armed = kind;
-                if (!def.directional) {
-                    m_ghostFacing = 0.0f;
+    // A group per weapon category, in its colour, then the original turrets,
+    // which have none.
+    for (std::size_t group = 0; group <= logic::kWeaponCategoryCount; ++group) {
+        const bool original = group == logic::kWeaponCategoryCount;
+        const std::optional<logic::WeaponCategory> category =
+            original ? std::nullopt : std::optional(static_cast<logic::WeaponCategory>(group));
+        const glm::vec4 tone = category ? logic::weaponCategoryColor(*category) : glm::vec4(0.6f, 0.6f, 0.6f, 1.0f);
+
+        int inRow = 0;
+        for (std::size_t i = 0; i < logic::kTurretKindCount; ++i) {
+            const auto kind = static_cast<logic::TurretKind>(i);
+            const logic::TurretDef& def = logic::turretDef(kind);
+            if (def.category != category) {
+                continue;
+            }
+            if (inRow == 0) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tone.r, tone.g, tone.b, 1.0f));
+                ImGui::SeparatorText(category ? logic::weaponCategoryName(*category) : "Original turrets");
+                ImGui::PopStyleColor();
+            } else if (inRow % 3 != 0) {
+                ImGui::SameLine();
+            }
+            ++inRow;
+
+            const bool armed = m_armed && *m_armed == kind;
+            const float shade = armed ? 0.85f : 0.45f;
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(tone.r * shade, tone.g * shade, tone.b * shade, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(tone.r * 0.7f, tone.g * 0.7f, tone.b * 0.7f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(tone.r * 0.85f, tone.g * 0.85f, tone.b * 0.85f, 1.0f));
+            if (ImGui::Button(def.name, ImVec2(140.0f, 0.0f))) {
+                if (armed) {
+                    m_armed.reset();
+                } else {
+                    m_armed = kind;
+                    if (!def.directional) {
+                        m_ghostFacing = 0.0f;
+                    }
                 }
             }
-        }
-        if (armed) {
-            ImGui::PopStyleColor();
-        }
-        if (ImGui::IsItemHovered()) {
-            const char* where = def.placement == logic::TurretClass::Mount     ? "on top of a wall"
-                                : def.placement == logic::TurretClass::Blocker ? "on open ground; solid"
-                                                                               : "on open ground";
-            ImGui::SetTooltip("%s: placed %s", def.name, where);
+            ImGui::PopStyleColor(3);
+            if (ImGui::IsItemHovered()) {
+                const char* where = def.placement == logic::TurretClass::Mount     ? "on top of a wall"
+                                    : def.placement == logic::TurretClass::Blocker ? "on open ground; solid"
+                                                                                   : "on open ground";
+                ImGui::BeginTooltip();
+                if (def.spriteId != 0) {
+                    ImGui::Text("#%u %s", static_cast<unsigned>(def.spriteId), def.name);
+                } else {
+                    ImGui::TextUnformatted(def.name);
+                }
+                if (category) {
+                    std::string kinds = logic::weaponCategoryName(*category);
+                    for (std::size_t c = 0; c < logic::kWeaponCategoryCount; ++c) {
+                        const auto other = static_cast<logic::WeaponCategory>(c);
+                        if ((def.secondaryCategories & logic::categoryBit(other)) != 0) {
+                            kinds += std::string(" + ") + logic::weaponCategoryName(other);
+                        }
+                    }
+                    ImGui::TextColored(ImVec4(tone.r, tone.g, tone.b, 1.0f), "%s", kinds.c_str());
+                }
+                if (def.blurb[0] != '\0') {
+                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 20.0f);
+                    ImGui::TextUnformatted(def.blurb);
+                    ImGui::PopTextWrapPos();
+                }
+                ImGui::TextDisabled("Placed %s", where);
+                ImGui::EndTooltip();
+            }
         }
     }
 
     if (m_armed) {
-        const logic::Turret ghost = logic::makeTurret(*m_armed, m_cursor, m_ghostFacing);
-        if (const char* problem = m_cursorInWorld ? placementProblem(ghost, std::nullopt) : nullptr) {
+        if (const char* problem = m_cursorInWorld ? placementProblem(ghost(), std::nullopt) : nullptr) {
             ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "%s", problem);
         } else {
             ImGui::TextUnformatted("");
         }
     }
     ImGui::TextDisabled("Left: place / drag   Right: cancel / remove");
+    ImGui::TextDisabled("Blockers and floor traps: drag to lay a line");
     ImGui::TextDisabled("Q/E: rotate   Ctrl+Z/Y: undo/redo");
 }
 

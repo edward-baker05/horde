@@ -31,9 +31,12 @@ namespace horde::scene {
 //
 // Mouse and keys, while the cursor isn't over a panel:
 //   left click        place the armed kind; or, with none armed, grab a turret to drag it
-//   right click       disarm; or, with none armed, remove the turret under the cursor
-//   Q / E             rotate the ghost, the dragged turret or the one under the cursor
-//                     by 15 degrees (1 with Shift)
+//   left drag         with a blocker or floor trap armed, lay a line of them end to end
+//   G                 toggle snapping to the wall grid (on by default)
+//   right click       disarm or cancel a line; or, with none armed, remove the turret
+//                     under the cursor
+//   Q / E             rotate the ghost, the dragged turret or the one under the cursor:
+//                     45 degrees (15 with Shift) while snapping, else 15 (1 with Shift)
 //   Delete            remove the turret under the cursor
 //   Esc               disarm
 //   Ctrl+Z / Ctrl+Y   undo / redo (Ctrl+Shift+Z redoes too)
@@ -68,6 +71,14 @@ public:
     const char* placementProblem(const logic::Turret& turret, std::optional<std::size_t> ignore) const;
 
 private:
+    // Where a turret of `kind` facing `facing` goes for `point`: with snapping
+    // on, moved so its footprint's edges lie on the wall grid's cell lines.
+    glm::vec2 snapCenter(logic::TurretKind kind, glm::vec2 point, float facing) const;
+    // The armed kind as it would be placed at the cursor.
+    logic::Turret ghost() const;
+    // The turrets a line drag from m_lineStart to the cursor would place,
+    // end to end; the first is where the drag began.
+    std::vector<logic::Turret> lineTurrets() const;
     // The topmost placed turret under `point`.
     std::optional<std::size_t> turretAt(glm::vec2 point) const;
     void rotate(float radians);
@@ -89,6 +100,13 @@ private:
     std::optional<std::size_t> m_dragging;
     glm::vec2 m_dragOffset{0.0f, 0.0f};
     std::vector<logic::Turret> m_beforeDrag;
+
+    // Snap placement and moves to the wall grid, and rotation to 45 degrees.
+    bool m_snap = true;
+
+    // A line of ground turrets being dragged out: where it began (already
+    // snapped). Placed on release.
+    std::optional<glm::vec2> m_lineStart;
 };
 
 // The turrets as the wave has them: beams where they point now, blockers
