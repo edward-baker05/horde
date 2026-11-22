@@ -108,7 +108,16 @@ and the SPIR-V.
 ```sh
 # Regenerate the placeholder sprite atlas
 python3 tools/make_placeholder_atlas.py
+
+# Rebuild the unit sprite atlas after editing assets/art/unit_sheet.png
+# (or the palettes in the tool); writes assets/textures/units.png and the
+# generated src/gfx/UnitSpriteData.hpp + shaders/src/unit_sprites.hlsli
+python3 tools/make_unit_atlas.py
 ```
+
+The unit sheet is drawn in fixed key colours, one per role (hair, hair light,
+skin, clothes, accessory...); the colours units actually wear come from the
+palettes. See the docstring at the top of `tools/make_unit_atlas.py`.
 
 Assets are copied next to the executable by the `horde_runtime_files` target on
 every build.

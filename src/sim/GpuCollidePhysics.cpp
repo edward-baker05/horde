@@ -673,7 +673,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 }
 
 void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                                   const glm::mat4& viewProjection, float alpha) {
+                                   const glm::mat4& viewProjection, glm::vec2 viewportPx, float alpha) {
     // m_prevPositions holds where each unit started the latest step, which
     // unit_integrate writes before moving it: exactly the previous state.
     gfx::UnitRenderer::DrawOptions options;
@@ -685,6 +685,17 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.maxHealth = static_cast<float>(m_config.health.maxHp);
     options.ids = m_ids;
     options.slots = m_slots;
+    options.viewportPx = viewportPx;
+    options.sprites = m_sprites.enabled;
+    options.species = m_sprites.species;
+    options.lod = m_sprites.lod;
+    options.thresholds = m_sprites.thresholds;
+    options.rotate = m_sprites.rotate;
+    options.directionSteps = static_cast<Uint32>(m_sprites.directionSteps);
+    // Below a few percent of walking pace there's no clear direction to face.
+    options.minTurnSpeed = 0.05f * m_config.movement.maxSpeed;
+    options.integerScale = m_sprites.integerScale;
+    options.seed = m_config.flow.seed;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
 }
 
@@ -695,6 +706,47 @@ void GpuCollidePhysics::debugUi() {
         m_config.movement.wobbleAngle = glm::radians(wobbleDegrees);
     }
     ImGui::SliderFloat(tr("Wobble rate"), &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
+
+    using Renderer = gfx::UnitRenderer;
+    ImGui::SeparatorText(tr("Unit sprites"));
+    if (!m_renderer.hasSprites()) {
+        ImGui::TextDisabled(tr("textures/units.png not loaded: drawing discs"));
+        return;
+    }
+    ImGui::Checkbox(tr("Sprites"), &m_sprites.enabled);
+    if (!m_sprites.enabled) {
+        return;
+    }
+    int species = static_cast<int>(m_sprites.species);
+    if (ImGui::Combo(tr("Crowd"), &species, "Humans\0Aliens\0")) {
+        m_sprites.species = static_cast<Renderer::Species>(species);
+    }
+    // Combo index 0 is Auto (-1); the rest follow Lod's values.
+    int lod = static_cast<int>(m_sprites.lod) + 1;
+    if (ImGui::Combo(tr("LOD"), &lod, "Auto\0Near\0Mid\0Low\0Circle\0")) {
+        m_sprites.lod = static_cast<Renderer::Lod>(lod - 1);
+    }
+    // Screen pixels a unit must span for each LOD; below low it's a circle.
+    Renderer::LodThresholds& t = m_sprites.thresholds;
+    ImGui::BeginDisabled(m_sprites.lod != Renderer::Lod::Auto);
+    ImGui::SliderFloat(tr("Near from"), &t.nearPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Mid from"), &t.midPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Low from"), &t.lowPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Hysteresis"), &t.hysteresis, 0.0f, 3.0f, "%.1f px");
+    t.midPixels = std::min(t.midPixels, t.nearPixels); // mid can't start above near
+    t.lowPixels = std::min(t.lowPixels, t.midPixels);
+    if (ImGui::Button(tr("Reset LOD thresholds"))) {
+        t = Renderer::LodThresholds{};
+    }
+    ImGui::EndDisabled();
+    ImGui::Checkbox(tr("Whole-pixel scale"), &m_sprites.integerScale);
+    ImGui::Checkbox(tr("Face direction of travel"), &m_sprites.rotate);
+    ImGui::BeginDisabled(!m_sprites.rotate);
+    ImGui::SliderInt(tr("Directions"), &m_sprites.directionSteps, 0, 32, m_sprites.directionSteps == 0 ? "any" : "%d");
+    ImGui::EndDisabled();
+    static const char* const kLodNames[] = {"near", "mid", "low", "circle"};
+    ImGui::Text("Drawing %s, %.1f px per unit", kLodNames[static_cast<int>(m_renderer.lastLod())],
+                m_renderer.lastUnitPixels());
 }
 
 bool GpuCollidePhysics::readHealth(std::vector<float>& out) {

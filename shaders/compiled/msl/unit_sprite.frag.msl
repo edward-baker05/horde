@@ -1,0 +1,194 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_UnitSpriteUniforms
+{
+    float4 Palette[83];
+    uint SpriteMode;
+    uint Lod;
+    uint2 Padding;
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_TEXCOORD0 [[user(locn0)]];
+    float2 in_var_TEXCOORD1 [[user(locn1)]];
+    uint4 in_var_TEXCOORD2 [[user(locn2)]];
+    float2 in_var_TEXCOORD3 [[user(locn3), flat]];
+    float2 in_var_TEXCOORD4 [[user(locn4), flat]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant type_UnitSpriteUniforms& UnitSpriteUniforms [[buffer(0)]], texture2d<float> Atlas [[texture(0)]], sampler AtlasSampler [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 _281;
+    do
+    {
+        bool _77;
+        if (UnitSpriteUniforms.SpriteMode != 0u)
+        {
+            _77 = UnitSpriteUniforms.Lod >= 3u;
+        }
+        else
+        {
+            _77 = false;
+        }
+        if (_77)
+        {
+            if (dot(in.in_var_TEXCOORD1, in.in_var_TEXCOORD1) > 6.25)
+            {
+                discard_fragment();
+            }
+            float3 _154;
+            switch (uint(rint(Atlas.sample(AtlasSampler, (in.in_var_TEXCOORD3 * float2(0.009615384973585605621337890625, 0.0064102564938366413116455078125)), level(0.0)).x * 255.0)))
+            {
+                case 1u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x].xyz;
+                    break;
+                }
+                case 2u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 1u].xyz;
+                    break;
+                }
+                case 3u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 2u].xyz;
+                    break;
+                }
+                case 4u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y].xyz;
+                    break;
+                }
+                case 5u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y + 1u].xyz;
+                    break;
+                }
+                case 6u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.z].xyz;
+                    break;
+                }
+                case 7u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w].xyz;
+                    break;
+                }
+                case 8u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w + 1u].xyz;
+                    break;
+                }
+                case 9u:
+                {
+                    _154 = UnitSpriteUniforms.Palette[81u].xyz;
+                    break;
+                }
+                default:
+                {
+                    _154 = UnitSpriteUniforms.Palette[82u].xyz;
+                    break;
+                }
+            }
+            _281 = float4(_154 * in.in_var_TEXCOORD0.xyz, in.in_var_TEXCOORD0.w);
+            break;
+        }
+        if (UnitSpriteUniforms.SpriteMode == 0u)
+        {
+            _281 = Atlas.sample(AtlasSampler, in.in_var_TEXCOORD1) * in.in_var_TEXCOORD0;
+            break;
+        }
+        float2 _172 = floor(in.in_var_TEXCOORD1 + float2(0.5));
+        float _176 = _172.x;
+        float _180 = _172.y;
+        float2 _187 = float2(((-in.in_var_TEXCOORD4.y) * _176) + (in.in_var_TEXCOORD4.x * _180), ((-in.in_var_TEXCOORD4.x) * _176) - (in.in_var_TEXCOORD4.y * _180));
+        if (any(abs(_187) > float2(6.4899997711181640625)))
+        {
+            discard_fragment();
+        }
+        float4 _198 = Atlas.sample(AtlasSampler, ((in.in_var_TEXCOORD3 + _187) * float2(0.009615384973585605621337890625, 0.0064102564938366413116455078125)), level(0.0));
+        uint _202 = uint(rint(_198.x * 255.0));
+        bool _208;
+        if (_202 != 0u)
+        {
+            _208 = _198.w < 0.5;
+        }
+        else
+        {
+            _208 = true;
+        }
+        if (_208)
+        {
+            discard_fragment();
+        }
+        float3 _272;
+        switch (_202)
+        {
+            case 1u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x].xyz;
+                break;
+            }
+            case 2u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 1u].xyz;
+                break;
+            }
+            case 3u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.x + 2u].xyz;
+                break;
+            }
+            case 4u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y].xyz;
+                break;
+            }
+            case 5u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.y + 1u].xyz;
+                break;
+            }
+            case 6u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.z].xyz;
+                break;
+            }
+            case 7u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w].xyz;
+                break;
+            }
+            case 8u:
+            {
+                _272 = UnitSpriteUniforms.Palette[in.in_var_TEXCOORD2.w + 1u].xyz;
+                break;
+            }
+            case 9u:
+            {
+                _272 = UnitSpriteUniforms.Palette[81u].xyz;
+                break;
+            }
+            default:
+            {
+                _272 = UnitSpriteUniforms.Palette[82u].xyz;
+                break;
+            }
+        }
+        _281 = float4(_272 * in.in_var_TEXCOORD0.xyz, in.in_var_TEXCOORD0.w);
+        break;
+    } while(false);
+    out.out_var_SV_Target0 = _281;
+    return out;
+}
+

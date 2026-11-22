@@ -4,6 +4,10 @@
 
 #include <glm/glm.hpp>
 
+#include "gfx/Texture.hpp"
+
+struct SDL_Window;
+
 namespace horde::scene {
 struct Services;
 }
@@ -25,6 +29,40 @@ public:
 
     bool init(scene::Services& services);
     void shutdown();
+
+    // Which crowd the sprites draw: they share art roles but not palettes.
+    enum class Species : Uint32 { Humans = 0, Aliens = 1 };
+
+    // Sprite level of detail. Auto picks from how many screen pixels a unit
+    // covers; the rest force one, for looking at the art.
+    enum class Lod : int { Auto = -1, Near = 0, Mid = 1, Low = 2, Circle = 3 };
+
+    // When Auto switches LOD: a unit must span at least `nearPixels` screen
+    // pixels to draw near art, `midPixels` for mid and `lowPixels` for low,
+    // else a plain circle. Leaving a
+    // LOD takes `hysteresis` pixels fewer than entering it, so zooming across
+    // a threshold doesn't flicker.
+    struct LodThresholds {
+        float nearPixels = 40.0f;
+        float midPixels = 14.0f;
+        float lowPixels = 8.0f; // low art is 5px across: below 5 it loses pixels
+        float hysteresis = 0.0f;
+    };
+
+    // The level of detail the latest sprite draw used (never Auto).
+    Lod lastLod() const {
+        return m_lod;
+    }
+
+    // Screen pixels one unit spanned in the latest draw.
+    float lastUnitPixels() const {
+        return m_unitPixels;
+    }
+
+    // Whether the sprite atlas loaded; without it units draw as discs.
+    bool hasSprites() const {
+        return m_unitAtlas != nullptr;
+    }
 
     // Per-unit extras a physics system can supply.
     //
@@ -49,6 +87,25 @@ public:
         float maxHealth = 1.0f;
         SDL_GPUBuffer* ids = nullptr; // null: a unit's ID is its index
         SDL_GPUBuffer* slots = nullptr; // null: draw in index order
+        // Pixel size of the render target, for picking the sprite LOD.
+        glm::vec2 viewportPx{0.0f};
+
+        // Crowd sprites instead of flat discs: each unit's look comes from
+        // hashing its ID with `seed`, so `ids` should be set when units are
+        // reordered. The level of detail follows the zoom unless `lod` forces
+        // one. `integerScale` rounds sprite pixels to whole screen pixels.
+        bool sprites = true;
+        Species species = Species::Humans;
+        Lod lod = Lod::Auto;
+        LodThresholds thresholds;
+        bool integerScale = false;
+        // Turn near and mid sprites to face the way each unit walks, snapped
+        // to `directionSteps` directions (0 = any angle). Units slower than
+        // `minTurnSpeed` (world units per second) keep facing up.
+        bool rotate = true;
+        Uint32 directionSteps = 16;
+        float minTurnSpeed = 1.0f;
+        Uint32 seed = 0;
     };
 
     // `units` holds at least `count` BaseUnitData entries.
@@ -62,8 +119,17 @@ public:
     }
 
 private:
+    // Picks the sprite LOD for a unit `unitPixels` across, with hysteresis
+    // so zooming across a threshold doesn't flicker between two.
+    Lod pickLod(float unitPixels, const LodThresholds& thresholds) const;
+
     SDL_GPUDevice* m_device = nullptr;
     SDL_GPUTexture* m_atlas = nullptr;
+    SDL_GPUTexture* m_unitAtlas = nullptr; // owned by m_unitAtlasTexture
+    Texture m_unitAtlasTexture;
+    // Updated by draw(), which is otherwise const.
+    mutable Lod m_lod = Lod::Near;
+    mutable float m_unitPixels = 0.0f;
     SDL_GPUGraphicsPipeline* m_pipeline = nullptr;
     SDL_GPUSampler* m_sampler = nullptr;
 };

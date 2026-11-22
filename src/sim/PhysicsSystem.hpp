@@ -203,7 +203,8 @@ struct SimConfig {
 //   update()      CPU work for one step; must not rely on compute() running in between
 //   compute()     GPU dispatches and uploads for one step, before the render pass begins
 //   renderPass()  draws inside the frame's render pass, `alpha` of the way from
-//                 the previous step's state to the latest
+//                 the previous step's state to the latest, into a target
+//                 `viewportPx` pixels across
 class PhysicsSystem {
 public:
     virtual ~PhysicsSystem() = default;
@@ -223,7 +224,7 @@ public:
     }
 
     virtual void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, const glm::mat4& viewProjection,
-                            float alpha) = 0;
+                            glm::vec2 viewportPx, float alpha) = 0;
 
     // Extra lines for the level's debug panel.
     virtual void debugUi() {}

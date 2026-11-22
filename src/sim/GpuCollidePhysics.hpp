@@ -42,7 +42,7 @@ public:
     void update(float dt) override;
     void compute(SDL_GPUCommandBuffer* commands) override;
     void renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass, const glm::mat4& viewProjection,
-                    float alpha) override;
+                    glm::vec2 viewportPx, float alpha) override;
     void debugUi() override;
     bool readUnits(std::vector<BaseUnitData>& out) override;
     bool readHealth(std::vector<float>& out) override;
@@ -93,6 +93,16 @@ private:
 
     SDL_GPUDevice* m_device = nullptr;
     gfx::UnitRenderer m_renderer;
+    // How units are drawn; changed from the debug UI.
+    struct SpriteSettings {
+        bool enabled = true;
+        gfx::UnitRenderer::Species species = gfx::UnitRenderer::Species::Humans;
+        gfx::UnitRenderer::Lod lod = gfx::UnitRenderer::Lod::Auto;
+        gfx::UnitRenderer::LodThresholds thresholds;
+        bool rotate = true;
+        int directionSteps = 16; // 0 = any angle
+        bool integerScale = false;
+    } m_sprites;
     GpuSpatialGrid m_grid;
     GpuUnitCollisions m_collisions;
     GpuUnitReorder m_reorder;

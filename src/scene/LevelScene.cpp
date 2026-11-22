@@ -276,7 +276,7 @@ void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* p
     // How far between the last physics step and the next this frame falls.
     const float alpha =
         m_options.physicsRate > 0.0f ? std::clamp(m_stepAccumulator * m_options.physicsRate, 0.0f, 1.0f) : 1.0f;
-    m_physics->renderPass(commands, pass, m_camera.viewProjection(), alpha);
+    m_physics->renderPass(commands, pass, m_camera.viewProjection(), m_camera.viewport(), alpha);
 }
 
 namespace {
