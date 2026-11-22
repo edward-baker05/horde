@@ -4,6 +4,8 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_video.h>
 
+#include "ui/ShellState.hpp"
+
 namespace horde::gfx {
 class Camera2D;
 class GpuContext;
@@ -11,6 +13,15 @@ class ShaderLoader;
 class SpriteBatch;
 class Texture;
 } // namespace horde::gfx
+
+namespace horde::audio {
+class MusicPlayer;
+}
+
+namespace horde::ui {
+class RmlLayer;
+class DeviceShell;
+}
 
 namespace horde::scene {
 
@@ -38,14 +49,11 @@ struct Services {
     gfx::GpuContext* gpu = nullptr;
     gfx::ShaderLoader* shaders = nullptr;
     gfx::Texture* atlas = nullptr; // shared sprite atlas
-    SDL_Window* window = nullptr;
     SceneStack* scenes = nullptr;
-    const FrameStats* frameStats = nullptr;
-    // When set, App submits the scene's compute work on a command buffer of
-    // its own and times it into FrameStats::simGpuMs. While playing that is
-    // done off the main thread with fences, costing the GPU nothing; a
-    // benchmark waits for the work instead, to isolate it exactly.
-    bool* measureSimGpu = nullptr;
+    ui::RmlLayer* ui = nullptr;
+    ui::DeviceShell* shell = nullptr;
+    audio::MusicPlayer* music = nullptr; // null when there is no sound device
+    bool dancingCow = false;             // off in benchmarks, so timings stay comparable
 };
 
 // A distinct view of the game: the level, the tech tree, the main menu.
@@ -65,9 +73,24 @@ public:
 
     virtual void onExit() {}
 
+    // Which device (if any) this scene lives on. Read by SceneStack to drive
+    // the device shell; the default keeps the scene on the swapchain.
+    virtual ui::ScenePresentation presentation() const { return {}; }
+
+    // Another scene was pushed on top / that scene was popped again.
+    virtual void onCovered() {}
+    virtual void onRevealed() {}
+
     // Return true if the event was consumed and should not propagate.
     virtual bool handleEvent(const SDL_Event& event) {
         (void)event;
+        return false;
+    }
+
+    // True while the scene is in the middle of a mouse gesture (a drag, a
+    // stroke), so mouse events skip the UI and reach it even over a panel:
+    // releasing the button there still ends the gesture.
+    virtual bool capturesPointer() const {
         return false;
     }
 

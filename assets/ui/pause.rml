@@ -1,0 +1,39 @@
+<rml>
+<head>
+	<title>Paused</title>
+	<link type="text/rcss" href="phone.rcss"/>
+</head>
+<body data-model="pause">
+	<div class="band">
+		<div class="status-bar"></div>
+		<div class="hero">
+			<div class="spin"><img src="folk/rosette.png"/></div>
+			<div class="title-row">
+				<img class="bird" src="folk/bird_r.png"/><span class="wordmark">PAUZA</span><img class="bird" src="folk/bird_l.png"/>
+			</div>
+			<span class="tagline">„Horda poczeka.”</span>
+			<img class="tulips" src="folk/tulips.png"/>
+		</div>
+	</div>
+	<div class="scallop"/>
+
+	<div class="page red">
+		<button class="primary" data-event-click="resume">WZNÓW</button>
+
+		<div class="group">
+			<button class="row" data-event-click="restart">Od nowa</button>
+		</div>
+
+		<div class="group" data-if="!to_editor">
+			<button class="row danger" data-event-click="quit">Wyjdź do menu</button>
+		</div>
+		<div class="group" data-if="to_editor">
+			<button class="row danger" data-event-click="quit">Wróć do edytora</button>
+		</div>
+	</div>
+
+	<div class="home-bar"/>
+	<div class="pasiak top"/>
+	<div class="pasiak bottom"/>
+</body>
+</rml>

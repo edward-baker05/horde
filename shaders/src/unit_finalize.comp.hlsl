@@ -21,8 +21,17 @@ RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float> Health : register(u1, space1); // hit points, 0 to the max
 // Velocity from flinging explosions, which is free of the speed cap.
 RWStructuredBuffer<float2> Fling : register(u2, space1);
+// What a round needs to know, cumulative since the level started and never
+// cleared: [0] units killed, [1] units that left through an exit, [2 + i]
+// unit-steps spent touching tower slot i. Matches sim::RoundCounters.
+RWStructuredBuffer<uint> Counters : register(u3, space1);
 
 #define MAX_MARKERS 8
+#define MAX_TOWERS 32
+
+static const uint EXIT_STOP = 0;    // units that reach an exit stay there
+static const uint EXIT_RESPAWN = 1; // back in at a spawn, after the exit damage
+static const uint EXIT_REMOVE = 2;  // out of the level for good, counted as leaked
 
 // Matches GPUFinalizeUniforms in sim/GpuCollidePhysics.cpp
 cbuffer FinalizeParams : register(b0, space2) {
@@ -38,11 +47,13 @@ cbuffer FinalizeParams : register(b0, space2) {
     uint ExitCount;
     uint SpawnCount;
     uint Frame;         // varies the respawn position from frame to frame
-    uint RespawnOnExit; // 0: units that reach an exit stay there
+    uint ExitMode;      // EXIT_*
     float ExitDamage;   // hit points lost on reaching an exit
-    uint3 HealthPadding;
+    uint TowerCount;
+    uint2 HealthPadding;
     float4 Exits[MAX_MARKERS];  // xy = centre, zw = half size
     float4 Spawns[MAX_MARKERS]; // xy = centre, zw = half size
+    float4 Towers[MAX_TOWERS];  // xy = centre, z = radius (0: empty slot); see walls.hlsli
 };
 
 #define WALL_PRIMS_SLOT t1
@@ -139,9 +150,29 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     }
     unit.vel = vel;
 
+    // Pressed up against a tower: one step of wear on it. Half a world unit
+    // of slack, since the wall push leaves units resting on the surface.
+    float2 here = unit.pos + Radius;
+    for (uint t = 0; t < TowerCount; ++t) {
+        float4 tower = Towers[t];
+        if (tower.z > 0.0f && length(here - tower.xy) <= tower.z + Radius + 0.5f) {
+            InterlockedAdd(Counters[2 + t], 1);
+        }
+    }
+
+    // Out through the exit in a round: gone for good, and counted.
+    if (ExitMode == EXIT_REMOVE && reachedExit(here)) {
+        unit.pos = float2(DEAD_POSITION, DEAD_POSITION);
+        unit.vel = float2(0.0f, 0.0f);
+        Fling[index] = float2(0.0f, 0.0f);
+        Units[index] = unit;
+        InterlockedAdd(Counters[1], 1);
+        return;
+    }
+
     // Through the exit: take the damage, then back in at a random point of a
     // random spawn, at rest, keeping whatever health is left.
-    if (RespawnOnExit != 0 && SpawnCount > 0 && reachedExit(unit.pos + Radius)) {
+    if (ExitMode == EXIT_RESPAWN && SpawnCount > 0 && reachedExit(unit.pos + Radius)) {
         Health[index] = max(Health[index] - ExitDamage, 0.0f);
 
         uint h = hash(index ^ hash(Frame));
@@ -152,9 +183,10 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         fling = float2(0.0f, 0.0f);
     }
 
-    // Out of hit points, from an exit or an explosion: despawn. Every pass
-    // skips it from here on.
+    // Out of hit points, from an exit or an explosion: despawn, and count the
+    // kill. Every pass skips a dead unit from here on, so each counts once.
     if (Health[index] <= 0.0f) {
+        InterlockedAdd(Counters[0], 1);
         unit.pos = float2(DEAD_POSITION, DEAD_POSITION);
         unit.vel = float2(0.0f, 0.0f);
         fling = float2(0.0f, 0.0f);

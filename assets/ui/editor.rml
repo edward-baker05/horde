@@ -1,0 +1,224 @@
+<rml>
+<head>
+	<title>Level editor</title>
+	<link type="text/rcss" href="tablet.rcss"/>
+	<link type="text/rcss" href="editor.rcss"/>
+</head>
+<body data-model="editor">
+	<div class="osd top-left">
+		<span class="line">{{level_name}}</span>
+		<span class="line"><span class="rec-dot" data-class-off="!dirty"/>{{saved_label}}</span>
+	</div>
+
+	<div class="osd bottom-left">
+		<span class="line status" data-if="status != ''">{{status}}</span>
+		<span class="line problems" data-if="problem_count > 0">{{problems_label}}</span>
+		<span class="line">{{tool_label}} · {{zoom_label}}</span>
+		<span class="line">{{cursor_label}}</span>
+	</div>
+
+	<!-- What's selected: its numbers, colour and the delete button. -->
+	<!-- Number fields: steps either side (shift steps ten at a time), and a
+	     typed value lands on Enter or when the field loses focus. -->
+	<div class="card inspector" data-if="inspect_open">
+		<span class="title">{{inspect_title}}</span>
+		<span class="note" data-if="inspect_note != ''">{{inspect_note}}</span>
+		<div class="fields">
+			<div class="field" data-for="f, i : inspect_fields">
+				<span class="name">{{f.label}}</span>
+				<button class="step" data-event-click="step('inspect', i, -1, ev.shift_key)">−</button>
+				<input type="text" class="num" data-value="f.text" data-event-focus="focus('inspect', i)" data-event-blur="blur('inspect', i)" data-event-change="change('inspect', i, ev.linebreak)"/>
+				<button class="step" data-event-click="step('inspect', i, 1, ev.shift_key)">+</button>
+				<span class="unit">{{f.unit}}</span>
+			</div>
+		</div>
+		<div data-if="inspect_has_color">
+			<span class="heading">{{'Colour' | tr}}</span>
+			<div class="colour">
+				<span class="preview" data-style-background-color="inspect_hex"/>
+				<input type="text" class="hex" data-value="inspect_hex" data-event-focus="focus('hex', 0)" data-event-blur="blur('hex', 0)" data-event-change="change('hex', 0, ev.linebreak)"/>
+			</div>
+			<div class="swatches">
+				<span class="swatch" data-for="s, i : swatches" data-style-background-color="s" data-event-click="swatch('inspect', i)"></span>
+			</div>
+		</div>
+		<button class="act danger" data-event-click="remove">{{'Delete' | tr}}</button>
+	</div>
+
+	<!-- The level sheet: tabs along the top; tapping the open tab folds it. -->
+	<div class="sheet" data-class-folded="tab == ''">
+		<div class="tabs">
+			<span class="tab" data-class-on="tab == 'level'" data-event-click="set_tab('level')">{{'LEVEL' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'round'" data-event-click="set_tab('round')">{{'ROUND' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'list'" data-event-click="set_tab('list')">{{'LIST' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'files'" data-event-click="set_tab('files')">{{'FILES' | tr}}</span>
+		</div>
+
+		<div class="body" data-if="tab == 'level'">
+			<span class="heading">{{'Bounds' | tr}}</span>
+			<div class="field" data-for="f, i : level_fields">
+				<span class="name">{{f.label}}</span>
+				<button class="step" data-event-click="step('level', i, -1, ev.shift_key)">−</button>
+				<input type="text" class="num" data-value="f.text" data-event-focus="focus('level', i)" data-event-blur="blur('level', i)" data-event-change="change('level', i, ev.linebreak)"/>
+				<button class="step" data-event-click="step('level', i, 1, ev.shift_key)">+</button>
+				<span class="unit">{{f.unit}}</span>
+			</div>
+
+			<span class="heading">{{'Background' | tr}}</span>
+			<div class="colour">
+				<span class="preview" data-style-background-color="background_hex"/>
+				<input type="text" class="hex" data-value="background_hex" data-event-focus="focus('hex', 1)" data-event-blur="blur('hex', 1)" data-event-change="change('hex', 1, ev.linebreak)"/>
+			</div>
+			<div class="swatches">
+				<span class="swatch" data-for="s, i : swatches" data-style-background-color="s" data-event-click="swatch('background', i)"></span>
+			</div>
+
+			<span class="heading">{{'Snapping' | tr}}</span>
+			<div class="toggle" data-event-click="toggle('snap_position')">
+				<span class="name">{{'Snap position' | tr}}</span>
+				<span class="switch" data-class-on="snap_position"><span class="knob"/></span>
+			</div>
+			<div class="toggle" data-event-click="toggle('snap_rotation')">
+				<span class="name">{{'Snap rotation' | tr}}</span>
+				<span class="switch" data-class-on="snap_rotation"><span class="knob"/></span>
+			</div>
+			<div class="field" data-for="f, i : snap_fields">
+				<span class="name">{{f.label}}</span>
+				<button class="step" data-event-click="step('snap', i, -1, ev.shift_key)">−</button>
+				<input type="text" class="num" data-value="f.text" data-event-focus="focus('snap', i)" data-event-blur="blur('snap', i)" data-event-change="change('snap', i, ev.linebreak)"/>
+				<button class="step" data-event-click="step('snap', i, 1, ev.shift_key)">+</button>
+				<span class="unit">{{f.unit}}</span>
+			</div>
+		</div>
+
+		<div class="body" data-if="tab == 'round'">
+			<span class="heading">{{'Round' | tr}}</span>
+			<div class="field" data-for="f, i : round_fields">
+				<span class="name">{{f.label}}</span>
+				<button class="step" data-event-click="step('round', i, -1, ev.shift_key)">−</button>
+				<input type="text" class="num" data-value="f.text" data-event-focus="focus('round', i)" data-event-blur="blur('round', i)" data-event-change="change('round', i, ev.linebreak)"/>
+				<button class="step" data-event-click="step('round', i, 1, ev.shift_key)">+</button>
+				<span class="unit">{{f.unit}}</span>
+			</div>
+			<span class="note">{{'Spawning speeds up as the horde dies: at the last kill it is the spawn rate times (1 + boost).' | tr}}</span>
+		</div>
+
+		<div class="body" data-if="tab == 'list'">
+			<span class="heading">{{'Walls (last draws on top)' | tr}}</span>
+			<span class="row" data-for="r, i : walls" data-class-on="r.on" data-event-click="pick_item('wall', i)">{{r.label}}</span>
+			<span class="empty" data-if="walls.size == 0">{{'No walls yet.' | tr}}</span>
+			<span class="heading">{{'Markers' | tr}}</span>
+			<span class="row" data-for="r, i : markers" data-class-on="r.on" data-event-click="pick_item('marker', i)">{{r.label}}</span>
+			<span class="heading">{{'Field regions' | tr}}</span>
+			<span class="row" data-for="r, i : regions" data-class-on="r.on" data-event-click="pick_item('region', i)">{{r.label}}</span>
+			<span class="empty" data-if="regions.size == 0">{{'No field regions yet.' | tr}}</span>
+		</div>
+
+		<div class="body" data-if="tab == 'files'">
+			<span class="heading">{{'Save' | tr}}</span>
+			<div class="save">
+				<input type="text" class="name-box" maxlength="64" data-value="save_name" data-event-focus="focus('name', 0)" data-event-blur="blur('name', 0)" data-event-change="change('name', 0, ev.linebreak)"/>
+				<button class="act" data-class-disabled="problem_count > 0" data-event-click="save">{{'Save' | tr}}</button>
+			</div>
+			<button class="act quiet" data-event-click="new_level">{{'New level' | tr}}</button>
+
+			<span class="heading">{{'Open' | tr}}</span>
+			<span class="row" data-for="r, i : levels" data-class-on="r.on" data-event-click="open_level(i)">{{r.label}}</span>
+			<span class="empty" data-if="levels.size == 0">{{'No levels saved yet.' | tr}}</span>
+
+			<span class="heading">{{'Problems' | tr}}</span>
+			<span class="empty" data-if="problems.size == 0">{{'None. This level can be saved.' | tr}}</span>
+			<span class="row bad" data-for="r, i : problems" data-event-click="pick_problem(i)">{{r.label}}</span>
+
+			<div data-if="warnings.size > 0">
+				<span class="heading">{{'Warnings' | tr}}</span>
+				<span class="note">{{'These do not stop saving.' | tr}}</span>
+				<span class="note warn" data-for="w : warnings">{{w}}</span>
+			</div>
+		</div>
+	</div>
+
+	<!-- The armed tool's settings, just above its slot in the tray. -->
+	<div class="dock">
+		<div class="card tool-card" data-if="tool_card != ''">
+			<div data-if="tool_card == 'paint'">
+				<div class="seg">
+					<span class="opt" data-class-on="paint_mode == 0" data-event-click="set_paint_mode(0)">{{'Paint' | tr}}</span>
+					<span class="opt" data-class-on="paint_mode == 1" data-event-click="set_paint_mode(1)">{{'Erase' | tr}}</span>
+					<span class="opt" data-class-on="paint_mode == 2" data-event-click="set_paint_mode(2)">{{'Slope' | tr}}</span>
+				</div>
+				<div class="seg">
+					<span class="opt" data-class-on="!brush_square" data-event-click="set_brush(0)">{{'Circle' | tr}}</span>
+					<span class="opt" data-class-on="brush_square" data-event-click="set_brush(1)">{{'Square' | tr}}</span>
+				</div>
+			</div>
+
+			<div class="field" data-for="f, i : tool_fields">
+				<span class="name">{{f.label}}</span>
+				<button class="step" data-event-click="step('tool', i, -1, ev.shift_key)">−</button>
+				<input type="text" class="num" data-value="f.text" data-event-focus="focus('tool', i)" data-event-blur="blur('tool', i)" data-event-change="change('tool', i, ev.linebreak)"/>
+				<button class="step" data-event-click="step('tool', i, 1, ev.shift_key)">+</button>
+				<span class="unit">{{f.unit}}</span>
+			</div>
+
+			<div data-if="tool_card == 'paint'">
+				<div class="toggle" data-event-click="toggle('auto_smooth')">
+					<span class="name">{{'Auto-smooth slopes' | tr}}</span>
+					<span class="switch" data-class-on="auto_smooth"><span class="knob"/></span>
+				</div>
+				<div class="palette">
+					<span class="swatch big" data-for="s, i : palette" data-style-background-color="s" data-class-on="i == palette_index" data-event-click="pick_palette(i)">{{i + 1}}</span>
+				</div>
+				<div data-if="palette_edit">
+					<div class="colour">
+						<span class="preview" data-style-background-color="palette_hex"/>
+						<input type="text" class="hex" data-value="palette_hex" data-event-focus="focus('hex', 2)" data-event-blur="blur('hex', 2)" data-event-change="change('hex', 2, ev.linebreak)"/>
+					</div>
+					<div class="swatches">
+						<span class="swatch" data-for="s, i : swatches" data-style-background-color="s" data-event-click="swatch('palette', i)"></span>
+					</div>
+				</div>
+			</div>
+
+			<div data-if="tool_card == 'wall' || tool_card == 'line'">
+				<span class="heading">{{'New wall colour' | tr}}</span>
+				<div class="colour">
+					<span class="preview" data-style-background-color="new_hex"/>
+					<input type="text" class="hex" data-value="new_hex" data-event-focus="focus('hex', 3)" data-event-blur="blur('hex', 3)" data-event-change="change('hex', 3, ev.linebreak)"/>
+				</div>
+				<div class="swatches">
+					<span class="swatch" data-for="s, i : swatches" data-style-background-color="s" data-event-click="swatch('new', i)"></span>
+				</div>
+			</div>
+
+			<span class="note">{{tool_hint}}</span>
+		</div>
+	</div>
+
+	<div class="tray">
+		<div class="slots">
+			<div class="tower" data-for="t, i : tools" data-class-selected="i == tool" data-event-click="pick_tool(i)">
+				<span class="key">{{i + 1}}</span>
+				<div class="icon" data-style-background-color="t.color"><span data-attr-class="'glyph ' + t.shape">{{t.glyph}}</span></div>
+				<span class="label">{{t.name}}</span>
+			</div>
+			<div class="tower action" data-class-disabled="!can_undo" data-event-click="undo">
+				<div class="icon plain"><span class="glyph text">←</span></div>
+				<span class="label">{{'Undo' | tr}}</span>
+			</div>
+			<div class="tower" data-class-disabled="!can_redo" data-event-click="redo">
+				<div class="icon plain"><span class="glyph text">→</span></div>
+				<span class="label">{{'Redo' | tr}}</span>
+			</div>
+			<div class="tower" data-event-click="play">
+				<div class="icon play"><span class="glyph text">►</span></div>
+				<span class="label">{{'Test play' | tr}}</span>
+			</div>
+			<div class="tower" data-event-click="menu">
+				<div class="icon plain"><span class="glyph text">×</span></div>
+				<span class="label">{{'Menu' | tr}}</span>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>

@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.28)
-project(horde LANGUAGES CXX VERSION 0.1.0)
+project(horde LANGUAGES C CXX VERSION 0.1.0)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+option(HORDE_BUILD_TESTS "Build the unit tests" ON)
 
 include(Dependencies)
 include(Shaders)
@@ -16,10 +18,13 @@ add_executable(horde
     src/bench/Benchmark.cpp
     src/bench/Quality.cpp
     src/core/Paths.cpp
+    src/core/SaveData.cpp
+    src/gfx/Blur.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
     src/gfx/GpuTimer.cpp
     src/gfx/LevelRenderer.cpp
+    src/gfx/RenderTarget.cpp
     src/gfx/ShaderLoader.cpp
     src/gfx/SpriteBatch.cpp
     src/gfx/Texture.cpp
@@ -33,26 +38,45 @@ add_executable(horde
     src/sim/Spawn.cpp
     src/sim/UnitBuffers.cpp
     src/sim/WallColliders.cpp
-    src/editor/EditorUi.cpp
+    src/sim/TowerSite.cpp
+    src/sim/GpuReadback.cpp
+    src/editor/Actions.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp
     src/editor/HitTest.cpp
     src/editor/Paint.cpp
     src/editor/Tools.cpp
+    src/scene/EditorOverlay.cpp
     src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp
+    src/scene/PauseScene.cpp
     src/scene/Presets.cpp
+    src/scene/RoundOverlay.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
+    src/ui/DeviceLayout.cpp
+    src/ui/DeviceShell.cpp
+    src/ui/FrameStatsOverlay.cpp
     src/ui/ImGuiLayer.cpp
+    src/ui/RmlInput.cpp
+    src/ui/RmlLayer.cpp
+    src/ui/RmlRenderer.cpp
+    src/ui/RmlSystem.cpp
+    src/audio/MusicPlayer.cpp
+    src/scene/DancingCow.cpp
+    src/core/PolishMode.cpp
+    src/ui/ScreenInput.cpp
+    src/ui/ShellState.cpp
     src/logic/UnitData.hpp
     src/logic/Level.cpp
     src/logic/LevelGeometry.cpp
     src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
     src/logic/LevelValidation.cpp
-    src/logic/WallGridShapes.cpp)
+    src/logic/WallGridShapes.cpp
+    src/logic/TowerStats.cpp
+    src/logic/Round.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -61,6 +85,8 @@ target_link_libraries(horde PRIVATE
     SDL3_image::SDL3_image
     glm::glm
     imgui::imgui
+    RmlUi::RmlUi
+    stb_vorbis
     nlohmann_json::nlohmann_json)
 
 if(MSVC)
@@ -84,5 +110,11 @@ add_custom_command(TARGET horde POST_BUILD
         $<TARGET_FILE_DIR:horde>/shaders
     COMMENT "Copying assets and compiled shaders next to horde binary")
 
+
+if(HORDE_BUILD_TESTS)
+    # Not include(CTest): that would also switch on RmlUi's own test targets.
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT horde)

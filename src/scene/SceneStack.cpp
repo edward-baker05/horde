@@ -4,6 +4,8 @@
 
 #include <utility>
 
+#include "ui/DeviceShell.hpp"
+
 namespace horde::scene {
 
 SceneStack::SceneStack(Services services) : m_services(services) {
@@ -29,6 +31,31 @@ void SceneStack::replace(std::unique_ptr<Scene> scene) {
     m_pending.push_back({Action::Replace, std::move(scene)});
 }
 
+Scene* SceneStack::topmostOn(ui::DeviceKind device) const {
+    for (auto it = m_scenes.rbegin(); it != m_scenes.rend(); ++it) {
+        if ((*it)->presentation().device == device) {
+            return it->get();
+        }
+    }
+    return nullptr;
+}
+
+void SceneStack::resizeScene(Scene& scene) const {
+    if (m_services.shell == nullptr) {
+        return;
+    }
+    const ui::DeviceKind device = scene.presentation().device;
+    const glm::vec2 size =
+        device == ui::DeviceKind::None ? m_services.shell->windowPx() : glm::vec2(m_services.shell->screenSize(device));
+    scene.onResize(size.x, size.y);
+}
+
+void SceneStack::notifyResize() {
+    for (const std::unique_ptr<Scene>& scene : m_scenes) {
+        resizeScene(*scene);
+    }
+}
+
 bool SceneStack::applyPending() {
     if (m_pending.empty()) {
         return true;
@@ -45,6 +72,9 @@ bool SceneStack::applyPending() {
                 if (!m_scenes.empty()) {
                     m_scenes.back()->onExit();
                     m_scenes.pop_back();
+                    if (!m_scenes.empty()) {
+                        m_scenes.back()->onRevealed();
+                    }
                 }
                 break;
 
@@ -67,6 +97,10 @@ bool SceneStack::applyPending() {
                     return false;
                 }
 
+                resizeScene(*request.scene);
+                if (request.action == Action::Push && !m_scenes.empty()) {
+                    m_scenes.back()->onCovered();
+                }
                 m_scenes.push_back(std::move(request.scene));
                 SDL_Log("Scene: %s", name);
                 break;

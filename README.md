@@ -9,7 +9,7 @@ platforms without writing three renderers.
 
 **You do not need to install anything except a compiler, CMake and Git.** If
 SDL3 is available as a system package it is used; otherwise CMake fetches and
-builds it. You do **not** need a shader toolchain — compiled shaders are
+builds it (RmlUi, for the menus, is always fetched). You do **not** need a shader toolchain — compiled shaders are
 committed.
 
 ---
@@ -215,7 +215,7 @@ horde/
     ├── core/Paths      asset path resolution
     ├── gfx/            GpuContext, ShaderLoader, Texture, SpriteBatch, Camera2D
     ├── scene/          Scene, SceneStack, MainMenu, Level, TechTree
-    └── ui/ImGuiLayer   Dear ImGui setup
+    └── ui/             ImGuiLayer, RmlUi layer, phone/tablet DeviceShell
 ```
 
 Builds go to `build/<preset-name>/`, and the executable to that directory's
@@ -251,7 +251,7 @@ sprite icons, which is a world-space rendering problem rather than a widget
 problem — so it uses exactly the same batch and camera as the level does.
 
 **Dear ImGui is for tooling only.** Inspectors, timings, toggles. Game-facing UI
-(menus, tech tree nodes, labels) is drawn as sprites. Keeping that line clear is
+(the phone and tablet menus, the round and the level editor) is RmlUi, drawn into each device's screen texture; the tech tree is sprites. Keeping that line clear is
 what stops the tech tree turning into a fight with a widget toolkit.
 
 **Scenes are a stack.** `scene::SceneStack` lets a transient view sit on top of
@@ -341,10 +341,11 @@ target_link_libraries(horde PRIVATE SDL3_ttf::SDL3_ttf)
 ```
 
 Then `TTF_CreateGPUTextEngine(device)` and `TTF_GetGPUTextDrawData()`. This is
-what menu labels and tech-tree node names need; until then those are ImGui.
+what tech-tree node names need; until then those are ImGui. (Menus use RmlUi.)
 
 **Change a dependency version** — edit the `HORDE_*_TAG` variables at the top of
-`cmake/Dependencies.cmake`, then delete `build/` and reconfigure.
+`cmake/Dependencies.cmake`, then delete `build/` and reconfigure. For FreeType and RmlUi also set the matching
+`HORDE_*_SHA256` variable beside the tag.
 
 **Force a GPU backend** — `SDL_GPU_DRIVER=vulkan` (or `metal`, `direct3d12`).
 

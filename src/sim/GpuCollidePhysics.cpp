@@ -2,12 +2,14 @@
 
 #include <SDL3/SDL_log.h>
 
+#include <glm/gtc/packing.hpp>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 
 #include <algorithm>
 #include <cmath>
 
+#include "core/PolishMode.hpp"
 #include "gfx/GpuContext.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "scene/Scene.hpp"
@@ -47,9 +49,16 @@ struct alignas(16) GPUIntegrateUniforms {
     float congestionStart;
     float congestionStop;
     Uint32 congestionPadding[3];
+    Uint32 attractorCount;
+    Uint32 slowCount;
+    float attractShare;
+    Uint32 effectsPadding;
+    glm::vec4 attractors[kMaxTowers]; // (centre, radius, turn rate)
+    glm::vec4 slowZones[kMaxTowers];  // (centre, radius, speed factor)
 };
-static_assert(sizeof(GPUIntegrateUniforms) ==
-              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions + 48);
+
+static_assert(sizeof(GPUIntegrateUniforms) == 32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 +
+                                                  32 * kMaxExplosions + 48 + 16 + 32 * kMaxTowers);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -65,13 +74,42 @@ struct alignas(16) GPUFinalizeUniforms {
     Uint32 exitCount;
     Uint32 spawnCount;
     Uint32 frame;
-    Uint32 respawnOnExit;
+    Uint32 exitMode; // EXIT_* in unit_finalize.comp.hlsl
     float exitDamage;
-    Uint32 healthPadding[3];
+    Uint32 towerCount;
+    Uint32 healthPadding[2];
     glm::vec4 exits[kMaxFlowMarkers];
     glm::vec4 spawns[kMaxFlowMarkers];
+    glm::vec4 towers[kMaxTowers];
 };
-static_assert(sizeof(GPUFinalizeUniforms) == 80 + 32 * kMaxFlowMarkers);
+
+static_assert(sizeof(GPUFinalizeUniforms) == 80 + 32 * kMaxFlowMarkers + 16 * kMaxTowers);
+
+// Matches cbuffer DensityParams in unit_density.comp.hlsl
+struct alignas(16) GPUDensityUniforms {
+    Uint32 unitCount;
+    float radius;
+    float invCellSize;
+    Uint32 dimX;
+    Uint32 dimY;
+    Uint32 padding[3];
+};
+
+static_assert(sizeof(GPUDensityUniforms) == 32);
+
+// World units per density cell: about six units across, coarse enough that
+// the whole map of a 2000-unit level is a 63 KB read (63 x 63 x 16 bytes).
+constexpr float kDensityCellSize = 32.0f;
+// Steps between density maps: about ten a second at 60 Hz.
+constexpr std::uint32_t kDensityEverySteps = 6;
+
+// Matches EXIT_* in unit_finalize.comp.hlsl.
+constexpr Uint32 kExitStop = 0;
+constexpr Uint32 kExitRespawn = 1;
+constexpr Uint32 kExitRemove = 2;
+
+// unit_finalize's Counters: killed, leaked, then contacts per tower slot.
+constexpr Uint32 kCounterWords = 2 + static_cast<Uint32>(kMaxTowers);
 
 // Packs up to kMaxFlowMarkers areas as (centre, half size).
 Uint32 packAreas(const std::vector<MarkerArea>& areas, glm::vec4* out) {
@@ -150,18 +188,19 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     // unit_integrate.comp: 1 ro buffer (IDs), 4 rw buffers (units, previous positions, fling, health), 1 uniform
     // buffer
     m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 2, 0, 4, 1, 256, 1, 1);
-    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 3 rw buffers (units, health, fling),
-    // 1 uniform buffer
-    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 3, 1, 256, 1, 1);
-    if (!m_integratePipeline || !m_finalizePipeline) {
+    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 4 rw buffers (units, health, fling,
+    // round counters), 1 uniform buffer
+    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 4, 1, 256, 1, 1);
+    // unit_density.comp: 1 ro buffer (units), 1 rw buffer (density), 1 uniform buffer
+    m_densityPipeline = services.shaders->loadCompute("unit_density.comp", 0, 0, 1, 0, 1, 1, 256, 1, 1);
+    if (!m_integratePipeline || !m_finalizePipeline || !m_densityPipeline) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to load pipelines");
         return false;
     }
 
     // One cell per unit diameter, so the collision shader's 3x3 search is complete.
     const CollisionSettings& collision = m_config.collision;
-    if (!m_renderer.init(services) ||
-        !m_grid.init(services, m_capacity, config.worldSize, config.unitSize) ||
+    if (!m_renderer.init(services) || !m_grid.init(services, m_capacity, config.worldSize, config.unitSize) ||
         !m_collisions.init(services, collision, config.unitSize, config.worldSize) ||
         (collision.reorderUnits && !m_reorder.init(services)) || !m_walls.init(m_device, config.walls.get())) {
         return false;
@@ -192,6 +231,30 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     SDL_GPUBufferCreateInfo idsInfo = healthInfo;
     m_ids = SDL_CreateGPUBuffer(m_device, &idsInfo);
 
+    SDL_GPUBufferCreateInfo countersInfo{};
+    countersInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    countersInfo.size = sizeof(Uint32) * kCounterWords;
+    m_counters = SDL_CreateGPUBuffer(m_device, &countersInfo);
+    if (m_counters == nullptr || !m_countersReadback.init(m_device, countersInfo.size)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create round counters: %s",
+                     SDL_GetError());
+        return false;
+    }
+    m_densityDim = glm::max(glm::ivec2(glm::ceil(config.worldSize / kDensityCellSize)), glm::ivec2(1));
+    SDL_GPUBufferCreateInfo densityInfo{};
+    densityInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    densityInfo.size = static_cast<Uint32>(sizeof(glm::uvec4) * m_densityDim.x * m_densityDim.y);
+    m_density = SDL_CreateGPUBuffer(m_device, &densityInfo);
+    if (m_density == nullptr || !m_densityReadback.init(m_device, densityInfo.size)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create density map: %s",
+                     SDL_GetError());
+        return false;
+    }
+    const std::vector<Uint32> zeroCounters(kCounterWords, 0u);
+    if (!uploadBytesNow(m_device, zeroCounters.data(), countersInfo.size, m_counters)) {
+        return false;
+    }
+
     bool spares = true;
     if (collision.reorderUnits) {
         m_prevSpare = SDL_CreateGPUBuffer(m_device, &prevInfo);
@@ -203,8 +266,7 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     }
 
     if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling || !m_ids || !spares) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s",
-                     SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s", SDL_GetError());
         return false;
     }
 
@@ -251,6 +313,8 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
 }
 
 void GpuCollidePhysics::shutdown() {
+    m_countersReadback.shutdown();
+    m_densityReadback.shutdown();
     m_walls.shutdown();
     m_reorder.shutdown();
     m_collisions.shutdown();
@@ -261,7 +325,7 @@ void GpuCollidePhysics::shutdown() {
         return;
     }
 
-    SDL_GPUComputePipeline** pipelines[] = {&m_integratePipeline, &m_finalizePipeline};
+    SDL_GPUComputePipeline** pipelines[] = {&m_integratePipeline, &m_finalizePipeline, &m_densityPipeline};
     for (SDL_GPUComputePipeline** pipeline : pipelines) {
         if (*pipeline) {
             SDL_ReleaseGPUComputePipeline(m_device, *pipeline);
@@ -276,9 +340,9 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
-    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1],   &m_prevPositions, &m_health,
-                                 &m_fling,    &m_ids,        &m_prevSpare,     &m_healthSpare,
-                                 &m_flingSpare, &m_idsSpare, &m_slots};
+    SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1],  &m_prevPositions, &m_health,     &m_fling,
+                                 &m_ids,      &m_prevSpare, &m_healthSpare,   &m_flingSpare, &m_idsSpare,
+                                 &m_slots,    &m_counters,  &m_density};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
             SDL_ReleaseGPUBuffer(m_device, *buffer);
@@ -291,6 +355,96 @@ void GpuCollidePhysics::shutdown() {
 
 void GpuCollidePhysics::update(float dt) {
     m_dt = dt;
+    // Only a round reads the counters, so only a round pays for the copy.
+    if (m_config.flow.removeAtExit) {
+        m_countersReadback.request(m_counters);
+    }
+    // update() comes before this frame's compute(), so the frame that built
+    // the map has been submitted and the copy sees it.
+    if (m_densityPending && m_densityReadback.request(m_density)) {
+        m_densityPending = false;
+    }
+}
+
+void GpuCollidePhysics::setCrowdEffects(const CrowdEffects& effects) {
+    m_effects = effects;
+    m_effectsSet = true;
+    m_walls.setTowers(effects.towers);
+}
+
+bool GpuCollidePhysics::pollDensity(DensityMap& out) {
+    std::vector<std::byte> bytes;
+    const std::size_t cells = static_cast<std::size_t>(m_densityDim.x) * static_cast<std::size_t>(m_densityDim.y);
+    if (!m_densityReadback.poll(bytes) || bytes.size() < sizeof(glm::uvec4) * cells) {
+        return false;
+    }
+    out.dim = m_densityDim;
+    out.cellSize = kDensityCellSize;
+    out.counts.resize(cells);
+    out.samples.resize(cells);
+    out.velocities.resize(cells);
+    // A step or two old by now; close enough that the caller ages it from here.
+    out.age = 0.0f;
+    for (std::size_t i = 0; i < cells; ++i) {
+        glm::uvec4 cell;
+        SDL_memcpy(&cell, bytes.data() + i * sizeof(glm::uvec4), sizeof(cell));
+        out.counts[i] = cell.x;
+        SDL_memcpy(&out.samples[i].x, &cell.y, sizeof(float));
+        SDL_memcpy(&out.samples[i].y, &cell.z, sizeof(float));
+        out.velocities[i] = glm::unpackHalf2x16(cell.w);
+    }
+    return true;
+}
+
+void GpuCollidePhysics::buildDensity(SDL_GPUCommandBuffer* commands) {
+    // Only a round aims, so only a round pays for the map.
+    if (!m_effectsSet || ++m_stepsSinceDensity < kDensityEverySteps) {
+        return;
+    }
+    m_stepsSinceDensity = 0;
+    const auto cells = static_cast<std::uint32_t>(m_densityDim.x * m_densityDim.y);
+    // Counts only: the sample in a cell with no units is never read.
+    m_grid.fill(commands, m_density, cells, 0, 4);
+
+    GPUDensityUniforms uniforms{};
+    uniforms.unitCount = m_unitCount;
+    uniforms.radius = m_config.unitSize * 0.5f;
+    uniforms.invCellSize = 1.0f / kDensityCellSize;
+    uniforms.dimX = static_cast<Uint32>(m_densityDim.x);
+    uniforms.dimY = static_cast<Uint32>(m_densityDim.y);
+    SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
+
+    SDL_GPUStorageBufferReadWriteBinding binding{};
+    binding.buffer = m_density;
+    if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, &binding, 1)) {
+        SDL_BindGPUComputePipeline(pass, m_densityPipeline);
+        SDL_GPUBuffer* readOnly[1] = {m_units[m_current]};
+        SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 1);
+        SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
+        SDL_EndGPUComputePass(pass);
+    }
+    // Recorded on this frame's command buffer, which isn't submitted yet, so
+    // the copy is requested next step, when the map has gone in.
+    m_densityPending = true;
+}
+
+void GpuCollidePhysics::setSpawnRate(float perSecond) {
+    m_config.flow.spawnRate = perSecond;
+}
+
+bool GpuCollidePhysics::pollCounters(RoundCounters& out) {
+    std::vector<std::byte> bytes;
+    if (!m_countersReadback.poll(bytes) || bytes.size() < sizeof(Uint32) * kCounterWords) {
+        return false;
+    }
+    Uint32 words[kCounterWords];
+    SDL_memcpy(words, bytes.data(), sizeof(words));
+    out.killed = words[0];
+    out.leaked = words[1];
+    for (std::size_t i = 0; i < kMaxTowers; ++i) {
+        out.contacts[i] = words[2 + i];
+    }
+    return true;
 }
 
 bool GpuCollidePhysics::addExplosion(const Explosion& explosion) {
@@ -335,8 +489,8 @@ void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
         return;
     }
 
-    const std::vector<BaseUnitData> units = spawnInAreas(count, flow.spawns, m_config.worldSize, m_config.unitSize,
-                                                         m_spawnRng, m_config.walls.get());
+    const std::vector<BaseUnitData> units =
+        spawnInAreas(count, flow.spawns, m_config.worldSize, m_config.unitSize, m_spawnRng, m_config.walls.get());
     const Uint32 size = static_cast<Uint32>(sizeof(BaseUnitData) * count);
 
     void* mapped = SDL_MapGPUTransferBuffer(m_device, m_spawnTransfer, true);
@@ -422,6 +576,17 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.invCellSize = 1.0f / m_grid.cellSize();
         uniforms.congestionStart = m_config.collision.congestionStart;
         uniforms.congestionStop = m_config.collision.congestionStop;
+        uniforms.attractorCount = static_cast<Uint32>(std::min(m_effects.attractors.size(), kMaxTowers));
+        for (Uint32 i = 0; i < uniforms.attractorCount; ++i) {
+            const Attractor& a = m_effects.attractors[i];
+            uniforms.attractors[i] = glm::vec4(a.center, a.radius, a.strength);
+        }
+        uniforms.slowCount = static_cast<Uint32>(std::min(m_effects.slowZones.size(), kMaxTowers));
+        for (Uint32 i = 0; i < uniforms.slowCount; ++i) {
+            const SlowZone& z = m_effects.slowZones[i];
+            uniforms.slowZones[i] = glm::vec4(z.center, z.radius, z.speedFactor);
+        }
+        uniforms.attractShare = m_effects.attractShare;
         std::erase_if(m_explosions, [](const ActiveExplosion& active) { return active.left <= 1e-5f; });
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
@@ -476,16 +641,21 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
         uniforms.spawnCount = packAreas(m_config.flow.spawns, uniforms.spawns);
         uniforms.frame = m_frame;
-        uniforms.respawnOnExit = m_config.flow.respawnAtExit ? 1u : 0u;
+        uniforms.exitMode = m_config.flow.removeAtExit    ? kExitRemove
+                            : m_config.flow.respawnAtExit ? kExitRespawn
+                                                          : kExitStop;
         uniforms.exitDamage = m_config.health.exitDamage;
+        uniforms.towerCount = m_walls.towerCount();
+        std::copy_n(m_walls.towerUniforms(), kMaxTowers, uniforms.towers);
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding bindings[3]{};
+        SDL_GPUStorageBufferReadWriteBinding bindings[4]{};
         bindings[0].buffer = m_units[m_current];
         bindings[1].buffer = m_health;
         bindings[2].buffer = m_fling;
+        bindings[3].buffer = m_counters;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 3)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 4)) {
             SDL_BindGPUComputePipeline(pass, m_finalizePipeline);
             SDL_GPUBuffer* readOnly[4] = {m_prevPositions, m_walls.buffers()[0], m_walls.buffers()[1],
                                           m_walls.buffers()[2]};
@@ -497,10 +667,13 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
 
     // 5. Velocity toward the neighbours' mean, if asked for.
     m_current = m_collisions.smooth(commands, m_units, m_current, m_unitCount, m_grid, m_walls);
+
+    // 6. Where the crowd is, for a round's towers to aim at.
+    buildDensity(commands);
 }
 
 void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
-                                   const glm::mat4& viewProjection, float alpha) {
+                                   const glm::mat4& viewProjection, glm::vec2 viewportPx, float alpha) {
     // m_prevPositions holds where each unit started the latest step, which
     // unit_integrate writes before moving it: exactly the previous state.
     gfx::UnitRenderer::DrawOptions options;
@@ -512,6 +685,7 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.maxHealth = static_cast<float>(m_config.health.maxHp);
     options.ids = m_ids;
     options.slots = m_slots;
+    options.viewportPx = viewportPx;
     options.sprites = m_sprites.enabled;
     options.species = m_sprites.species;
     options.lod = m_sprites.lod;
@@ -528,47 +702,47 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
 void GpuCollidePhysics::debugUi() {
     // Live: the shader reads these every step.
     float wobbleDegrees = glm::degrees(m_config.movement.wobbleAngle);
-    if (ImGui::SliderFloat("Wobble", &wobbleDegrees, 0.0f, 60.0f, "%.0f deg")) {
+    if (ImGui::SliderFloat(tr("Wobble"), &wobbleDegrees, 0.0f, 60.0f, tr("%.0f deg"))) {
         m_config.movement.wobbleAngle = glm::radians(wobbleDegrees);
     }
-    ImGui::SliderFloat("Wobble rate", &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
+    ImGui::SliderFloat(tr("Wobble rate"), &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
 
     using Renderer = gfx::UnitRenderer;
-    ImGui::SeparatorText("Unit sprites");
+    ImGui::SeparatorText(tr("Unit sprites"));
     if (!m_renderer.hasSprites()) {
-        ImGui::TextDisabled("textures/units.png not loaded: drawing discs");
+        ImGui::TextDisabled(tr("textures/units.png not loaded: drawing discs"));
         return;
     }
-    ImGui::Checkbox("Sprites", &m_sprites.enabled);
+    ImGui::Checkbox(tr("Sprites"), &m_sprites.enabled);
     if (!m_sprites.enabled) {
         return;
     }
     int species = static_cast<int>(m_sprites.species);
-    if (ImGui::Combo("Crowd", &species, "Humans\0Aliens\0")) {
+    if (ImGui::Combo(tr("Crowd"), &species, "Humans\0Aliens\0")) {
         m_sprites.species = static_cast<Renderer::Species>(species);
     }
     // Combo index 0 is Auto (-1); the rest follow Lod's values.
     int lod = static_cast<int>(m_sprites.lod) + 1;
-    if (ImGui::Combo("LOD", &lod, "Auto\0Near\0Mid\0Low\0Circle\0")) {
+    if (ImGui::Combo(tr("LOD"), &lod, "Auto\0Near\0Mid\0Low\0Circle\0")) {
         m_sprites.lod = static_cast<Renderer::Lod>(lod - 1);
     }
     // Screen pixels a unit must span for each LOD; below low it's a circle.
     Renderer::LodThresholds& t = m_sprites.thresholds;
     ImGui::BeginDisabled(m_sprites.lod != Renderer::Lod::Auto);
-    ImGui::SliderFloat("Near from", &t.nearPixels, 1.0f, 60.0f, "%.1f px");
-    ImGui::SliderFloat("Mid from", &t.midPixels, 1.0f, 60.0f, "%.1f px");
-    ImGui::SliderFloat("Low from", &t.lowPixels, 1.0f, 60.0f, "%.1f px");
-    ImGui::SliderFloat("Hysteresis", &t.hysteresis, 0.0f, 3.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Near from"), &t.nearPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Mid from"), &t.midPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Low from"), &t.lowPixels, 1.0f, 60.0f, "%.1f px");
+    ImGui::SliderFloat(tr("Hysteresis"), &t.hysteresis, 0.0f, 3.0f, "%.1f px");
     t.midPixels = std::min(t.midPixels, t.nearPixels); // mid can't start above near
     t.lowPixels = std::min(t.lowPixels, t.midPixels);
-    if (ImGui::Button("Reset LOD thresholds")) {
+    if (ImGui::Button(tr("Reset LOD thresholds"))) {
         t = Renderer::LodThresholds{};
     }
     ImGui::EndDisabled();
-    ImGui::Checkbox("Whole-pixel scale", &m_sprites.integerScale);
-    ImGui::Checkbox("Face direction of travel", &m_sprites.rotate);
+    ImGui::Checkbox(tr("Whole-pixel scale"), &m_sprites.integerScale);
+    ImGui::Checkbox(tr("Face direction of travel"), &m_sprites.rotate);
     ImGui::BeginDisabled(!m_sprites.rotate);
-    ImGui::SliderInt("Directions", &m_sprites.directionSteps, 0, 32, m_sprites.directionSteps == 0 ? "any" : "%d");
+    ImGui::SliderInt(tr("Directions"), &m_sprites.directionSteps, 0, 32, m_sprites.directionSteps == 0 ? "any" : "%d");
     ImGui::EndDisabled();
     static const char* const kLodNames[] = {"near", "mid", "low", "circle"};
     ImGui::Text("Drawing %s, %.1f px per unit", kLodNames[static_cast<int>(m_renderer.lastLod())],

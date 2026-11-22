@@ -87,6 +87,8 @@ public:
         float maxHealth = 1.0f;
         SDL_GPUBuffer* ids = nullptr; // null: a unit's ID is its index
         SDL_GPUBuffer* slots = nullptr; // null: draw in index order
+        // Pixel size of the render target, for picking the sprite LOD.
+        glm::vec2 viewportPx{0.0f};
 
         // Crowd sprites instead of flat discs: each unit's look comes from
         // hashing its ID with `seed`, so `ids` should be set when units are
@@ -122,7 +124,6 @@ private:
     Lod pickLod(float unitPixels, const LodThresholds& thresholds) const;
 
     SDL_GPUDevice* m_device = nullptr;
-    SDL_Window* m_window = nullptr;
     SDL_GPUTexture* m_atlas = nullptr;
     SDL_GPUTexture* m_unitAtlas = nullptr; // owned by m_unitAtlasTexture
     Texture m_unitAtlasTexture;

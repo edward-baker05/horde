@@ -1,0 +1,438 @@
+/* Phone theme: aggressively Polish. Bialo-czerwona split: a white cut-paper
+   band on top with a scalloped edge, crimson below. Lowicz wycinanki art from
+   tools/make_folk_ui.py. Polish only.
+
+   All sizes are in dp so the layout scales with the display. The renderer has
+   no shader or layer support, so stick to flat colours, vertex gradients,
+   images, radii, opacity and transforms (no box-shadow, filter or
+   linear-gradient). */
+
+body {
+	font-family: "Liberation Sans";
+	font-size: 17dp;
+	color: #1a1416;
+	background-color: #c8102e;
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+/* --- White band ------------------------------------------------------- */
+
+.band {
+	display: block;
+	position: relative;
+	background-color: #f7f0e1;
+	/* The renderer clamps textures, so whole images are scaled, never tiled. */
+	decorator: image(folk/paper.png cover left top);
+}
+
+/* The band's cut edge, hanging into the red. */
+.scallop {
+	display: block;
+	height: 12dp;
+	decorator: image(folk/scallop.png fill);
+}
+
+/* Lowicz striped wool along the very top and bottom. */
+.pasiak {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: 8dp;
+	decorator: image(folk/pasiak.png cover left top);
+}
+
+.pasiak.top { top: 0; }
+.pasiak.bottom { bottom: 0; }
+
+/* --- Status bar ------------------------------------------------------- */
+
+.status-bar {
+	display: block;
+	height: 44dp;
+	padding: 18dp 28dp 0 28dp;
+	font-size: 15dp;
+	font-weight: bold;
+	color: #1a1416;
+}
+
+.status-bar .clock {
+	float: left;
+}
+
+.status-bar .icons {
+	float: right;
+	height: 12dp;
+	margin-top: 3dp;
+}
+
+.carrier {
+	display: inline-block;
+	margin-right: 6dp;
+	font-size: 12dp;
+	line-height: 12dp;
+	color: #c8102e;
+	vertical-align: bottom;
+}
+
+.signal {
+	display: inline-block;
+	width: 3dp;
+	margin-left: 2dp;
+	background-color: #1a1416;
+	border-radius: 1dp;
+	vertical-align: bottom;
+}
+
+.signal.s1 { height: 4dp; }
+.signal.s2 { height: 6dp; }
+.signal.s3 { height: 9dp; }
+.signal.s4 { height: 12dp; background-color: #c9bfae; }
+
+.battery {
+	display: inline-block;
+	width: 22dp;
+	height: 10dp;
+	margin-left: 8dp;
+	padding: 1dp;
+	border: 1dp #1a1416;
+	border-radius: 3dp;
+	vertical-align: bottom;
+}
+
+/* A battery in the flag's colours. */
+.battery .charge {
+	display: block;
+	width: 72%;
+	height: 100%;
+	border-radius: 1dp;
+	decorator: vertical-gradient(#ffffff #ffffff);
+}
+
+.battery .charge .lower {
+	display: block;
+	margin-top: 50%;
+	height: 50%;
+	background-color: #c8102e;
+}
+
+/* --- Hero ------------------------------------------------------------- */
+
+.hero {
+	display: block;
+	padding: 0 20dp 8dp 20dp;
+	text-align: center;
+}
+
+.date {
+	display: block;
+	font-size: 14dp;
+	font-weight: bold;
+	letter-spacing: 1dp;
+	color: #8a7d6c;
+}
+
+.spin {
+	display: block;
+	width: 124dp;
+	height: 124dp;
+	margin: 8dp auto 6dp auto;
+	animation: 48s linear-in-out infinite spin;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	33% { transform: rotate(120deg); }
+	66% { transform: rotate(240deg); }
+	100% { transform: rotate(360deg); }
+}
+
+.spin img {
+	display: block;
+	width: 124dp;
+	height: 124dp;
+	animation: 0.7s elastic-out rosette-in;
+}
+
+@keyframes rosette-in {
+	from { opacity: 0; transform: scale(0.5); }
+	to { opacity: 1; transform: scale(1); }
+}
+
+.title-row {
+	display: block;
+	height: 56dp;
+}
+
+.title-row img.bird {
+	display: inline-block;
+	width: 56dp;
+	height: 50dp;
+	vertical-align: middle;
+}
+
+.wordmark {
+	display: inline-block;
+	padding: 0 6dp;
+	font-size: 48dp;
+	line-height: 56dp;
+	font-weight: bold;
+	letter-spacing: 6dp;
+	color: #c8102e;
+	vertical-align: middle;
+}
+
+.tagline {
+	display: block;
+	margin-top: 2dp;
+	font-size: 16dp;
+	font-weight: bold;
+	letter-spacing: 1dp;
+	color: #1a1416;
+}
+
+img.tulips {
+	display: block;
+	width: 100%;
+	height: 34dp;
+	margin-top: 10dp;
+}
+
+/* --- Sub-page header (inside the band) -------------------------------- */
+
+.header {
+	display: block;
+	height: 52dp;
+	padding: 4dp 16dp 0 16dp;
+}
+
+.header .back {
+	display: inline-block;
+	height: 40dp;
+	padding: 0 12dp 0 8dp;
+	font-size: 17dp;
+	font-weight: bold;
+	line-height: 40dp;
+	color: #c8102e;
+	border-radius: 20dp;
+	transition: background-color 0.12s;
+}
+
+.header .back:hover {
+	background-color: #c8102e1f;
+}
+
+.header .back:active {
+	background-color: #c8102e40;
+}
+
+.page-title {
+	display: block;
+	position: relative;
+	height: 40dp;
+	padding: 4dp 28dp 20dp 28dp;
+	font-size: 34dp;
+	line-height: 40dp;
+	font-weight: bold;
+	color: #c8102e;
+}
+
+.page-title img.bird {
+	position: absolute;
+	top: -8dp;
+	right: 22dp;
+	width: 62dp;
+	height: 56dp;
+}
+
+/* --- Content (on the red) --------------------------------------------- */
+
+.page {
+	display: block;
+	animation: 0.22s cubic-out page-in;
+}
+
+.red {
+	display: block;
+	padding: 14dp 16dp 0 16dp;
+}
+
+@keyframes page-in {
+	from { opacity: 0; transform: translateY(14dp); }
+	to { opacity: 1; transform: translateY(0dp); }
+}
+
+/* Sub-page lists scroll under the band. Top is the band (status bar 44 +
+   header 52 + title 64) plus the 12dp scallop; bottom clears the home bar. */
+.scroll {
+	position: absolute;
+	top: 172dp;
+	bottom: 30dp;
+	left: 0;
+	right: 0;
+	overflow-y: auto;
+	padding: 6dp 16dp 16dp 16dp;
+}
+
+scrollbarvertical {
+	width: 4dp;
+	margin-right: 4dp;
+}
+
+scrollbarvertical sliderbar {
+	min-height: 32dp;
+	background-color: #ffffff60;
+	border-radius: 2dp;
+}
+
+.section {
+	display: block;
+	padding: 16dp 14dp 8dp 14dp;
+	font-size: 12dp;
+	font-weight: bold;
+	letter-spacing: 2dp;
+	color: #fff3e0;
+}
+
+/* Cards are cut paper: cream sheet, black edge. Rows sit inset with their own
+   radius, so hovers look right whichever rows data-if / data-for leave
+   visible. */
+.group {
+	display: block;
+	margin-bottom: 12dp;
+	padding: 4dp;
+	background-color: #fffbf2;
+	border: 2dp #1a1416;
+	border-radius: 18dp;
+}
+
+button.row {
+	display: block;
+	position: relative;
+	height: 50dp;
+	padding: 0 44dp 0 14dp;
+	white-space: nowrap;
+	overflow: hidden;
+	font-size: 18dp;
+	font-weight: bold;
+	line-height: 50dp;
+	text-align: left;
+	color: #1a1416;
+	border-radius: 13dp;
+	transition: background-color 0.12s;
+}
+
+/* Level and preset names run long; a size down keeps them clear of the rosette. */
+.scroll button.row {
+	font-size: 16dp;
+}
+
+button.row:hover {
+	background-color: #f6b80030;
+}
+
+button.row:active {
+	background-color: #f6b80066;
+}
+
+/* Rosettes stand in for chevrons. */
+.row img.chev {
+	position: absolute;
+	top: 14dp;
+	right: 12dp;
+	width: 22dp;
+	height: 22dp;
+	transition: transform 0.3s cubic-out;
+}
+
+.row:hover img.chev {
+	transform: rotate(90deg) scale(1.15);
+}
+
+.row .hint {
+	position: absolute;
+	top: 0;
+	right: 44dp;
+	font-size: 14dp;
+	font-weight: normal;
+	color: #8a7d6c;
+}
+
+.row.danger {
+	color: #c8102e;
+}
+
+/* The call to action: white on the red, so the screen reads as the flag. */
+button.primary {
+	display: block;
+	height: 58dp;
+	margin-bottom: 12dp;
+	font-size: 26dp;
+	font-weight: bold;
+	line-height: 58dp;
+	letter-spacing: 6dp;
+	text-align: center;
+	color: #c8102e;
+	background-color: #ffffff;
+	border: 2dp #1a1416;
+	border-radius: 18dp;
+	transition: transform 0.1s cubic-out, background-color 0.12s;
+}
+
+button.primary:hover {
+	background-color: #fff3e0;
+}
+
+button.primary:active {
+	transform: scale(0.97);
+}
+
+/* --- Home indicator --------------------------------------------------- */
+
+.home-bar {
+	position: absolute;
+	bottom: 16dp;
+	left: 50%;
+	width: 134dp;
+	height: 5dp;
+	margin-left: -67dp;
+	background-color: #fffbf2;
+	border-radius: 3dp;
+}
+
+/* --- Ustawienia -------------------------------------------------------- */
+
+/* A switch at the row's right edge: crimson with a white knob when on, as the
+   flag; .on when the setting is. */
+.switch {
+	position: absolute;
+	top: 11dp;
+	right: 12dp;
+	width: 48dp;
+	height: 28dp;
+	border: 2dp #1a1416;
+	border-radius: 16dp;
+	background-color: #c9bfae;
+	transition: background-color 0.18s;
+}
+
+.switch.on {
+	background-color: #c8102e;
+}
+
+.switch .knob {
+	position: absolute;
+	top: 2dp;
+	left: 2dp;
+	width: 24dp;
+	height: 24dp;
+	border-radius: 12dp;
+	background-color: #ffffff;
+	transition: left 0.18s cubic-out;
+}
+
+.switch.on .knob {
+	left: 22dp;
+}
+

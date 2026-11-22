@@ -1,0 +1,101 @@
+<rml>
+<head>
+	<title>Main menu</title>
+	<link type="text/rcss" href="phone_normal.rcss"/>
+</head>
+<body data-model="menu">
+	<div class="status-bar">
+		<span class="clock">{{clock}}</span>
+		<span class="icons">
+			<span class="signal s1"/><span class="signal s2"/><span class="signal s3"/><span class="signal s4"/>
+			<span class="battery"><span class="charge"/></span>
+		</span>
+	</div>
+
+	<!-- Home screen: a Play widget, app icons, and a dock of system apps. -->
+	<div class="page home" data-if="page == 'root'">
+		<div class="widget">
+			<div class="widget-head">
+				<span class="wordmark small">HORDE<span class="dot">.</span></span>
+				<span class="tag">{{level_count}}</span>
+			</div>
+			<div class="thumb"><span class="thumb-label">{{featured}}</span></div>
+			<button class="play" data-event-click="open('play')"><span class="play-icon">►</span>PLAY</button>
+		</div>
+
+		<div class="apps">
+			<button class="app" data-event-click="upgrades">
+				<span class="app-icon gold"><span class="glyph diamond"/></span>
+				<span class="app-label">Upgrades</span>
+			</button>
+			<button class="app" data-event-click="editor">
+				<span class="app-icon teal"><span class="glyph square"/></span>
+				<span class="app-label">Level Editor</span>
+			</button>
+		</div>
+	</div>
+
+	<div class="dock" data-if="page == 'root'">
+		<button class="app" data-event-click="open('dev')">
+			<span class="app-icon purple"><span class="glyph tri">▲</span></span>
+			<span class="app-label">Dev Ground</span>
+		</button>
+		<button class="app" data-event-click="open('settings')">
+			<span class="app-icon silver"><span class="glyph circle"/></span>
+			<span class="app-label">Settings</span>
+		</button>
+		<button class="app" data-event-click="quit">
+			<span class="app-icon red"><span class="glyph bar"/></span>
+			<span class="app-label">Quit</span>
+		</button>
+	</div>
+
+	<div data-if="page == 'play'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Play</div>
+		<div class="page scroll">
+			<div class="section">LEVELS</div>
+			<div class="group">
+				<button class="row" data-for="name, i : levels" data-event-click="play(i)">{{name}}<span class="chevron">›</span></button>
+			</div>
+		</div>
+	</div>
+
+	<div data-if="page == 'dev'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Dev Ground</div>
+		<div class="page scroll">
+			<div class="section">LEVELS</div>
+			<div class="group">
+				<button class="row" data-event-click="dev_level(-1)">Built-in level<span class="hint">default</span><span class="chevron">›</span></button>
+				<button class="row" data-for="name, i : levels" data-event-click="dev_level(i)">{{name}}<span class="chevron">›</span></button>
+			</div>
+			<div data-if="presets.size > 0">
+				<div class="section">PRESETS</div>
+				<div class="group">
+					<button class="row" data-for="name, i : presets" data-event-click="dev_preset(i)">{{name}}<span class="chevron">›</span></button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div data-if="page == 'settings'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ Menu</button>
+		</div>
+		<div class="page-title">Settings</div>
+		<div class="page scroll">
+			<div class="section">GAME</div>
+			<div class="group">
+				<button class="row" data-event-click="toggle_polish">Polish mode<span class="switch" data-class-on="polish"><span class="knob"/></span></button>
+			</div>
+		</div>
+	</div>
+
+	<div class="home-bar"/>
+</body>
+</rml>

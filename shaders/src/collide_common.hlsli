@@ -49,6 +49,9 @@ cbuffer CollideParams : register(b0, space2) {
     float AverageOmega;   // average solver: over-relaxation factor on the mean, 1 = plain average
     float ChebyshevOmega; // chebyshev solver: this pass's weight, 1 = a plain relaxed pass
     float Smoothing;      // unit_smooth.comp: how far velocity moves toward the neighbours' mean, 0 to 1
+    uint TowerCount;      // towers to push units out of, as walls; see walls.hlsli
+    uint3 TowerPadding;
+    float4 Towers[32];    // MAX_TOWERS: xy = centre, z = radius (0: empty slot)
 };
 
 // All are Jacobi: every unit reads the same state (InUnits) and writes the

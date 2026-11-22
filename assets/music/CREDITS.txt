@@ -1,0 +1,26 @@
+mazurka_op24_no2.ogg
+  Frédéric Chopin, Mazurka No. 15 in C major, Op. 24 No. 2
+  Performed by Edward Neeman for Musopen's "Set Chopin Free" project
+  Licence: public domain (no attribution required; credited as a courtesy)
+  Source: https://commons.wikimedia.org/wiki/File:Chopin_-_Mazurka_No._15_in_C_major,_Op._24_No._2_(Edward_Neeman).flac
+  Converted from the FLAC original (sha1 69d03003cd166225f16b2dc3e54350ede53e6abb)
+  to Ogg Vorbis q4 with ffmpeg, metadata stripped.
+
+polonaise_op40_no1.ogg
+  Frédéric Chopin, Polonaise No. 3 in A major, Op. 40 No. 1 "Military"
+  Performed by Aya Higuchi for Musopen's "Set Chopin Free" project
+  Licence: public domain (no attribution required; credited as a courtesy)
+  Source: https://commons.wikimedia.org/wiki/File:Chopin_-_Polonaise_No._3_in_A_major,_Op._40_No._1_'Military'_(Aya_Higuchi).flac
+  Converted from the FLAC original (sha1 b9d45ff6c5b7ab612aaf221791ccdc1fb10b0c35)
+  to 44.1 kHz Ogg Vorbis q4 with ffmpeg, metadata stripped.
+
+polish_cow.ogg
+  Cypis, "Gdzie jest biały węgorz? (Zejście)" (the Polish cow song)
+  NOT royalty free: copyrighted, used with the owner's go-ahead for a private
+  build only. Do not ship or publish this file.
+  Converted from the user's MP3 to Ogg Vorbis q4 with ffmpeg, leading and
+  trailing silence trimmed so it loops without a gap.
+
+../ui/krowa/*.png
+  Frames of the Tenor "Polish Cow" GIF (tenor.com/view/...-19109155), cut out
+  of their white background. Same caveat: not ours to redistribute.

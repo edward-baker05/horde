@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <variant>
 
+#include "core/PolishMode.hpp"
 #include "logic/LevelGeometry.hpp"
 
 namespace horde::logic {
@@ -28,12 +29,12 @@ std::vector<Problem> validate(const Level& level) {
         }
 
         if (degenerate) {
-            problems.push_back({i, "Wall has zero or negative size"});
+            problems.push_back({i, tr("Wall has zero or negative size")});
             continue; // an empty shape has no meaningful bounds to test
         }
 
         if (!wallAabb(wall).within(bounds)) {
-            problems.push_back({i, "Wall lies outside the level bounds"});
+            problems.push_back({i, tr("Wall lies outside the level bounds")});
         }
     }
 
@@ -72,8 +73,8 @@ std::vector<std::string> warnings(const Level& level) {
 
         if (covered > 0) {
             char message[160];
-            std::snprintf(message, sizeof(message), "%s %zu: %d of its %d cells are painted over",
-                          marker.kind == MarkerKind::Spawn ? "Spawn" : "Exit", i, covered, total);
+            std::snprintf(message, sizeof(message), tr("%s %zu: %d of its %d cells are painted over"),
+                          marker.kind == MarkerKind::Spawn ? tr("Spawn") : tr("Exit"), i, covered, total);
             out.emplace_back(message);
         }
     }

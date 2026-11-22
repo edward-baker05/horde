@@ -12,6 +12,7 @@ set(HORDE_SDL3_IMAGE_TAG "release-3.4.4" CACHE STRING "SDL3_image tag to fetch w
 set(HORDE_GLM_TAG "1.0.1" CACHE STRING "glm tag to fetch when no system glm is found")
 set(HORDE_IMGUI_TAG "v1.92.9-docking" CACHE STRING "Dear ImGui tag to fetch")
 set(HORDE_JSON_TAG "v3.11.3" CACHE STRING "nlohmann/json tag to fetch when no system copy is found")
+set(HORDE_DOCTEST_TAG "v2.4.11" CACHE STRING "doctest tag to fetch when no system copy is found")
 
 # --- SDL3 --------------------------------------------------------------------
 
@@ -131,3 +132,109 @@ target_compile_features(imgui PUBLIC cxx_std_20)
 target_link_libraries(imgui PUBLIC SDL3::SDL3)
 
 add_library(imgui::imgui ALIAS imgui)
+
+# --- doctest -----------------------------------------------------------------
+#
+# Header-only test framework, used only by tests/.
+
+if(HORDE_BUILD_TESTS)
+    find_package(doctest CONFIG QUIET)
+
+    if(doctest_FOUND)
+        message(STATUS "horde: using system doctest ${doctest_VERSION}")
+    else()
+        message(STATUS "horde: no system doctest, fetching ${HORDE_DOCTEST_TAG}")
+        set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
+        set(DOCTEST_WITH_MAIN_IN_STATIC_LIB OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(doctest
+            GIT_REPOSITORY https://github.com/doctest/doctest.git
+            GIT_TAG ${HORDE_DOCTEST_TAG}
+            GIT_SHALLOW ON
+            EXCLUDE_FROM_ALL
+            SYSTEM)
+        # v2.4.11 declares cmake_minimum_required below 3.5, which CMake 4 rejects.
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+        FetchContent_MakeAvailable(doctest)
+        unset(CMAKE_POLICY_VERSION_MINIMUM)
+    endif()
+endif()
+
+# --- FreeType + RmlUi --------------------------------------------------------
+#
+# RmlUi lays out and styles the device screens. Its FreeType font engine needs
+# FreeType: use the system one if present, otherwise build a minimal copy with
+# every optional codec off (we only load TTF/OTF files).
+
+# Release tarballs rather than git clones: far faster and reproducible. The
+# SHA256 variables pin the default tags; set them together with the tag variables.
+set(HORDE_FREETYPE_TAG "VER-2-13-3" CACHE STRING "FreeType tag to fetch when no system copy is found")
+set(HORDE_FREETYPE_SHA256 "bc5c898e4756d373e0d991bab053036c5eb2aa7c0d5c67e8662ddc6da40c4103" CACHE STRING "SHA256 of the FreeType tarball for HORDE_FREETYPE_TAG")
+set(HORDE_RMLUI_TAG "6.3" CACHE STRING "RmlUi tag to fetch")
+set(HORDE_RMLUI_SHA256 "d977298bb6147610e5984d5db85ddf284020d655a8713913f6982074f1dbdede" CACHE STRING "SHA256 of the RmlUi tarball for HORDE_RMLUI_TAG")
+
+find_package(Freetype QUIET)
+
+if(Freetype_FOUND OR FREETYPE_FOUND)
+    message(STATUS "horde: using system FreeType ${FREETYPE_VERSION_STRING}")
+else()
+    message(STATUS "horde: no system FreeType, fetching ${HORDE_FREETYPE_TAG}")
+    set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+    set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(freetype
+        URL https://github.com/freetype/freetype/archive/refs/tags/${HORDE_FREETYPE_TAG}.tar.gz
+        URL_HASH SHA256=${HORDE_FREETYPE_SHA256}
+        DOWNLOAD_EXTRACT_TIMESTAMP ON
+        EXCLUDE_FROM_ALL
+        SYSTEM
+        OVERRIDE_FIND_PACKAGE)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    FetchContent_MakeAvailable(freetype)
+    unset(CMAKE_POLICY_VERSION_MINIMUM)
+    if(NOT TARGET Freetype::Freetype)
+        add_library(Freetype::Freetype ALIAS freetype)
+    endif()
+endif()
+
+set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(RMLUI_FONT_ENGINE freetype CACHE STRING "" FORCE)
+FetchContent_Declare(RmlUi
+    URL https://github.com/mikke89/RmlUi/archive/refs/tags/${HORDE_RMLUI_TAG}.tar.gz
+    URL_HASH SHA256=${HORDE_RMLUI_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+# Static, so we ship no extra .so/.dll and a fetched (non-PIC) FreeType links in.
+set(_horde_saved_shared ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+FetchContent_MakeAvailable(RmlUi)
+unset(CMAKE_POLICY_VERSION_MINIMUM)
+set(BUILD_SHARED_LIBS ${_horde_saved_shared})
+
+# --- stb_vorbis --------------------------------------------------------------
+#
+# Public-domain Ogg Vorbis decoder for the menu music. stb has no releases, so a
+# commit is pinned; set HORDE_STB_SHA256 together with HORDE_STB_COMMIT.
+
+set(HORDE_STB_COMMIT "0e9206afd9752c8c0826b671b16b702ec7d175cd" CACHE STRING "nothings/stb commit to fetch")
+set(HORDE_STB_SHA256 "bfa11113029788800e1bbecdf6de107f9922d382c73ad20d3441526e4634c96e" CACHE STRING "SHA256 of the stb tarball for HORDE_STB_COMMIT")
+
+FetchContent_Declare(stb
+    URL https://github.com/nothings/stb/archive/${HORDE_STB_COMMIT}.tar.gz
+    URL_HASH SHA256=${HORDE_STB_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+FetchContent_MakeAvailable(stb)
+
+add_library(stb_vorbis STATIC ${stb_SOURCE_DIR}/stb_vorbis.c)
+target_include_directories(stb_vorbis SYSTEM PUBLIC ${stb_SOURCE_DIR})
+# Decoding from memory and files only; no stdio-based pushdata API needed.
+target_compile_definitions(stb_vorbis PRIVATE STB_VORBIS_NO_PUSHDATA_API)
+if(NOT MSVC)
+    target_compile_options(stb_vorbis PRIVATE -w)
+endif()

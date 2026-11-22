@@ -70,9 +70,12 @@ public:
     // GPU passes build() records per call: a rough cost indicator.
     std::uint32_t passCount() const;
 
-private:
+    // Sets every `stride`-th uint of `buffer` to `value`, `count` times
+    // (buffer_fill.comp). Also clears GpuCollidePhysics's density map.
     void fill(SDL_GPUCommandBuffer* commands, SDL_GPUBuffer* buffer, std::uint32_t count, std::uint32_t value,
               std::uint32_t stride);
+
+private:
 
     SDL_GPUDevice* m_device = nullptr;
 

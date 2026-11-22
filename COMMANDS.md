@@ -124,6 +124,25 @@ every build.
 
 ---
 
+## Tests
+
+Unit tests build by default (`-DHORDE_BUILD_TESTS=OFF` skips them):
+
+```sh
+ctest --preset linux-debug --output-on-failure
+```
+
+---
+
+## In-game keys
+
+| Key | What |
+| --- | --- |
+| F3 | toggle the frame stats overlay (frame cost, physics GPU/CPU time) |
+| Esc | pause a level (resume, or back to the menu / editor) |
+
+---
+
 ## Formatting
 
 ```sh
@@ -166,8 +185,11 @@ SDL_GPU validation messages appear without extra setup.
 ## Dependencies
 
 Versions are pinned in `cmake/Dependencies.cmake` as `HORDE_*_TAG` variables.
-Each dependency uses a system package when one is present and fetches the pinned
-tag otherwise.
+Most dependencies use a system package when one is present and fetch the pinned
+tag otherwise; RmlUi (the menus) is always fetched. The FreeType and RmlUi
+tarballs are verified against `HORDE_FREETYPE_SHA256` / `HORDE_RMLUI_SHA256`, so
+changing `HORDE_FREETYPE_TAG` or `HORDE_RMLUI_TAG` means setting the matching
+SHA256 too.
 
 ```sh
 # See what was picked — look for the "horde:" lines
@@ -199,15 +221,15 @@ committing the file; anyone with the build can then run it.
 | `big-world-1m-chebyshev-120hz-16` | the same at 120 Hz, 16 passes |
 | `big-world-1m-relaxed-120hz` | big world test level, 1M units, 50k/s spawn, relaxed solver, 120 Hz, 16 passes, relaxation 0.5, velocity smoothing 1.0, speed 200 |
 
-**To try one:** start the game and click it under *Presets* in the main menu, or
+**To try one:** start the game and open *Dev Ground* then *Presets* in the main menu, or
 
 ```powershell
 .\build\windows\bin\Release\horde.exe --preset big-world-1m-chebyshev-60hz-10
 ```
 
-The Level panel's *Frame cost* section shows what each frame costs (physics
+The F3 overlay (toggle it in any scene) shows what each frame costs (physics
 GPU and CPU time, and the frame rate it could reach uncapped), which is the
-number to compare between presets and machines. Its *Preset* dropdown loads
+number to compare between presets and machines. The Level panel's *Preset* dropdown loads
 another preset into "Restart with". Settings can be tweaked there before
 pressing *Restart level*.
 
@@ -390,7 +412,8 @@ in `docs/adr/0004-wall-collisions-and-broadphases.md`.
 
 The editor's Level panel has a *Test play* section. Pick a physics system and
 unit count, then press *Test play* to run the level as it stands (saved or not)
-with units spawned at random outside the walls. *Back* returns to the editor.
+with units spawned at random outside the walls. Press Esc to pause, then
+*Back to editor* to return.
 
 ### Editing shaders
 

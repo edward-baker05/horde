@@ -4,14 +4,21 @@
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_timer.h>
 
+#include <imgui.h>
+
 #include <algorithm>
+#include <array>
 #include <vector>
 
 #include "core/Paths.hpp"
+#include "core/PolishMode.hpp"
 #include "gfx/Camera2D.hpp"
 #include "gfx/ShaderLoader.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/MainMenuScene.hpp"
+#include "ui/FrameStatsOverlay.hpp"
+#include "ui/ScreenInput.hpp"
+#include "ui/ShellState.hpp"
 
 namespace horde::app {
 
@@ -80,14 +87,28 @@ bool App::init(const AppConfig& config) {
         return false;
     }
 
+    // Game-facing UI (menus); ImGui above stays for developer tooling.
+    if (!m_rml.init(m_gpu, *m_shaders)) {
+        return false;
+    }
+
+    if (!m_shell.init(m_gpu, *m_shaders) || !m_compositeBatch.init(m_gpu.device(), *m_shaders, m_gpu.swapchainFormat())) {
+        return false;
+    }
+    relayout();
+
     // allocated services to a scene
     scene::Services services;
     services.gpu = &m_gpu;
     services.shaders = m_shaders.get();
     services.atlas = &m_atlas;
-    services.window = m_window;
-    services.frameStats = &m_stats;
-    services.measureSimGpu = &m_measureSimGpu;
+    services.ui = &m_rml;
+    services.shell = &m_shell;
+    // No music or cow in benchmarks; without a sound device the game runs silent.
+    if (!m_config.bench && m_music.init()) {
+        services.music = &m_music;
+    }
+    services.dancingCow = !m_config.bench;
     // Benchmarks decide for themselves whether to sync the GPU.
     if (m_config.bench) {
         m_measureSimGpu = m_config.bench->syncGpu;
@@ -110,6 +131,9 @@ bool App::init(const AppConfig& config) {
     if (!m_scenes->applyPending()) {
         return false;
     }
+    // Start with the first scene's device already in place rather than sliding in.
+    updateShell(10.0f);
+    m_scenes->notifyResize();
 
     m_running = true;
     m_lastTicks = SDL_GetTicksNS();
@@ -168,6 +192,38 @@ int App::run() {
     }
 
     return 0;
+}
+
+void App::relayout() {
+    int width = 0;
+    int height = 0;
+    SDL_GetWindowSizeInPixels(m_window, &width, &height);
+    m_rml.setContextSize(ui::DeviceKind::None, {width, height}, SDL_GetWindowDisplayScale(m_window));
+    m_shell.layout({static_cast<float>(width), static_cast<float>(height)});
+    m_phoneSize = glm::ivec2(-1);
+    m_tabletSize = glm::ivec2(-1);
+    syncDeviceSizes();
+    if (m_scenes) {
+        m_scenes->notifyResize();
+    }
+}
+
+void App::syncDeviceSizes() {
+    const glm::ivec2 phone = m_shell.screenSize(ui::DeviceKind::Phone);
+    const glm::ivec2 tablet = m_shell.screenSize(ui::DeviceKind::Tablet);
+    if (phone == m_phoneSize && tablet == m_tabletSize) {
+        return;
+    }
+    const bool first = m_phoneSize.x < 0;
+    m_phoneSize = phone;
+    m_tabletSize = tablet;
+    // The UI is authored in logical px; the scale makes it fill the screen texture.
+    m_rml.setContextSize(ui::DeviceKind::Phone, phone, m_shell.rect(ui::DeviceKind::Phone).scale);
+    m_rml.setContextSize(ui::DeviceKind::Tablet, tablet, m_shell.rect(ui::DeviceKind::Tablet).scale);
+    // relayout() notifies the scenes itself; this covers a phone orientation change.
+    if (!first && m_scenes) {
+        m_scenes->notifyResize();
+    }
 }
 
 int App::finishBenchmark() {
@@ -273,6 +329,13 @@ void App::pumpEvents() {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
+        // F3 toggles the frame stats in any scene, unless a text field has the keyboard.
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F3 && !event.key.repeat &&
+            !ImGui::GetIO().WantTextInput) {
+            m_showFrameStats = !frameStatsVisible();
+            m_frameStatsChosen = true;
+            continue;
+        }
         // ImGui gets first refusal so that tool panels capture input before the
         // game camera sees it.
         const bool consumed = m_imgui.handleEvent(event);
@@ -283,12 +346,7 @@ void App::pumpEvents() {
                 continue;
 
             case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
-                const float width = static_cast<float>(event.window.data1);
-                const float height = static_cast<float>(event.window.data2);
-
-                if (scene::Scene* active = m_scenes->active()) {
-                    active->onResize(width, height);
-                }
+                relayout();
                 continue;
             }
 
@@ -300,21 +358,86 @@ void App::pumpEvents() {
             continue;
         }
 
-        if (scene::Scene* active = m_scenes->active()) {
-            active->handleEvent(event);
+        scene::Scene* active = m_scenes->active();
+        const ui::DeviceKind kind = active != nullptr ? active->presentation().device : ui::DeviceKind::None;
+
+        // Scenes on a device see mouse positions in its screen's pixels. SDL
+        // reports window units, so scale to swapchain pixels before remapping.
+        // Device-less scenes get the raw event, as RmlUi's None context scales
+        // for itself.
+        SDL_Event routed = event;
+        if (kind != ui::DeviceKind::None) {
+            ui::scaleMouseEvent(routed, SDL_GetWindowPixelDensity(m_window));
+            // A press on the bezel or the background belongs to nobody.
+            if (!m_shell.remapEvent(kind, routed)) {
+                continue;
+            }
+        }
+
+        // RmlUi next, so a menu under the pointer keeps clicks from the scene,
+        // unless the scene is mid-drag and the pointer is its.
+        const bool pointerEvent = event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+                                  event.type == SDL_EVENT_MOUSE_BUTTON_UP || event.type == SDL_EVENT_MOUSE_WHEEL;
+        const bool captured = pointerEvent && active != nullptr && active->capturesPointer();
+        if (!captured && m_rml.handleEvent(kind, routed)) {
+            continue;
+        }
+
+        if (active != nullptr) {
+            active->handleEvent(routed);
         }
     }
+}
+
+void App::updateShell(float deltaTime) {
+    m_presentations.clear();
+    for (const std::unique_ptr<scene::Scene>& scene : m_scenes->scenes()) {
+        m_presentations.push_back(scene->presentation());
+    }
+    m_shell.setTargets(ui::computeTargets(m_presentations));
+    m_shell.update(deltaTime);
+    syncDeviceSizes();
 }
 
 void App::update(float deltaTime) {
     m_imgui.beginFrame();
 
+    // Devices follow the stack: slides start when a scene on the other device
+    // is pushed or popped. Only the top scene updates; covered ones stay frozen.
+    updateShell(deltaTime);
+
     if (scene::Scene* active = m_scenes->active()) {
         const Uint64 start = SDL_GetTicksNS();
         active->update(deltaTime);
         m_lastSceneUpdateNs = SDL_GetTicksNS() - start;
+        m_rml.update();
         active->debugUi();
     }
+
+    if (frameStatsVisible()) {
+        // Top-right: every other window's first-use position is near the top-left,
+        // and this one takes clicks, so it must not sit over them.
+        const ImVec2 display = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos(ImVec2(display.x - 8.0f, 8.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+        ImGui::SetNextWindowBgAlpha(0.55f);
+        constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                           ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove |
+                                           ImGuiWindowFlags_NoBringToFrontOnFocus;
+        if (ImGui::Begin(tr("Frame stats"), nullptr, flags)) {
+            ui::drawFrameStats(m_stats, m_config.bench ? nullptr : &m_measureSimGpu);
+        }
+        ImGui::End();
+    }
+}
+
+bool App::frameStatsVisible() const {
+    if (m_frameStatsChosen) {
+        return m_showFrameStats;
+    }
+    // Until F3 is pressed: on for full-window scenes, off on the devices.
+    const scene::Scene* active = m_scenes->active();
+    return active == nullptr || active->presentation().device == ui::DeviceKind::None;
 }
 
 void App::render() {
@@ -402,33 +525,125 @@ void App::render() {
         }
     }
 
-    m_batch.begin();
+    const ui::DeviceKind topDevice = active != nullptr ? active->presentation().device : ui::DeviceKind::None;
+    // Behind full-window scenes and device screens: slate, or dark wine in Polish mode.
+    const SDL_FColor backdrop =
+        polish::enabled() ? SDL_FColor{0.29f, 0.03f, 0.08f, 1.0f} : SDL_FColor{0.06f, 0.07f, 0.09f, 1.0f};
+    const std::array<ui::DeviceKind, 2> deviceKinds{ui::DeviceKind::Phone, ui::DeviceKind::Tablet};
 
-    if (active != nullptr) {
-        active->render(m_batch);
+    // Which device screens get drawn this frame: visible, with a scene on them.
+    // Covered scenes are frozen but still show. A device slid fully off is skipped.
+    std::array<scene::Scene*, 2> deviceScenes{};
+    for (size_t i = 0; i < deviceKinds.size(); ++i) {
+        // A device sliding out keeps its last frame: skipping it here also skips
+        // its uploads, RmlUi record, screen pass and blur.
+        if (m_shell.visible(deviceKinds[i]) && !m_shell.frozen(deviceKinds[i])) {
+            deviceScenes[i] = m_scenes->topmostOn(deviceKinds[i]);
+        }
     }
 
-    // Both of these upload vertex data through copy passes and so must happen
-    // before the render pass begins. ImGui's SDL_GPU backend is explicit about
-    // this: skipping PrepareDrawData renders nothing, silently.
+    // All uploads happen before any render pass: copy passes cannot nest in one.
+    m_batch.begin();
+    if (topDevice == ui::DeviceKind::None && active != nullptr) {
+        active->render(m_batch);
+    }
     m_batch.upload(commands);
-    m_imgui.prepare(commands);
 
+    for (size_t i = 0; i < deviceKinds.size(); ++i) {
+        if (deviceScenes[i] == nullptr) {
+            continue;
+        }
+        gfx::SpriteBatch& deviceBatch = m_shell.batch(deviceKinds[i]);
+        deviceBatch.begin();
+        deviceScenes[i]->render(deviceBatch);
+        deviceBatch.upload(commands);
+    }
+
+    // The composite batch is in window pixels, y down, like the scene cameras.
+    const glm::vec2 windowPx = m_shell.windowPx();
+    m_compositeBatch.begin();
+    if (topDevice != ui::DeviceKind::None && polish::enabled()) {
+        // Behind the devices in Polish mode: the flag, white over red.
+        const glm::vec4 solid = gfx::atlasCell(1, 1, 4, 4);
+        const glm::vec2 half{windowPx.x, windowPx.y * 0.5f};
+        gfx::drawCentered(m_compositeBatch, m_atlas.handle(), {windowPx.x * 0.5f, windowPx.y * 0.25f}, half, 0.0f, solid,
+                          {0.96f, 0.96f, 0.96f, 1.0f});
+        gfx::drawCentered(m_compositeBatch, m_atlas.handle(), {windowPx.x * 0.5f, windowPx.y * 0.75f}, half, 0.0f, solid,
+                          {0.86f, 0.08f, 0.24f, 1.0f});
+    }
+    m_shell.composite(m_compositeBatch, m_atlas.handle());
+    m_compositeBatch.upload(commands);
+    m_compositeCamera.setViewport(windowPx.x, windowPx.y);
+    m_compositeCamera.setCenter(windowPx * 0.5f);
+    m_compositeCamera.setZoom(1.0f);
+
+    // ImGui's SDL_GPU backend is explicit about this: skipping PrepareDrawData
+    // renders nothing, silently.
+    m_imgui.prepare(commands);
+    // RmlUi uploads geometry and glyphs while rendering, so it records here
+    // and replays inside the pass.
+    m_rml.beginFrame();
+    for (size_t i = 0; i < deviceKinds.size(); ++i) {
+        if (deviceScenes[i] != nullptr) {
+            m_rml.record(deviceKinds[i], commands);
+        }
+    }
+    m_rml.record(ui::DeviceKind::None, commands);
+
+    // Each device's scene renders into its own screen texture.
+    for (size_t i = 0; i < deviceKinds.size(); ++i) {
+        scene::Scene* scene = deviceScenes[i];
+        if (scene == nullptr) {
+            continue;
+        }
+        gfx::RenderTarget& target = m_shell.screen(deviceKinds[i]);
+
+        SDL_GPUColorTargetInfo screenTarget{};
+        screenTarget.texture = target.texture();
+        screenTarget.clear_color = backdrop;
+        screenTarget.load_op = SDL_GPU_LOADOP_CLEAR;
+        screenTarget.store_op = SDL_GPU_STOREOP_STORE;
+
+        if (SDL_GPURenderPass* screenPass = SDL_BeginGPURenderPass(commands, &screenTarget, 1, nullptr)) {
+            m_shell.markDrawn(deviceKinds[i]);
+            scene->camera().setViewport(static_cast<float>(target.size().x), static_cast<float>(target.size().y));
+            m_shell.batch(deviceKinds[i]).flush(commands, screenPass, scene->camera().viewProjection());
+            scene->renderPass(commands, screenPass);
+            m_rml.draw(deviceKinds[i], screenPass, commands);
+            SDL_EndGPURenderPass(screenPass);
+        }
+    }
+
+    // Background devices blur their screen texture. These are render passes, so
+    // they follow every upload and the device passes that write what they read.
+    for (size_t i = 0; i < deviceKinds.size(); ++i) {
+        if (deviceScenes[i] != nullptr && m_shell.blurAmount(deviceKinds[i]) > 0.0f) {
+            m_shell.applyBlur(deviceKinds[i], commands);
+        }
+    }
+
+    // A scene without a device keeps its own background; otherwise the devices
+    // sit on black, or on the flag drawn into the composite batch.
+    const bool direct = topDevice == ui::DeviceKind::None;
     SDL_GPUColorTargetInfo colorTarget{};
     colorTarget.texture = swapchain;
-    colorTarget.clear_color = SDL_FColor{0.06f, 0.07f, 0.09f, 1.0f};
+    colorTarget.clear_color = direct ? backdrop : SDL_FColor{0.0f, 0.0f, 0.0f, 1.0f};
     colorTarget.load_op = SDL_GPU_LOADOP_CLEAR;
     colorTarget.store_op = SDL_GPU_STOREOP_STORE;
 
     SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(commands, &colorTarget, 1, nullptr);
 
     if (pass != nullptr) {
-        if (active != nullptr) {
+        if (direct && active != nullptr) {
             active->camera().setViewport(static_cast<float>(swapchainWidth), static_cast<float>(swapchainHeight));
             m_batch.flush(commands, pass, active->camera().viewProjection());
             active->renderPass(commands, pass);
         }
 
+        m_compositeBatch.flush(commands, pass, m_compositeCamera.viewProjection());
+        // The window context last, so what it shows (the dancing cow) sits over
+        // the devices as well as over device-less scenes.
+        m_rml.draw(ui::DeviceKind::None, pass, commands);
         m_imgui.draw(commands, pass);
         SDL_EndGPURenderPass(pass);
     }
@@ -450,6 +665,10 @@ void App::shutdown() {
 
     m_gpuTimer.stop();
     m_scenes.reset();
+    m_music.shutdown();
+    m_compositeBatch.shutdown();
+    m_shell.shutdown();
+    m_rml.shutdown();
     m_imgui.shutdown();
     m_atlas.release();
     m_batch.shutdown();
