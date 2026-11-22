@@ -27,16 +27,18 @@ namespace horde::scene {
 
 struct Services;
 
-// The level editor's tablet app: the round's OSD, tray and dark panels turned
-// to authoring. The tray holds the tools and the editor's buttons, a card
-// above it the armed tool's settings, a card on the left what's selected, and
-// a tabbed sheet on the right the level, its round, its contents and files.
+// The level editor's tablet app: the round's readouts, dock and glass panels
+// turned to authoring. The dock holds the tools, a card above it the armed
+// tool's settings, undo and redo sit by the level's name at the top left, a
+// card below them what's selected, and a tabbed sheet on the right the level
+// (with Test play), its round, its contents and files. Saving and leaving are
+// the phone's: EditorMenuScene, on Esc.
 // An RmlUi document (assets/ui/editor.rml) bound to an "editor" data model on
 // the tablet's context. Edits land straight in the EditorState it is given,
 // one undo step each; what needs the scene comes back through takeAction().
 class EditorOverlay {
 public:
-    enum class Action { None, Play, Menu };
+    enum class Action { None, Play };
 
     ~EditorOverlay();
 
@@ -62,6 +64,10 @@ public:
     // Takes the keyboard back from whichever field has it, keeping its value.
     void blur();
 
+    // The level was saved from elsewhere (the editor menu): refreshes the
+    // saved levels and the Files tab's name.
+    void levelSaved();
+
 private:
     using Args = Rml::VariantList;
 
@@ -78,9 +84,8 @@ private:
 
     struct Tool {
         Rml::String name;
-        Rml::String shape; // a glyph class in tablet.rcss or editor.rcss
-        Rml::String glyph; // text drawn in the shape, for those radii can't make
-        Rml::String color;
+        Rml::String icon;  // a glyph in the "lucide" font, see ui/Icons.hpp
+        Rml::String color; // the icon's tint
     };
 
     // One number: how to read it from the state and write it back.

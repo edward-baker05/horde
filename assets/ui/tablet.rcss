@@ -1,11 +1,15 @@
-/* Tablet round app: a camera OSD over the feed and a turret tray along the
-   bottom, with a line over it about the turret under the pointer. Sizes are in dp on the 1280x800 landscape tablet. The feed shows
-   through the body, which ignores the pointer so clicks reach the scene; only
-   the tray takes them. Same renderer limits as phone_normal.rcss: flat colours,
-   vertex gradients, radii, opacity and transforms. */
+/* Tablet round app, after iPadOS: the camera feed edge to edge, its readouts
+   in small glass cards, and a floating glass dock of turrets over a fade at
+   the bottom, with a capsule above it about the turret under the pointer.
+   System colours, Inter, capsule buttons, and corners concentric with the
+   card or screen around them. Sizes are in dp on the 1280x800 landscape
+   tablet. The feed shows through the body, which ignores the pointer so
+   clicks reach the scene; only the tray takes them. Same renderer limits as
+   phone_normal.rcss: flat colours, vertex gradients, radii, opacity and
+   transforms. Glass is a translucent fill with a light 1dp rim. */
 
 body {
-	font-family: "Liberation Sans";
+	font-family: "Inter";
 	font-size: 17dp;
 	color: #ffffff;
 	width: 100%;
@@ -14,54 +18,62 @@ body {
 	pointer-events: none;
 }
 
-/* --- Feed OSD ---------------------------------------------------------- */
+/* --- Feed readouts ------------------------------------------------------ */
 
-/* White on the feed, outlined in black so it reads over any level colour. */
+/* Dark glass, so white text reads over any level colour. */
 .osd {
 	position: absolute;
 	display: block;
-	font-size: 19dp;
-	font-weight: bold;
-	font-effect: outline(1dp #000000);
+	padding: 9dp 14dp 7dp 14dp;
+	font-size: 15dp;
+	font-weight: 600;
+	background-color: #0000008c;
+	border: 1dp #ffffff1f;
+	border-radius: 16dp;
 }
 
 .osd .line {
 	display: block;
-	margin-bottom: 5dp;
+	margin-bottom: 2dp;
 }
 
 /* The feed ends at the tray's top: 116dp up from the bottom. */
-.top-left { left: 26dp; top: 20dp; }
-.top-right { right: 26dp; top: 20dp; text-align: right; }
-.bottom-left { left: 26dp; bottom: 134dp; }
-.bottom-right { right: 26dp; bottom: 134dp; }
+.top-left { left: 22dp; top: 22dp; }
+.top-right { right: 22dp; top: 22dp; text-align: right; }
+.bottom-left { left: 22dp; bottom: 130dp; }
+.bottom-right { right: 22dp; bottom: 130dp; }
+
+.osd .money {
+	color: #30d158;
+}
 
 .rec-dot {
 	display: inline-block;
-	width: 12dp;
-	height: 12dp;
+	width: 10dp;
+	height: 10dp;
 	margin-right: 7dp;
-	border-radius: 6dp;
-	background-color: #ff3b30;
+	border-radius: 5dp;
+	background-color: #ff453a;
 	transition: opacity 0.15s;
 }
 
 .rec-dot.off {
-	opacity: 0.2;
+	opacity: 0.25;
 }
 
 .pips {
 	display: block;
-	height: 16dp;
+	height: 14dp;
+	margin: 4dp 0 2dp 0;
 }
 
 .pip {
 	display: inline-block;
-	width: 10dp;
-	height: 16dp;
-	margin-right: 4dp;
-	border: 1dp #000000;
-	background-color: #ffffff26;
+	width: 9dp;
+	height: 14dp;
+	margin-right: 3dp;
+	border-radius: 3dp;
+	background-color: #ffffff33;
 }
 
 .pip.on {
@@ -73,23 +85,25 @@ body {
 	position: absolute;
 	left: 50%;
 	top: 342dp;
-	width: 34dp;
-	height: 34dp;
-	margin: -17dp 0 0 -17dp;
+	width: 30dp;
+	height: 30dp;
+	margin: -15dp 0 0 -15dp;
 }
 
 .crosshair .v,
 .crosshair .h {
 	position: absolute;
-	background-color: #ffffff66;
+	background-color: #ffffff59;
+	border-radius: 1dp;
 }
 
-.crosshair .v { left: 16dp; top: 0; width: 2dp; height: 34dp; }
-.crosshair .h { left: 0; top: 16dp; width: 34dp; height: 2dp; }
+.crosshair .v { left: 14dp; top: 0; width: 2dp; height: 30dp; }
+.crosshair .h { left: 0; top: 14dp; width: 30dp; height: 2dp; }
 
 /* --- Turret tray --------------------------------------------------------- */
 
-/* Height must match kRoundTrayFraction in src/scene/LevelMode.hpp. */
+/* Height must match kRoundTrayFraction in src/scene/LevelMode.hpp. The band
+   takes the pointer; the dock floats in it over a fade from the feed. */
 .tray {
 	position: absolute;
 	left: 0;
@@ -99,18 +113,17 @@ body {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	background-color: #121417;
-	decorator: vertical-gradient(#15171a #0e1012);
-	border-top: 1dp #ffffff14;
+	decorator: vertical-gradient(#00000000 #000000b3);
 	pointer-events: auto;
 }
 
+/* The dock: 8dp round 24dp-cornered items, so 32dp corners. */
 .slots {
 	display: flex;
-	padding: 6dp 8dp;
-	background-color: #ffffff0d;
-	border: 1dp #ffffff14;
-	border-radius: 22dp;
+	padding: 8dp;
+	background-color: #1c1c1ee0;
+	border: 1dp #ffffff2e;
+	border-radius: 32dp;
 }
 
 .tower {
@@ -119,11 +132,11 @@ body {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	width: 62dp;
+	width: 66dp;
 	height: 80dp;
-	margin: 0 2dp;
+	margin: 0 1dp;
 	border: 1dp #00000000;
-	border-radius: 16dp;
+	border-radius: 24dp;
 	transition: background-color 0.12s;
 }
 
@@ -132,20 +145,20 @@ body {
 }
 
 .tower:active {
-	transform: scale(0.96);
+	transform: scale(0.95);
 }
 
 /* The icon and label leave the pointer to the item itself, so the whole item
    is one hover target: a mouseout bubbling up from a child would otherwise
    clear the hint while the pointer is still on the item. */
-.tower .icon,
+.tower .icon-tile,
 .tower .label {
 	pointer-events: none;
 }
 
 .tower.selected {
-	background-color: #ffffff1a;
-	border-color: #ffffff59;
+	background-color: #ffffff24;
+	border-color: #ffffff3d;
 }
 
 /* The first of a weapon category, set apart from the group before. */
@@ -161,62 +174,38 @@ body {
 	background-color: #00000000;
 }
 
-.tower .icon {
+/* Each item's tile: neutral dark glass holding a line glyph in the item's
+   tint, so the dock reads as one set and colour stays a cue, not a fill. */
+.tower .icon-tile {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	width: 42dp;
-	height: 42dp;
-	border-radius: 10dp;
+	width: 44dp;
+	height: 44dp;
+	box-sizing: border-box;
+	decorator: vertical-gradient(#3a3a3f #222226);
+	border: 1dp #ffffff1f;
+	border-radius: 11dp;
 }
 
-/* Placeholder weapon sprites: textures/weapons.png, 64px cells in a 4x4 grid,
-   weapon n in cell n - 1. Real art replaces the cells, not these rects. */
-@spritesheet weapons {
-	src: ../textures/weapons.png;
-	weapon-1: 0px 0px 64px 64px;
-	weapon-2: 64px 0px 64px 64px;
-	weapon-3: 128px 0px 64px 64px;
-	weapon-4: 192px 0px 64px 64px;
-	weapon-5: 0px 64px 64px 64px;
-	weapon-6: 64px 64px 64px 64px;
-	weapon-7: 128px 64px 64px 64px;
-	weapon-8: 192px 64px 64px 64px;
-	weapon-9: 0px 128px 64px 64px;
-	weapon-10: 64px 128px 64px 64px;
-	weapon-11: 128px 128px 64px 64px;
-	weapon-12: 192px 128px 64px 64px;
-	weapon-13: 0px 192px 64px 64px;
-	weapon-14: 64px 192px 64px 64px;
-	weapon-15: 128px 192px 64px 64px;
-	weapon-16: 192px 192px 64px 64px;
-}
-
-.tower .sprite {
-	width: 42dp;
-	height: 42dp;
-	border-radius: 10dp;
+.tower .glyph-icon {
+	font-family: "lucide";
+	font-size: 22dp;
+	line-height: 22dp;
 }
 
 .tower .label {
 	display: block;
-	margin-top: 7dp;
+	margin-top: 6dp;
 	font-size: 12dp;
-	color: #dfe3e7;
-}
-
-/* Kinds without a sprite: their initials, dark on the tinted icon. */
-.glyph {
-	display: block;
-	font-size: 15dp;
-	font-weight: bold;
-	color: #0c0e10;
+	font-weight: 500;
+	color: #ffffffd9;
 }
 
 /* --- Hint and start ------------------------------------------------------ */
 
 /* Over the tray: what the turret under the pointer does, or why the one
-   selected can't go where the pointer is. */
+   selected can't go where the pointer is, in a glass capsule. */
 .hint {
 	position: absolute;
 	left: 0;
@@ -225,32 +214,43 @@ body {
 	display: block;
 	text-align: center;
 	font-size: 13dp;
-	font-weight: bold;
-	font-effect: outline(1dp #000000);
+}
+
+.hint .pill {
+	display: inline-block;
+	padding: 7dp 16dp;
+	background-color: #000000a6;
+	border: 1dp #ffffff1f;
+	border-radius: 16dp;
 }
 
 .hint .name {
+	font-weight: 600;
 	color: #ffffff;
-	margin-right: 10dp;
+	margin-right: 8dp;
 }
 
 .hint .text {
-	color: #dfe3e7;
+	color: #ebebf5bf;
 }
 
 .hint .problem {
-	color: #ff6b5e;
+	font-weight: 600;
+	color: #ff6961;
 }
 
-.start {
+/* Two classes, to outrank .act's size. */
+.act.start {
 	position: absolute;
 	left: 50%;
-	bottom: 150dp;
-	width: 160dp;
-	margin-left: -80dp;
-	padding: 10dp 0;
+	bottom: 164dp;
+	width: 150dp;
+	height: 44dp;
+	margin-left: -75dp;
+	padding: 0;
+	line-height: 44dp;
 	font-size: 17dp;
-	letter-spacing: 2dp;
+	border-radius: 22dp;
 	pointer-events: auto;
 }
 
@@ -260,11 +260,11 @@ body {
 .panel {
 	position: absolute;
 	display: block;
-	width: 170dp;
-	padding: 10dp 12dp;
-	background-color: #121417e6;
+	width: 176dp;
+	padding: 12dp 14dp;
+	background-color: #1c1c1ef0;
 	border: 1dp #ffffff26;
-	border-radius: 12dp;
+	border-radius: 18dp;
 	pointer-events: auto;
 }
 
@@ -275,36 +275,40 @@ body {
 }
 
 .panel .kind {
-	font-size: 11dp;
-	font-weight: bold;
-	color: #9aa3ab;
-	margin-top: 2dp;
+	font-size: 12dp;
+	font-weight: 500;
+	color: #8e8e93;
+	margin-top: 1dp;
 }
 
 .panel .title {
-	font-weight: bold;
+	font-weight: 600;
 	font-size: 16dp;
 }
 
 .panel .stat {
 	font-size: 13dp;
-	color: #c8cdd2;
-	margin-top: 5dp;
+	color: #ebebf5cc;
+	margin-top: 6dp;
 }
 
+/* Buttons are capsules in the tint. */
 .act {
 	display: block;
-	padding: 7dp 10dp;
+	height: 32dp;
+	padding: 0 14dp;
+	line-height: 32dp;
 	text-align: center;
-	font-size: 13dp;
-	font-weight: bold;
-	background-color: #2a7bff;
-	border-radius: 8dp;
+	font-size: 14dp;
+	font-weight: 600;
+	color: #ffffff;
+	background-color: #0a84ff;
+	border-radius: 16dp;
 	transition: background-color 0.12s;
 }
 
 .act:hover {
-	background-color: #4a8fff;
+	background-color: #409cff;
 }
 
 .act.disabled {
@@ -323,51 +327,65 @@ body {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	background-color: #00000099;
+	background-color: #00000080;
 	pointer-events: auto;
 }
 
+/* Capsule buttons 20dp in from the edge, under 28dp corners. */
 .results .card {
 	display: block;
-	width: 280dp;
-	padding: 22dp;
+	width: 300dp;
+	padding: 26dp 20dp 20dp 20dp;
 	text-align: center;
-	background-color: #121417f2;
+	background-color: #1c1c1ef5;
 	border: 1dp #ffffff26;
-	border-radius: 18dp;
+	border-radius: 28dp;
 }
 
 .results .verdict {
 	display: block;
-	font-size: 44dp;
-	font-weight: bold;
-	color: #ff5a4f;
-	margin-bottom: 10dp;
+	font-size: 34dp;
+	font-weight: 700;
+	color: #ff453a;
+	margin-bottom: 12dp;
 }
 
 .results .verdict.won {
-	color: #5fe08a;
+	color: #30d158;
 }
 
 .results .stat,
 .results .earned {
 	display: block;
 	font-size: 15dp;
+	color: #ebebf5cc;
 	margin: 4dp 0;
 }
 
 .results .earned {
 	font-size: 22dp;
-	font-weight: bold;
-	color: #5fe08a;
+	font-weight: 700;
+	color: #30d158;
 }
 
 .results .buttons {
 	display: flex;
 	justify-content: space-between;
-	margin-top: 16dp;
+	margin-top: 20dp;
 }
 
 .results .buttons .act {
-	width: 110dp;
+	width: 124dp;
+	height: 44dp;
+	line-height: 44dp;
+	font-size: 16dp;
+	border-radius: 22dp;
+}
+
+.results .buttons .act.quiet {
+	background-color: #ffffff1f;
+}
+
+.results .buttons .act.quiet:hover {
+	background-color: #ffffff2e;
 }

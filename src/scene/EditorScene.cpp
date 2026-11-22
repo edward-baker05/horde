@@ -15,6 +15,7 @@
 #include "gfx/Texture.hpp"
 #include "logic/LevelGeometry.hpp"
 #include "logic/LevelValidation.hpp"
+#include "scene/EditorMenuScene.hpp"
 #include "scene/LevelMode.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
@@ -64,9 +65,6 @@ void EditorScene::update(float deltaTime) {
     }
 
     switch (m_overlay.takeAction()) {
-        case EditorOverlay::Action::Menu:
-            m_services->scenes->pop();
-            break;
         case EditorOverlay::Action::Play: {
             // Over the editor, on the same tablet, so leaving the round comes
             // straight back here.
@@ -101,6 +99,22 @@ float EditorScene::handleWorldSize() const {
 
 float EditorScene::handlePickRadius() const {
     return handleWorldSize();
+}
+
+void EditorScene::escape() {
+    // An in-progress polyline is abandoned entirely, rather than committing a partial one.
+    if (m_draft.active || m_placement.active || m_painting) {
+        m_draft.clear();
+        m_placement.active = false;
+        m_painting = false;
+        return;
+    }
+    if (m_menuOpen) {
+        return;
+    }
+    m_menuOpen = true;
+    m_overlay.blur();
+    m_services->scenes->push(std::make_unique<EditorMenuScene>(m_state, [this] { m_overlay.levelSaved(); }));
 }
 
 void EditorScene::commitDraft() {
@@ -202,12 +216,9 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                 break;
 
             case SDLK_ESCAPE:
-                // Escape abandons an in-progress polyline entirely, rather than
-                // committing a partial one.
-                m_draft.clear();
-                m_placement.active = false;
-                m_painting = false;
-                m_state.tool = editor::Tool::Select;
+                if (!event.key.repeat) {
+                    escape();
+                }
                 return true;
 
             case SDLK_Z:

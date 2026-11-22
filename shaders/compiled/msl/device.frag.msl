@@ -1,0 +1,237 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_DeviceUniforms
+{
+    float2 WindowSize;
+    float2 ScreenOrigin;
+    float2 ScreenPx;
+    float Scale;
+    float Kind;
+    float Bezel;
+    float ScreenRadius;
+    float Landscape;
+    float Blur;
+    float Dim;
+    packed_float3 Padding;
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 in_var_TEXCOORD0 [[user(locn0)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant type_DeviceUniforms& DeviceUniforms [[buffer(0)]], texture2d<float> Screen [[texture(0)]], texture2d<float> Blurred [[texture(1)]], sampler ScreenSampler [[sampler(0)]], sampler BlurredSampler [[sampler(1)]])
+{
+    main0_out out = {};
+    float4 _808;
+    do
+    {
+        float2 _155 = in.in_var_TEXCOORD0 * DeviceUniforms.WindowSize;
+        if (DeviceUniforms.Kind > 2.5)
+        {
+            _808 = float4(mix(Screen.sample(ScreenSampler, in.in_var_TEXCOORD0).xyz, Blurred.sample(BlurredSampler, in.in_var_TEXCOORD0).xyz, float3(DeviceUniforms.Blur)) * DeviceUniforms.Dim, 1.0);
+            break;
+        }
+        if (DeviceUniforms.Kind > 1.5)
+        {
+            float2 _196 = (in.in_var_TEXCOORD0 - float2(0.5, 0.449999988079071044921875)) * float2(DeviceUniforms.WindowSize.x / DeviceUniforms.WindowSize.y, 1.0);
+            _808 = float4(mix(float3(0.104999996721744537353515625, 0.11200000345706939697265625, 0.12999999523162841796875), float3(0.0350000001490116119384765625, 0.0379999987781047821044921875, 0.04500000178813934326171875), float3(in.in_var_TEXCOORD0.y)) + (float3(0.0500000007450580596923828125, 0.054999999701976776123046875, 0.064999997615814208984375) * exp(dot(_196, _196) * (-3.0))), 1.0);
+            break;
+        }
+        bool _206 = DeviceUniforms.Kind < 0.5;
+        float _209 = 1.0 / DeviceUniforms.Scale;
+        float2 _214 = DeviceUniforms.ScreenPx * 0.5;
+        float2 _217 = float2(DeviceUniforms.Scale);
+        float2 _218 = (_155 - (DeviceUniforms.ScreenOrigin + _214)) / _217;
+        bool _224;
+        if (_206)
+        {
+            _224 = DeviceUniforms.Landscape > 0.5;
+        }
+        else
+        {
+            _224 = false;
+        }
+        float2 _232;
+        if (_224)
+        {
+            _232 = float2(-_218.y, _218.x);
+        }
+        else
+        {
+            _232 = _218;
+        }
+        float2 _233 = _214 / _217;
+        float2 _238;
+        if (_224)
+        {
+            _238 = _233.yx;
+        }
+        else
+        {
+            _238 = _233;
+        }
+        float2 _242 = _238 + float2(DeviceUniforms.Bezel);
+        float _245 = DeviceUniforms.ScreenRadius + DeviceUniforms.Bezel;
+        float _246 = _206 ? 2.599999904632568359375 : 2.2000000476837158203125;
+        bool3 _247 = bool3(_206);
+        float3 _248 = select(float3(0.25, 0.2599999904632568359375, 0.2800000011920928955078125), float3(0.23999999463558197021484375, 0.23999999463558197021484375, 0.25), _247);
+        float3 _249 = select(float3(0.62000000476837158203125, 0.63999998569488525390625, 0.670000016689300537109375), float3(0.63999998569488525390625, 0.62999999523162841796875, 0.61000001430511474609375), _247);
+        float _252 = mix(1.0, DeviceUniforms.Dim, 0.699999988079071044921875);
+        float2 _257;
+        if (_224)
+        {
+            _257 = _242.yx;
+        }
+        else
+        {
+            _257 = _242;
+        }
+        float2 _261 = float2(_245);
+        float2 _262 = (abs(_218 - float2(0.0, 22.0)) - _257) + _261;
+        float _270 = (length(precise::max(_262, float2(0.0))) + precise::min(precise::max(_262.x, _262.y), 0.0)) - _245;
+        float2 _274 = (abs(_218 - float2(0.0, 4.0)) - _257) + _261;
+        float4 _297 = float4(0.0, 0.0, 0.0, fast::clamp(((0.5 * exp(precise::max(_270, 0.0) * (-0.0384615398943424224853515625))) * fast::clamp((_270 * 0.16666667163372039794921875) + 1.0, 0.0, 1.0)) + (0.3499999940395355224609375 * exp(precise::max((length(precise::max(_274, float2(0.0))) + precise::min(precise::max(_274.x, _274.y), 0.0)) - _245, 0.0) * (-0.20000000298023223876953125))), 0.0, 1.0));
+        float3 _299 = mix(_248, _249, float3(0.449999988079071044921875)) * _252;
+        float4 _561;
+        if (_206)
+        {
+            float _303 = _242.y;
+            float _304 = _242.x;
+            float _306 = (-0.4000000059604644775390625) - _304;
+            float _308 = (_303 * 0.4099999964237213134765625) - _303;
+            float _310 = _303 * 0.039999999105930328369140625;
+            float _313 = precise::min(2.400000095367431640625, _310);
+            float2 _317 = (abs(_232 - float2(_306, _308)) - float2(2.400000095367431640625, _310)) + float2(_313);
+            float _337 = fast::clamp(0.5 - (((length(precise::max(_317, float2(0.0))) + precise::min(precise::max(_317.x, _317.y), 0.0)) - _313) / _209), 0.0, 1.0);
+            float _347 = (_303 * 0.579999983310699462890625) - _303;
+            float _349 = _303 * 0.0719999969005584716796875;
+            float2 _350 = float2(2.400000095367431640625, _349);
+            float _352 = precise::min(2.400000095367431640625, _349);
+            float2 _355 = float2(_352);
+            float2 _356 = (abs(_232 - float2(_306, _347)) - _350) + _355;
+            float _366 = _303 * 0.143999993801116943359375;
+            float _375 = fast::clamp(0.5 - (((length(precise::max(_356, float2(0.0))) + precise::min(precise::max(_356.x, _356.y), 0.0)) - _352) / _209), 0.0, 1.0);
+            float _385 = (_303 * 0.7599999904632568359375) - _303;
+            float2 _390 = (abs(_232 - float2(_306, _385)) - _350) + _355;
+            float _408 = fast::clamp(0.5 - (((length(precise::max(_390, float2(0.0))) + precise::min(precise::max(_390.x, _390.y), 0.0)) - _352) / _209), 0.0, 1.0);
+            float _418 = (_303 * 0.660000026226043701171875) - _303;
+            float _420 = _303 * 0.115999996662139892578125;
+            float _423 = precise::min(2.400000095367431640625, _420);
+            float2 _427 = (abs(_232 - float2(_304 + 0.4000000059604644775390625, _418)) - float2(2.400000095367431640625, _420)) + float2(_423);
+            float _446 = fast::clamp(0.5 - (((length(precise::max(_427, float2(0.0))) + precise::min(precise::max(_427.x, _427.y), 0.0)) - _423) / _209), 0.0, 1.0);
+            _561 = float4((_299 * (0.800000011920928955078125 + (0.3499999940395355224609375 * fast::clamp(0.5 - ((_232.y - _418) / (_303 * 0.23199999332427978515625)), 0.0, 1.0)))) * _446, _446) + ((float4((_299 * (0.800000011920928955078125 + (0.3499999940395355224609375 * fast::clamp(0.5 - ((_232.y - _385) / _366), 0.0, 1.0)))) * _408, _408) + ((float4((_299 * (0.800000011920928955078125 + (0.3499999940395355224609375 * fast::clamp(0.5 - ((_232.y - _347) / _366), 0.0, 1.0)))) * _375, _375) + ((float4((_299 * (0.800000011920928955078125 + (0.3499999940395355224609375 * fast::clamp(0.5 - ((_232.y - _308) / (_303 * 0.07999999821186065673828125)), 0.0, 1.0)))) * _337, _337) + (_297 * (1.0 - _337))) * (1.0 - _375))) * (1.0 - _408))) * (1.0 - _446));
+        }
+        else
+        {
+            float _455 = _242.x;
+            float _456 = _242.y;
+            float _457 = (-0.4000000059604644775390625) - _456;
+            float _461 = _455 * 0.0599999986588954925537109375;
+            float2 _462 = float2(_461, 2.2000000476837158203125);
+            float _464 = precise::min(_461, 2.2000000476837158203125);
+            float2 _467 = float2(_464);
+            float2 _468 = (abs(_232 - float2((_455 * 0.20000000298023223876953125) - _455, _457)) - _462) + _467;
+            float3 _484 = _299 * (0.800000011920928955078125 + (0.3499999940395355224609375 * fast::clamp(0.5 - ((_232.y - _457) * 0.2272727191448211669921875), 0.0, 1.0)));
+            float _487 = fast::clamp(0.5 - (((length(precise::max(_468, float2(0.0))) + precise::min(precise::max(_468.x, _468.y), 0.0)) - _464) / _209), 0.0, 1.0);
+            float2 _502 = (abs(_232 - float2((_455 * 0.3499999940395355224609375) - _455, _457)) - _462) + _467;
+            float _513 = fast::clamp(0.5 - (((length(precise::max(_502, float2(0.0))) + precise::min(precise::max(_502.x, _502.y), 0.0)) - _464) / _209), 0.0, 1.0);
+            float _524 = (_456 * 0.23999999463558197021484375) - _456;
+            float _526 = _456 * 0.0900000035762786865234375;
+            float _529 = precise::min(2.2000000476837158203125, _526);
+            float2 _533 = (abs(_232 - float2((-0.4000000059604644775390625) - _455, _524)) - float2(2.2000000476837158203125, _526)) + float2(_529);
+            float _552 = fast::clamp(0.5 - (((length(precise::max(_533, float2(0.0))) + precise::min(precise::max(_533.x, _533.y), 0.0)) - _529) / _209), 0.0, 1.0);
+            _561 = float4((_299 * (0.800000011920928955078125 + (0.3499999940395355224609375 * fast::clamp(0.5 - ((_232.y - _524) / (_456 * 0.180000007152557373046875)), 0.0, 1.0)))) * _552, _552) + ((float4(_484 * _513, _513) + ((float4(_484 * _487, _487) + (_297 * (1.0 - _487))) * (1.0 - _513))) * (1.0 - _552));
+        }
+        float2 _562 = abs(_232);
+        float2 _564 = (_562 - _242) + _261;
+        float _572 = (length(precise::max(_564, float2(0.0))) + precise::min(precise::max(_564.x, _564.y), 0.0)) - _245;
+        float _575 = fast::clamp(0.5 - (_572 / _209), 0.0, 1.0);
+        float4 _710;
+        if (_575 > 0.0)
+        {
+            float2 _580 = _562 - (_242 - _261);
+            float _581 = _580.x;
+            bool _587;
+            if (_581 > 0.0)
+            {
+                _587 = _580.y > 0.0;
+            }
+            else
+            {
+                _587 = false;
+            }
+            float2 _596;
+            if (_587)
+            {
+                _596 = fast::normalize(_580);
+            }
+            else
+            {
+                _596 = select(float2(0.0, 1.0), float2(1.0, 0.0), bool2(_581 > _580.y));
+            }
+            float _608 = dot(_596 * float2((_232.x < 0.0) ? (-1.0) : 1.0, (_232.y < 0.0) ? (-1.0) : 1.0), fast::normalize(select(float2(-0.3499999940395355224609375, -0.949999988079071044921875), float2(-0.949999988079071044921875, 0.3499999940395355224609375), bool2(_224))));
+            float3 _632 = (((mix(_248, _249, float3(fast::clamp(0.449999988079071044921875 + (0.449999988079071044921875 * _608), 0.0, 1.0))) * (0.75 + (0.3499999940395355224609375 * sin(fast::clamp((-_572) / _246, 0.0, 1.0) * 3.141590118408203125)))) + float3((0.25 * fast::clamp(_608, 0.0, 1.0)) * exp(abs((-0.60000002384185791015625) - _572) * (-2.0)))) * _252) * _575;
+            float _642 = _245 - _246;
+            float2 _645 = (_562 - (_242 - float2(_246))) + float2(_642);
+            float _664 = fast::clamp(0.5 - (((length(precise::max(_645, float2(0.0))) + precise::min(precise::max(_645.x, _645.y), 0.0)) - _642) / _209), 0.0, 1.0);
+            float4 _672 = float4((float3(0.01200000010430812835693359375, 0.01200000010430812835693359375, 0.01600000075995922088623046875) + float3(0.02500000037252902984619140625 * fast::clamp(0.5 - (_232.y / (2.0 * _242.y)), 0.0, 1.0))) * _664, _664) + ((float4(_632, _575) + (_561 * (1.0 - _575))) * (1.0 - _664));
+            float4 _709;
+            if (!_206)
+            {
+                float2 _681 = _232 - float2(0.0, (-_238.y) - (DeviceUniforms.Bezel * 0.5));
+                float _686 = fast::clamp(0.5 - ((length(_681) - 3.0) / _209), 0.0, 1.0);
+                float _700 = fast::clamp(0.5 - ((length(_681 - float2(-0.60000002384185791015625)) - 1.10000002384185791015625) / _209), 0.0, 1.0);
+                _709 = float4(float3(0.119999997317790985107421875, 0.1599999964237213134765625, 0.23999999463558197021484375) * _700, _700) + ((float4(float3(0.070000000298023223876953125, 0.07500000298023223876953125, 0.0900000035762786865234375) * _686, _686) + (_672 * (1.0 - _686))) * (1.0 - _700));
+            }
+            else
+            {
+                _709 = _672;
+            }
+            _710 = _709;
+        }
+        else
+        {
+            _710 = _561;
+        }
+        float2 _713 = (_562 - _238) + float2(DeviceUniforms.ScreenRadius);
+        float _724 = fast::clamp(0.5 - (((length(precise::max(_713, float2(0.0))) + precise::min(precise::max(_713.x, _713.y), 0.0)) - DeviceUniforms.ScreenRadius) / _209), 0.0, 1.0);
+        float4 _753;
+        if (_724 > 0.0)
+        {
+            float2 _729 = (_155 - DeviceUniforms.ScreenOrigin) / DeviceUniforms.ScreenPx;
+            _753 = float4((mix(Screen.sample(ScreenSampler, _729).xyz, Blurred.sample(BlurredSampler, _729).xyz, float3(DeviceUniforms.Blur)) * DeviceUniforms.Dim) * _724, _724) + (_710 * (1.0 - _724));
+        }
+        else
+        {
+            _753 = _710;
+        }
+        float4 _807;
+        if (_206)
+        {
+            float2 _759 = _232 - float2(0.0, 29.5 - _238.y);
+            float2 _761 = abs(_759) + float2(-44.0, 0.0);
+            float _772 = fast::clamp(0.5 - (((length(precise::max(_761, float2(0.0))) + precise::min(precise::max(_761.x, _761.y), 0.0)) - 18.5) / _209), 0.0, 1.0);
+            float _783 = fast::clamp(0.5 - ((length(_759 - float2(43.0, 0.0)) - 6.0) / _209), 0.0, 1.0);
+            float _798 = fast::clamp(0.5 - ((length(_759 - float2(41.5, -1.5)) - 2.0) / _209), 0.0, 1.0);
+            _807 = float4((float3(0.100000001490116119384765625, 0.12999999523162841796875, 0.2199999988079071044921875) * DeviceUniforms.Dim) * _798, _798) + ((float4((float3(0.039999999105930328369140625, 0.04500000178813934326171875, 0.0599999986588954925537109375) * DeviceUniforms.Dim) * _783, _783) + ((float4(0.0, 0.0, 0.0, _772) + (_753 * (1.0 - _772))) * (1.0 - _783))) * (1.0 - _798));
+        }
+        else
+        {
+            _807 = _753;
+        }
+        _808 = _807;
+        break;
+    } while(false);
+    out.out_var_SV_Target0 = _808;
+    return out;
+}
+

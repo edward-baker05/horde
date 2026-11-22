@@ -46,6 +46,7 @@ add_executable(horde
     src/editor/Paint.cpp
     src/editor/Tools.cpp
     src/scene/EditorOverlay.cpp
+    src/scene/EditorMenuScene.cpp
     src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp
@@ -101,14 +102,17 @@ horde_add_shaders(horde)
 
 # Runtime files live next to the executable so that SDL_GetBasePath() finds them
 # regardless of the working directory the game is launched from.
-add_custom_command(TARGET horde POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+add_custom_target(horde_runtime_files ALL
+    COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:horde>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/assets
         $<TARGET_FILE_DIR:horde>/assets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+    COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:horde>/shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/shaders/compiled
         $<TARGET_FILE_DIR:horde>/shaders
     COMMENT "Copying assets and compiled shaders next to horde binary")
+add_dependencies(horde_runtime_files horde)
 
 
 if(HORDE_BUILD_TESTS)

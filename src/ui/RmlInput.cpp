@@ -97,9 +97,13 @@ bool forwardToRml(Rml::Context& context, const SDL_Event& event) {
             // SDL scrolls up positive; RmlUi scrolls down positive.
             return !context.ProcessMouseWheel(Rml::Vector2f(event.wheel.x, -event.wheel.y),
                                               toRmlModifiers(SDL_GetModState()));
-        case SDL_EVENT_KEY_DOWN:
-            return !context.ProcessKeyDown(toRmlKey(event.key.key),
-                                           toRmlModifiers(static_cast<SDL_Keymod>(event.key.mod)));
+        case SDL_EVENT_KEY_DOWN: {
+            const bool consumed = !context.ProcessKeyDown(toRmlKey(event.key.key),
+                                                          toRmlModifiers(static_cast<SDL_Keymod>(event.key.mod)));
+            // Esc always reaches the scene too, as a focused text field takes
+            // it: scenes decide what it means, typing or not.
+            return consumed && event.key.key != SDLK_ESCAPE;
+        }
         case SDL_EVENT_KEY_UP:
             return !context.ProcessKeyUp(toRmlKey(event.key.key),
                                          toRmlModifiers(static_cast<SDL_Keymod>(event.key.mod)));

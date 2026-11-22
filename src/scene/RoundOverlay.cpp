@@ -13,6 +13,7 @@
 
 #include "core/Paths.hpp"
 #include "scene/Scene.hpp"
+#include "ui/Icons.hpp"
 #include "ui/RmlLayer.hpp"
 
 namespace horde::scene {
@@ -44,18 +45,44 @@ std::string hexColor(glm::vec4 color) {
     return text;
 }
 
-// Two letters for a kind with no sprite: the initials of a two-word name,
-// else its first two letters. "Spike block" is SB, "Flamer" FL.
-std::string initials(const char* name) {
-    const std::string text = name;
-    const std::size_t space = text.find(' ');
-    std::string out;
-    if (space != std::string::npos && space + 1 < text.size()) {
-        out = {text[0], text[space + 1]};
-    } else {
-        out = text.substr(0, 2);
+// The dock's glyph for each kind: what it is, or failing that what it does.
+const char* turretIcon(logic::TurretKind kind) {
+    using logic::TurretKind;
+    switch (kind) {
+        case TurretKind::Flamer:
+            return ui::icon::kFlame;
+        case TurretKind::Zapper:
+            return ui::icon::kZap;
+        case TurretKind::Mortar:
+            return ui::icon::kBomb;
+        case TurretKind::Beam:
+            return ui::icon::kRadar;
+        case TurretKind::SpikeBlock:
+            return ui::icon::kConstruction;
+        case TurretKind::Barricade:
+            return ui::icon::kBrickWall;
+        case TurretKind::Mine:
+            return ui::icon::kCircleDot;
+        case TurretKind::Gunner:
+            return ui::icon::kCrosshair;
+        case TurretKind::TShirtCannon:
+            return ui::icon::kShirt;
+        case TurretKind::MerchSlinger:
+            return ui::icon::kDisc3;
+        case TurretKind::MerchStand:
+            return ui::icon::kStore;
+        case TurretKind::JazzSpeaker:
+            return ui::icon::kMusic;
+        case TurretKind::BassStack:
+            return ui::icon::kSpeaker;
+        case TurretKind::FeedbackAmp:
+            return ui::icon::kAudioWaveform;
+        case TurretKind::PepperSpray:
+            return ui::icon::kSprayCan;
+        case TurretKind::CrowdBarrier:
+            return ui::icon::kFence;
     }
-    return upper(out);
+    return ui::icon::kCircle;
 }
 
 } // namespace
@@ -112,8 +139,9 @@ bool RoundOverlay::show(Services& services) {
         return false;
     }
 
-    // In tray order, coloured as in the feed: a sprite keeps its own
-    // colours, and the rest are tinted by category or placement class.
+    // In tray order, each glyph tinted as its kind is in the feed (by
+    // category or placement class), lightened a third so the darker tints
+    // still read on the dark tile.
     m_items.clear();
     std::optional<logic::WeaponCategory> lastCategory;
     for (const logic::TurretKind kind : trayKinds()) {
@@ -121,9 +149,8 @@ bool RoundOverlay::show(Services& services) {
         Item item;
         item.name = def.name;
         item.cost = static_cast<int>(def.cost);
-        item.color = hexColor(logic::turretColor(def));
-        item.sprite = def.spriteId != 0 ? "weapon-" + std::to_string(def.spriteId) : "";
-        item.glyph = initials(def.name);
+        item.icon = turretIcon(kind);
+        item.color = hexColor(glm::mix(logic::turretColor(def), glm::vec4(1.0f), 0.33f));
         item.group = !m_items.empty() && def.category != lastCategory;
         lastCategory = def.category;
         m_items.push_back(std::move(item));
@@ -150,9 +177,8 @@ bool RoundOverlay::show(Services& services) {
     if (auto item = constructor.RegisterStruct<Item>()) {
         item.RegisterMember("name", &Item::name);
         item.RegisterMember("cost", &Item::cost);
+        item.RegisterMember("icon", &Item::icon);
         item.RegisterMember("color", &Item::color);
-        item.RegisterMember("sprite", &Item::sprite);
-        item.RegisterMember("glyph", &Item::glyph);
         item.RegisterMember("group", &Item::group);
         item.RegisterMember("disabled", &Item::disabled);
     }
@@ -311,7 +337,7 @@ void RoundOverlay::setTrayState(int index, bool affordable) {
 }
 
 void RoundOverlay::setProblem(const char* problem) {
-    set("problem", m_problem, problem != nullptr ? upper(problem) : std::string());
+    set("problem", m_problem, problem != nullptr ? std::string(problem) : std::string());
 }
 
 void RoundOverlay::setPrep(bool prep) {
@@ -328,12 +354,12 @@ void RoundOverlay::refreshHint() {
     if (index < 0 || index >= static_cast<int>(trayKinds().size())) {
         set("hint_name", m_hintName, "");
         set("hint_text", m_hintText,
-            m_prep ? "PICK A TURRET, PLACE IT ON THE FEED, THEN START"
-                   : "TAP THE FEED TO STRIKE, OR A TURRET TO INSPECT");
+            m_prep ? "Pick a turret, place it on the feed, then start."
+                   : "Tap the feed to strike, or a turret to inspect.");
         return;
     }
     const logic::TurretDef& def = logic::turretDef(trayKinds()[static_cast<std::size_t>(index)]);
-    set("hint_name", m_hintName, upper(def.name) + "  " + turretKindLine(def));
+    set("hint_name", m_hintName, std::string(def.name) + "  \xC2\xB7  " + turretKindLine(def));
     std::string text = def.blurb;
     if (text.empty()) {
         text = def.placement == logic::TurretClass::Mount ? "Goes on top of a wall." : "Goes on open ground.";
@@ -361,12 +387,12 @@ void RoundOverlay::showResults(const Results& results) {
     const int seconds = static_cast<int>(results.seconds);
     setValue("ended", m_ended, true);
     setValue("won", m_won, results.won);
-    set("result_title", m_resultTitle, results.won ? "WIN" : "LOSS");
-    set("result_time", m_resultTime, "TIME " + twoDigits(seconds / 60) + ":" + twoDigits(seconds % 60));
-    set("result_kills", m_resultKills, "KILLS " + std::to_string(results.killed));
-    set("result_leaked", m_resultLeaked, "LEAKED " + std::to_string(results.leaked));
+    set("result_title", m_resultTitle, results.won ? "Round won" : "Round lost");
+    set("result_time", m_resultTime, "Time " + twoDigits(seconds / 60) + ":" + twoDigits(seconds % 60));
+    set("result_kills", m_resultKills, "Kills " + std::to_string(results.killed));
+    set("result_leaked", m_resultLeaked, "Leaked " + std::to_string(results.leaked));
     set("result_earned", m_resultEarned, "+$" + std::to_string(results.earned));
-    set("result_total", m_resultTotal, "TOTAL $" + std::to_string(results.total));
+    set("result_total", m_resultTotal, "Total $" + std::to_string(results.total));
     setPrep(false);
     hideTurretPanel();
     clearSelection();

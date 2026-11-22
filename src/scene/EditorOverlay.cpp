@@ -24,6 +24,7 @@
 #include "logic/LevelFiles.hpp"
 #include "logic/LevelValidation.hpp"
 #include "scene/Scene.hpp"
+#include "ui/Icons.hpp"
 #include "ui/RmlLayer.hpp"
 
 namespace horde::scene {
@@ -69,16 +70,6 @@ bool parseHex(std::string text, logic::Rgb& out) {
     out = {static_cast<std::uint8_t>(value >> 16 & 0xff), static_cast<std::uint8_t>(value >> 8 & 0xff),
            static_cast<std::uint8_t>(value & 0xff)};
     return true;
-}
-
-std::string upper(std::string text) {
-    // ASCII only, so UTF-8 in Polish names passes through whole.
-    for (char& c : text) {
-        if (c >= 'a' && c <= 'z') {
-            c = static_cast<char>(c - 'a' + 'A');
-        }
-    }
-    return text;
 }
 
 const char* wallKindName(const logic::Wall& wall) {
@@ -150,15 +141,15 @@ bool EditorOverlay::show(Services& services, editor::EditorState& state) {
 
     // Tints like the round's towers; spawns and exits in the level's green and red.
     m_tools = {
-        {editor::toolName(editor::Tool::Select), "ring", "", "#dfe3e7"},
-        {editor::toolName(editor::Tool::Rectangle), "rect", "", "#90d7ff"},
-        {editor::toolName(editor::Tool::Triangle), "tri", "\xE2\x96\xB2", "#a1e4ae"},
-        {editor::toolName(editor::Tool::Circle), "circle", "", "#76e2e2"},
-        {editor::toolName(editor::Tool::Polyline), "line", "", "#f4ca84"},
-        {editor::toolName(editor::Tool::Spawn), "text", "\xE2\x86\x93", "#5fe08a"},
-        {editor::toolName(editor::Tool::Exit), "text", "\xE2\x86\x91", "#ff7a70"},
-        {editor::toolName(editor::Tool::FieldRegion), "text", "\xE2\x89\xA1", "#d4bcff"},
-        {editor::toolName(editor::Tool::Paint), "text", "\xE2\x96\xBC", "#ffd27a"},
+        {editor::toolName(editor::Tool::Select), ui::icon::kMousePointer2, "#f2f2f7"},
+        {editor::toolName(editor::Tool::Rectangle), ui::icon::kSquare, "#90d7ff"},
+        {editor::toolName(editor::Tool::Triangle), ui::icon::kTriangle, "#a1e4ae"},
+        {editor::toolName(editor::Tool::Circle), ui::icon::kCircle, "#76e2e2"},
+        {editor::toolName(editor::Tool::Polyline), ui::icon::kSpline, "#f4ca84"},
+        {editor::toolName(editor::Tool::Spawn), ui::icon::kArrowDownToLine, "#5fe08a"},
+        {editor::toolName(editor::Tool::Exit), ui::icon::kArrowUpFromLine, "#ff7a70"},
+        {editor::toolName(editor::Tool::FieldRegion), ui::icon::kWind, "#d4bcff"},
+        {editor::toolName(editor::Tool::Paint), ui::icon::kPaintbrush, "#ffd27a"},
     };
     m_swatches.assign(std::begin(kSwatches), std::end(kSwatches));
     for (Group& group : m_groups) {
@@ -211,8 +202,7 @@ void EditorOverlay::bindModel(Rml::DataModelConstructor& constructor) {
     }
     if (auto tool = constructor.RegisterStruct<Tool>()) {
         tool.RegisterMember("name", &Tool::name);
-        tool.RegisterMember("shape", &Tool::shape);
-        tool.RegisterMember("glyph", &Tool::glyph);
+        tool.RegisterMember("icon", &Tool::icon);
         tool.RegisterMember("color", &Tool::color);
     }
     constructor.RegisterArray<Rml::Vector<Field>>();
@@ -301,9 +291,6 @@ void EditorOverlay::bindModel(Rml::DataModelConstructor& constructor) {
     });
     constructor.BindEventCallback("play", [this](Rml::DataModelHandle, Rml::Event&, const Args&) {
         m_action = Action::Play;
-    });
-    constructor.BindEventCallback("menu", [this](Rml::DataModelHandle, Rml::Event&, const Args&) {
-        m_action = Action::Menu;
     });
 }
 
@@ -883,17 +870,24 @@ void EditorOverlay::syncLabels(float zoom, glm::vec2 cursor) {
     set("can_redo", m_canRedo, state.undo.canRedo());
 
     set("level_name", m_levelName,
-        upper(state.path.empty() ? std::string(tr("Untitled")) : logic::levelDisplayName(state.path)));
+        state.path.empty() ? std::string(tr("Untitled")) : logic::levelDisplayName(state.path));
     set("dirty", m_dirty, state.dirty);
-    set("saved_label", m_savedLabel, upper(state.dirty ? tr("Unsaved changes") : tr("Saved")));
-    set("tool_label", m_toolLabel, upper(editor::toolName(state.tool)));
+    set("saved_label", m_savedLabel, std::string(state.dirty ? tr("Unsaved changes") : tr("Saved")));
+    set("tool_label", m_toolLabel, std::string(editor::toolName(state.tool)));
 
     char text[64];
-    std::snprintf(text, sizeof(text), "ZOOM %.2fx", static_cast<double>(zoom));
+    std::snprintf(text, sizeof(text), "Zoom %.2fx", static_cast<double>(zoom));
     set("zoom_label", m_zoomLabel, std::string(text));
     std::snprintf(text, sizeof(text), "X %05.0f  Y %05.0f", static_cast<double>(cursor.x),
                   static_cast<double>(cursor.y));
     set("cursor_label", m_cursorLabel, std::string(text));
+}
+
+void EditorOverlay::levelSaved() {
+    refreshLevels();
+    if (m_state != nullptr && !m_state->path.empty()) {
+        set("save_name", m_saveName, logic::levelDisplayName(m_state->path));
+    }
 }
 
 void EditorOverlay::refreshLevels() {

@@ -128,7 +128,7 @@ bool App::init(const AppConfig& config) {
         m_scenes->replace(std::make_unique<scene::LevelScene>(m_config.bench->level));
     } else {
         m_scenes->replace(std::make_unique<scene::MainMenuScene>());
-        // Over the menu, so "Back to menu" still has somewhere to go.
+        // Over the menu, so leaving from the pause still has somewhere to go.
         if (m_config.startLevel) {
             m_scenes->push(std::make_unique<scene::LevelScene>(*m_config.startLevel));
         }
@@ -365,6 +365,9 @@ void App::pumpEvents() {
         }
 
         scene::Scene* active = m_scenes->active();
+        if (active != nullptr && active->blocksInput()) {
+            continue;
+        }
         const ui::DeviceKind kind = active != nullptr ? active->presentation().device : ui::DeviceKind::None;
 
         // Scenes on a device see mouse positions in its screen's pixels. SDL
@@ -548,10 +551,18 @@ void App::render() {
         }
     }
 
+    // A window-sized scene under a phone overlay (the dev ground under its
+    // pause) still draws, into the shell's window texture, to be shown blurred.
+    scene::Scene* windowScene = topDevice != ui::DeviceKind::None && m_shell.windowBehind()
+                                    ? m_scenes->topmostOn(ui::DeviceKind::None)
+                                    : nullptr;
+
     // All uploads happen before any render pass: copy passes cannot nest in one.
     m_batch.begin();
     if (topDevice == ui::DeviceKind::None && active != nullptr) {
         active->render(m_batch);
+    } else if (windowScene != nullptr) {
+        windowScene->render(m_batch);
     }
     m_batch.upload(commands);
 
@@ -568,7 +579,7 @@ void App::render() {
     // The composite batch is in window pixels, y down, like the scene cameras.
     const glm::vec2 windowPx = m_shell.windowPx();
     m_compositeBatch.begin();
-    if (topDevice != ui::DeviceKind::None && polish::enabled()) {
+    if (topDevice != ui::DeviceKind::None && windowScene == nullptr && polish::enabled()) {
         // Behind the devices in Polish mode: the flag, white over red.
         const glm::vec4 solid = gfx::atlasCell(1, 1, 4, 4);
         const glm::vec2 half{windowPx.x, windowPx.y * 0.5f};
@@ -577,7 +588,12 @@ void App::render() {
         gfx::drawCentered(m_compositeBatch, m_atlas.handle(), {windowPx.x * 0.5f, windowPx.y * 0.75f}, half, 0.0f, solid,
                           {0.86f, 0.08f, 0.24f, 1.0f});
     }
-    m_shell.composite(m_compositeBatch, m_atlas.handle());
+    // A black veil over the backdrop while a scene fades it up from black.
+    const float brightness = active != nullptr ? active->backdropBrightness() : 1.0f;
+    if (topDevice != ui::DeviceKind::None && brightness < 1.0f) {
+        gfx::drawCentered(m_compositeBatch, m_atlas.handle(), windowPx * 0.5f, windowPx, 0.0f,
+                          gfx::atlasCell(1, 1, 4, 4), {0.0f, 0.0f, 0.0f, 1.0f - brightness});
+    }
     m_compositeBatch.upload(commands);
     m_compositeCamera.setViewport(windowPx.x, windowPx.y);
     m_compositeCamera.setCenter(windowPx * 0.5f);
@@ -620,6 +636,21 @@ void App::render() {
         }
     }
 
+    if (windowScene != nullptr) {
+        gfx::RenderTarget& target = m_shell.windowScreen();
+        SDL_GPUColorTargetInfo windowTarget{};
+        windowTarget.texture = target.texture();
+        windowTarget.clear_color = backdrop;
+        windowTarget.load_op = SDL_GPU_LOADOP_CLEAR;
+        windowTarget.store_op = SDL_GPU_STOREOP_STORE;
+        if (SDL_GPURenderPass* windowPass = SDL_BeginGPURenderPass(commands, &windowTarget, 1, nullptr)) {
+            windowScene->camera().setViewport(static_cast<float>(target.size().x), static_cast<float>(target.size().y));
+            m_batch.flush(commands, windowPass, windowScene->camera().viewProjection());
+            windowScene->renderPass(commands, windowPass);
+            SDL_EndGPURenderPass(windowPass);
+        }
+    }
+
     // Background devices blur their screen texture. These are render passes, so
     // they follow every upload and the device passes that write what they read.
     for (size_t i = 0; i < deviceKinds.size(); ++i) {
@@ -627,9 +658,12 @@ void App::render() {
             m_shell.applyBlur(deviceKinds[i], commands);
         }
     }
+    if (windowScene != nullptr) {
+        m_shell.applyWindowBlur(commands);
+    }
 
     // A scene without a device keeps its own background; otherwise the devices
-    // sit on black, or on the flag drawn into the composite batch.
+    // sit on the shell's backdrop, or on the flag drawn into the composite batch.
     const bool direct = topDevice == ui::DeviceKind::None;
     SDL_GPUColorTargetInfo colorTarget{};
     colorTarget.texture = swapchain;
@@ -646,7 +680,13 @@ void App::render() {
             active->renderPass(commands, pass);
         }
 
+        if (windowScene != nullptr) {
+            m_shell.drawWindowBackdrop(commands, pass);
+        } else if (!direct && !polish::enabled()) {
+            m_shell.drawBackdrop(commands, pass);
+        }
         m_compositeBatch.flush(commands, pass, m_compositeCamera.viewProjection());
+        m_shell.draw(commands, pass);
         // The window context last, so what it shows (the dancing cow) sits over
         // the devices as well as over device-less scenes.
         m_rml.draw(ui::DeviceKind::None, pass, commands);

@@ -178,6 +178,12 @@ bool ImGuiLayer::handleEvent(const SDL_Event& event) {
 
         case SDL_EVENT_KEY_DOWN:
         case SDL_EVENT_KEY_UP:
+            // A focused panel keeps keys from the game, but Esc pauses unless
+            // a field is being typed in.
+            if (event.key.key == SDLK_ESCAPE) {
+                return io.WantTextInput;
+            }
+            return io.WantCaptureKeyboard;
         case SDL_EVENT_TEXT_INPUT:
             return io.WantCaptureKeyboard;
 

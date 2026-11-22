@@ -50,6 +50,21 @@ TEST_CASE("computeTargets: phone overlay over tablet backgrounds the tablet") {
     CHECK(t.tablet == Placement::Background);
 }
 
+TEST_CASE("computeTargets: phone overlay over a window scene keeps that scene behind it") {
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone), pres(DeviceKind::None),
+                                     pres(DeviceKind::Phone, Orientation::Portrait, true)};
+    auto t = computeTargets(s);
+    CHECK(t.phone == Placement::Centered);
+    CHECK(t.tablet == Placement::Hidden);
+    CHECK(t.windowBehind);
+}
+
+TEST_CASE("computeTargets: phone overlay over the tablet has no window scene behind it") {
+    std::vector<ScenePresentation> s{pres(DeviceKind::Phone), pres(DeviceKind::Tablet),
+                                     pres(DeviceKind::Phone, Orientation::Portrait, true)};
+    CHECK_FALSE(computeTargets(s).windowBehind);
+}
+
 TEST_CASE("computeTargets: scene without a device hides both") {
     std::vector<ScenePresentation> s{pres(DeviceKind::Phone), pres(DeviceKind::None)};
     auto t = computeTargets(s);

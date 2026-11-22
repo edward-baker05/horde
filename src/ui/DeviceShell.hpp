@@ -19,11 +19,13 @@ class ShaderLoader;
 namespace horde::ui {
 
 // The phone and tablet the game lives on: where each sits in the window, the
-// offscreen texture each scene draws into, and how they are composited (bezel,
-// screen, slide offset) onto the swapchain. Scenes with no device bypass it.
+// offscreen texture each scene draws into, and how they are drawn onto the
+// swapchain (shadow, frame, screen at its slide offset, camera; see
+// shaders/src/device.frag.hlsl). Scenes with no device bypass it.
 class DeviceShell {
 public:
     DeviceShell() = default;
+    ~DeviceShell();
 
     DeviceShell(const DeviceShell&) = delete;
     DeviceShell& operator=(const DeviceShell&) = delete;
@@ -68,9 +70,24 @@ public:
     // px. False means drop it: a button press on the bezel or background.
     bool remapEvent(DeviceKind kind, SDL_Event& event) const;
 
-    // Queues the visible devices back to front (Background before Centered):
-    // bezel, then the screen texture at its slide offset.
-    void composite(gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas) const;
+    // Fills the window with the dark backdrop the devices sit on. Inside the swapchain pass.
+    void drawBackdrop(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) const;
+
+    // A window-sized scene (one with no device) under a phone overlay: the
+    // caller draws it into windowScreen(), blurs it with applyWindowBlur(),
+    // and drawWindowBackdrop() shows it in place of the backdrop, fading to
+    // its blur as the phone rises.
+    bool windowBehind() const {
+        return m_windowLayer.behind;
+    }
+    gfx::RenderTarget& windowScreen() {
+        return m_windowLayer.target;
+    }
+    void applyWindowBlur(SDL_GPUCommandBuffer* commands);
+    void drawWindowBackdrop(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) const;
+    // Draws the visible devices back to front (Background before Centered),
+    // each its shadow, frame and screen. Inside the swapchain pass.
+    void draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) const;
 
 private:
     struct Device {
@@ -86,6 +103,13 @@ private:
         bool drawn = false;
     };
 
+    struct WindowLayer {
+        gfx::RenderTarget target;
+        gfx::Blur blur;
+        Tween fade;
+        bool behind = false;
+    };
+
     Device& device(DeviceKind kind) {
         return kind == DeviceKind::Phone ? m_phone : m_tablet;
     }
@@ -97,14 +121,19 @@ private:
     // The slide offset in window px: phones drop down, tablets leave to the right.
     glm::vec2 slideOffset(const Device& d) const;
     void layoutDevice(Device& d);
-    void queue(const Device& d, gfx::SpriteBatch& compositeBatch, SDL_GPUTexture* atlas) const;
+    void drawDevice(const Device& d, SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass) const;
 
     SDL_GPUDevice* m_gpu = nullptr;
+    SDL_GPUGraphicsPipeline* m_pipeline = nullptr;
+    // Nearest for the sharp screen, drawn 1:1; linear for its half-size blur.
+    SDL_GPUSampler* m_nearest = nullptr;
+    SDL_GPUSampler* m_linear = nullptr;
     SDL_GPUTextureFormat m_format = SDL_GPU_TEXTUREFORMAT_INVALID;
     glm::vec2 m_windowPx{0.0f};
     Orientation m_phoneOrientation = Orientation::Portrait;
     Device m_phone;
     Device m_tablet;
+    WindowLayer m_windowLayer;
 };
 
 } // namespace horde::ui

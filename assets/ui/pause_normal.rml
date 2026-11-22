@@ -8,13 +8,14 @@
 
 	<div class="page">
 		<div class="hero">
-			<span class="wordmark">PAUSED<span class="dot">.</span></span>
+			<div class="symbol"><div class="bars"><span class="bar"/><span class="bar"/></div></div>
+			<span class="hero-title">Paused</span>
 			<span class="tagline">The horde can wait.</span>
 		</div>
 
 		<button class="primary" data-event-click="resume">Resume</button>
 
-		<div class="group">
+		<div class="group" data-if="can_restart">
 			<button class="row" data-event-click="restart">Restart</button>
 		</div>
 

@@ -1,151 +1,172 @@
-/* Phone theme: near-black ground, grouped cards, one teal accent. All sizes
-   are in dp so the layout scales with the display. The renderer has no shader
-   or layer support, so stick to flat colours, vertex gradients, radii,
-   opacity and transforms (no box-shadow, filter or linear-gradient). */
+/* Phone theme, after iOS in dark mode: a dark home screen of neutral glass
+   icons with line glyphs, and grouped-list pages on true black. One tint
+   (system blue), system colours for meaning (red for leaving, green for on),
+   Inter as the system font, Lucide (the "lucide" family, see ui/Icons.hpp)
+   for icons, and corners concentric with the screen's 55dp ones (inner
+   radius = outer minus padding). All sizes are dp so the layout scales with
+   the display.
+
+   The renderer has no shader or layer support, so stick to flat colours,
+   vertex gradients, radii, opacity and transforms (no box-shadow, filter or
+   linear-gradient). Glass is a translucent fill with a light 1dp rim. */
 
 body {
-	font-family: "Liberation Sans";
+	font-family: "Inter";
 	font-size: 17dp;
-	color: #f2f2f5;
-	background-color: #08080b;
-	decorator: vertical-gradient(#171a1f #08090b);
+	color: #ffffff;
+	background-color: #000000;
+	decorator: vertical-gradient(#141518 #000000);
 	width: 100%;
 	height: 100%;
 	display: block;
 }
 
+.icon {
+	font-family: "lucide";
+}
+
 /* --- Status bar ------------------------------------------------------- */
 
+/* The clock and icons sit in the ears either side of the Dynamic Island
+   (126dp wide, its middle 29.5dp down), each centred in its ear. */
 .status-bar {
-	display: block;
-	height: 44dp;
-	padding: 14dp 28dp 0 28dp;
-	font-size: 15dp;
-	font-weight: bold;
-	color: #f2f2f5;
+	position: relative;
+	display: flex;
+	justify-content: space-between;
+	height: 54dp;
+	font-size: 17dp;
+	font-weight: 600;
+	color: #ffffff;
 }
 
 .status-bar .clock {
-	float: left;
+	display: block;
+	width: 132dp;
+	padding-top: 19dp;
+	text-align: center;
+	line-height: 22dp;
 }
 
 .status-bar .icons {
-	float: right;
-	height: 12dp;
-	margin-top: 3dp;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 132dp;
+	height: 22dp;
+	margin-top: 19dp;
 }
 
+/* Cellular: four rounded bars rising to the right, bottoms aligned. */
 .signal {
-	display: inline-block;
-	width: 3dp;
-	margin-left: 2dp;
-	background-color: #f2f2f5;
-	border-radius: 1dp;
-	vertical-align: bottom;
+	display: flex;
+	align-items: flex-end;
+	height: 11dp;
 }
 
-.signal.s1 { height: 4dp; }
-.signal.s2 { height: 6dp; }
-.signal.s3 { height: 9dp; }
-.signal.s4 { height: 12dp; background-color: #5a5a64; }
+.signal .bar {
+	display: block;
+	width: 3dp;
+	margin-right: 1.5dp;
+	background-color: #ffffff;
+	border-radius: 1dp;
+}
 
+.signal .b1 { height: 4dp; }
+.signal .b2 { height: 6dp; }
+.signal .b3 { height: 8.5dp; }
+.signal .b4 { height: 11dp; margin-right: 0; }
+
+.status-bar .wifi {
+	display: block;
+	margin: 0 5dp 0 5dp;
+	font-family: "lucide";
+	font-size: 15dp;
+	line-height: 15dp;
+}
+
+/* Battery: a thin translucent case, a white charge inset in it, and the nub. */
 .battery {
-	display: inline-block;
-	width: 22dp;
-	height: 10dp;
-	margin-left: 8dp;
-	padding: 1dp;
-	border: 1dp #8c8c96;
-	border-radius: 3dp;
-	vertical-align: bottom;
+	display: block;
+	width: 25dp;
+	height: 12dp;
+	padding: 1.5dp;
+	box-sizing: border-box;
+	border: 1dp #ffffff66;
+	border-radius: 4dp;
 }
 
 .battery .charge {
 	display: block;
-	width: 72%;
+	width: 80%;
 	height: 100%;
-	background-color: #f2f2f5;
+	background-color: #ffffff;
+	border-radius: 2dp;
+}
+
+.status-bar .nub {
+	display: block;
+	width: 1.5dp;
+	height: 4dp;
+	margin-left: 1dp;
+	background-color: #ffffff66;
 	border-radius: 1dp;
 }
 
-/* --- Headers ---------------------------------------------------------- */
-
-.hero {
-	display: block;
-	padding: 150dp 28dp 40dp 28dp;
-}
-
-.wordmark {
-	display: block;
-	font-size: 56dp;
-	font-weight: bold;
-	letter-spacing: 6dp;
-	color: #f2f2f5;
-}
-
-.wordmark .dot {
-	color: #36dede;
-}
-
-.tagline {
-	display: block;
-	margin-top: 6dp;
-	font-size: 15dp;
-	letter-spacing: 1dp;
-	color: #8c8c96;
-}
+/* --- Navigation bar --------------------------------------------------- */
 
 .header {
 	display: block;
-	height: 52dp;
-	padding: 4dp 16dp 0 16dp;
+	height: 44dp;
+	padding: 0 8dp;
 }
 
 .header .back {
 	display: inline-block;
-	height: 40dp;
+	height: 44dp;
 	padding: 0 12dp 0 8dp;
 	font-size: 17dp;
-	line-height: 40dp;
-	color: #36dede;
-	border-radius: 20dp;
+	line-height: 44dp;
+	color: #0a84ff;
+	border-radius: 22dp;
 	transition: background-color 0.12s;
 }
 
 .header .back:hover {
-	background-color: #36dede1f;
+	background-color: #0a84ff1f;
 }
 
 .header .back:active {
-	background-color: #36dede40;
+	background-color: #0a84ff40;
 }
 
+/* Large title. */
 .page-title {
 	display: block;
-	padding: 4dp 28dp 20dp 28dp;
+	padding: 2dp 20dp 12dp 20dp;
 	font-size: 34dp;
-	font-weight: bold;
-	color: #f2f2f5;
+	font-weight: 700;
+	color: #ffffff;
 }
 
 /* --- Content ---------------------------------------------------------- */
 
 .page {
+	position: relative;
 	display: block;
 	padding: 0 16dp;
-	animation: 0.22s cubic-out page-in;
+	animation: 0.28s cubic-out page-in;
 }
 
 @keyframes page-in {
-	from { opacity: 0; transform: translateY(14dp); }
+	from { opacity: 0; transform: translateY(12dp); }
 	to { opacity: 1; transform: translateY(0dp); }
 }
 
 /* Sub-page lists scroll under a fixed header and title. Top is the status
-   bar + header + title heights; bottom leaves room for the home bar. */
+   bar + navigation bar + title heights; bottom leaves room for the home bar. */
 .scroll {
 	position: absolute;
-	top: 160dp;
+	top: 152dp;
 	bottom: 24dp;
 	left: 0;
 	right: 0;
@@ -154,94 +175,133 @@ body {
 }
 
 scrollbarvertical {
-	width: 4dp;
-	margin-right: 4dp;
+	width: 3dp;
+	margin-right: 3dp;
 }
 
 scrollbarvertical sliderbar {
 	min-height: 32dp;
-	background-color: #ffffff30;
+	background-color: #ffffff4d;
 	border-radius: 2dp;
 }
 
+/* Section header over a grouped list. */
 .section {
 	display: block;
-	padding: 18dp 14dp 8dp 14dp;
-	font-size: 12dp;
-	font-weight: bold;
-	letter-spacing: 1.5dp;
-	color: #8c8c96;
+	padding: 20dp 20dp 8dp 20dp;
+	font-size: 13dp;
+	color: #8e8e93;
 }
 
-/* Rows sit inset in the card with their own radius, so hover pills look right
-   whichever rows data-if / data-for leave visible. */
+/* Inset grouped list. Rows are pills inside it, concentric with its corners,
+   so they look right whichever rows data-if / data-for leave visible. */
 .group {
 	display: block;
 	margin-bottom: 12dp;
-	padding: 4dp;
-	background-color: #17171d;
-	border-radius: 18dp;
+	padding: 5dp;
+	background-color: #1c1c1e;
+	border-radius: 26dp;
 }
 
 button.row {
 	display: block;
-	height: 52dp;
-	padding: 0 14dp;
+	height: 48dp;
+	padding: 0 15dp;
 	font-size: 17dp;
-	line-height: 52dp;
+	line-height: 48dp;
 	text-align: left;
-	color: #f2f2f5;
-	border-radius: 14dp;
+	color: #ffffff;
+	border-radius: 21dp;
 	transition: background-color 0.12s;
 	position: relative;
 }
 
 button.row:hover {
-	background-color: #24242c;
+	background-color: #2c2c2e;
 }
 
 button.row:active {
-	background-color: #30303a;
+	background-color: #3a3a3c;
 }
 
-.row .chevron {
+.row .chevron,
+.option .chevron {
 	position: absolute;
 	top: 0;
-	right: 16dp;
-	color: #55555f;
+	right: 14dp;
+	font-family: "lucide";
 	font-size: 17dp;
+	color: #ebebf54d;
 }
 
 .row .hint {
 	position: absolute;
 	top: 0;
 	right: 36dp;
-	font-size: 15dp;
-	color: #8c8c96;
+	font-size: 17dp;
+	color: #8e8e93;
 }
 
 .row.danger {
-	color: #ff5a5f;
+	color: #ff453a;
 }
 
-/* The one filled call to action on a screen. */
+button.row.disabled {
+	color: #ffffff4d;
+}
+
+button.row.disabled:hover {
+	background-color: #00000000;
+}
+
+/* A text field filling its group, as a name row in iOS Settings. */
+input.text-field {
+	display: block;
+	width: 100%;
+	height: 48dp;
+	padding: 13dp 15dp;
+	box-sizing: border-box;
+	font-size: 17dp;
+	color: #ffffff;
+	border-radius: 21dp;
+	cursor: text;
+}
+
+input.text-field:focus {
+	background-color: #2c2c2e;
+}
+
+input.text-field selection {
+	background-color: #0a84ff99;
+	color: #ffffff;
+}
+
+/* Why the last action didn't work. */
+.status {
+	display: block;
+	padding: 4dp 20dp;
+	font-size: 15dp;
+	text-align: center;
+	color: #ff6961;
+}
+
+/* The one prominent action on a screen: a filled capsule in the tint. */
 button.primary {
 	display: block;
-	height: 60dp;
-	margin-bottom: 12dp;
-	font-size: 19dp;
-	font-weight: bold;
-	line-height: 60dp;
+	height: 52dp;
+	margin: 0 4dp 16dp 4dp;
+	font-size: 17dp;
+	font-weight: 600;
+	line-height: 52dp;
 	text-align: center;
-	color: #071013;
-	background-color: #36dede;
-	decorator: vertical-gradient(#65f0f0 #00cacb);
-	border-radius: 18dp;
-	transition: transform 0.1s cubic-out;
+	color: #ffffff;
+	background-color: #0a84ff;
+	border-radius: 26dp;
+	transition: background-color 0.12s, transform 0.12s cubic-out;
 }
 
 button.primary:hover {
-	decorator: vertical-gradient(#80f4f4 #36dede);
+	background-color: #409cff;
 }
 
 button.primary:active {
@@ -253,226 +313,393 @@ button.primary:active {
 	padding: 18dp;
 	font-size: 15dp;
 	text-align: center;
-	color: #8c8c96;
+	color: #8e8e93;
+}
+
+/* --- Pause ------------------------------------------------------------ */
+
+.hero {
+	display: block;
+	padding: 120dp 20dp 36dp 20dp;
+	text-align: center;
+}
+
+.hero .symbol {
+	display: block;
+	width: 76dp;
+	height: 76dp;
+	margin: 0 auto 18dp auto;
+	border-radius: 38dp;
+	background-color: #ffffff1a;
+	border: 1dp #ffffff26;
+}
+
+/* Two bars: the pause symbol. */
+.hero .symbol .bar {
+	display: inline-block;
+	width: 8dp;
+	height: 28dp;
+	margin: 24dp 4dp 0 4dp;
+	border-radius: 3dp;
+	background-color: #ffffff;
+}
+
+.hero .symbol .icon {
+	display: block;
+	font-size: 32dp;
+	line-height: 76dp;
+	text-align: center;
+}
+
+.hero .symbol .bars {
+	display: block;
+	text-align: center;
+}
+
+.hero-title {
+	display: block;
+	font-size: 34dp;
+	font-weight: 700;
+	color: #ffffff;
+}
+
+.tagline {
+	display: block;
+	margin-top: 6dp;
+	font-size: 17dp;
+	color: #8e8e93;
 }
 
 /* --- Home indicator --------------------------------------------------- */
 
 .home-bar {
 	position: absolute;
-	bottom: 10dp;
+	bottom: 8dp;
 	left: 50%;
-	width: 134dp;
+	width: 140dp;
 	height: 5dp;
-	margin-left: -67dp;
-	background-color: #f2f2f5;
+	margin-left: -70dp;
+	background-color: #ffffff;
 	border-radius: 3dp;
-	opacity: 0.85;
 }
 
 /* --- Settings ---------------------------------------------------------- */
 
-/* An iOS-style switch at the row's right edge; .on when the setting is. */
+/* An iOS switch at the row's right edge, green when on. */
 .switch {
 	position: absolute;
-	top: 16dp;
-	right: 16dp;
-	width: 46dp;
-	height: 28dp;
-	border-radius: 14dp;
-	background-color: #3a3a44;
-	transition: background-color 0.18s;
+	top: 8dp;
+	right: 12dp;
+	width: 51dp;
+	height: 31dp;
+	border-radius: 16dp;
+	background-color: #39393d;
+	transition: background-color 0.2s;
 }
 
 .switch.on {
-	background-color: #36dede;
+	background-color: #30d158;
 }
 
 .switch .knob {
 	position: absolute;
-	top: 3dp;
-	left: 3dp;
-	width: 22dp;
-	height: 22dp;
-	border-radius: 11dp;
-	background-color: #f2f2f5;
-	transition: left 0.18s cubic-out;
+	top: 2dp;
+	left: 2dp;
+	width: 27dp;
+	height: 27dp;
+	border-radius: 14dp;
+	background-color: #ffffff;
+	transition: left 0.2s cubic-out;
 }
 
 .switch.on .knob {
-	left: 21dp;
+	left: 22dp;
 }
-
 
 /* --- Home screen -------------------------------------------------------- */
 
-/* The Play widget: a glass card holding the wordmark, what Play starts, and
-   the one filled button. */
-.widget {
+/* The title, how many levels there are, and Play beneath. */
+.masthead {
 	display: block;
-	margin: 34dp 8dp 0 8dp;
-	padding: 20dp;
-	background-color: #1a1d22e6;
-	border: 1dp #ffffff1f;
-	border-radius: 28dp;
+	padding: 72dp 8dp 26dp 8dp;
 }
 
-.widget-head {
+.wordmark {
 	display: block;
-	height: 62dp;
-	position: relative;
-}
-
-.wordmark.small {
-	font-size: 31dp;
-	letter-spacing: 3dp;
-}
-
-.widget .tag {
-	position: absolute;
-	top: 4dp;
-	right: 0;
-	font-size: 11dp;
-	font-weight: bold;
+	font-size: 52dp;
+	font-weight: 700;
 	letter-spacing: 1dp;
-	color: #8d939c;
+	color: #ffffff;
 }
 
-/* Stands in for a level thumbnail until there is one to draw. */
-.thumb {
+.wordmark .dot {
+	display: inline-block;
+	padding: 0 6dp;
+	margin: 0;
+	background-color: transparent;
+	border-width: 0dp;
+	font-size: 52dp;
+	font-weight: 700;
+	color: #0a84ff;
+}
+
+.subtitle {
 	display: block;
-	position: relative;
-	height: 110dp;
-	margin-bottom: 16dp;
-	background-color: #1c2127;
-	decorator: vertical-gradient(#222831 #171b20);
-	border-radius: 16dp;
+	margin-top: 2dp;
+	font-size: 17dp;
+	color: #8e8e93;
 }
 
-.thumb-label {
-	position: absolute;
-	left: 12dp;
-	bottom: 10dp;
-	font-size: 13dp;
-	color: #a9b0b8;
-}
-
+/* The one prominent action: a white capsule. */
 button.play {
 	display: block;
-	height: 58dp;
-	font-size: 22dp;
-	font-weight: bold;
-	letter-spacing: 3dp;
-	line-height: 58dp;
+	height: 54dp;
+	margin: 0 4dp;
+	font-size: 18dp;
+	font-weight: 600;
+	line-height: 54dp;
 	text-align: center;
-	color: #071013;
-	background-color: #36dede;
-	border-radius: 18dp;
-	transition: transform 0.1s cubic-out;
+	color: #000000;
+	background-color: #ffffff;
+	border-radius: 27dp;
+	transition: background-color 0.12s, transform 0.12s cubic-out;
 }
 
 button.play:hover {
-	background-color: #65f0f0;
+	background-color: #e5e5ea;
 }
 
 button.play:active {
-	transform: scale(0.98);
+	transform: scale(0.97);
 }
 
-.play-icon {
-	margin-right: 10dp;
-	font-size: 16dp;
+button.play .icon {
+	margin-right: 8dp;
+	font-size: 18dp;
 }
 
-/* App icons: a tinted rounded square with a dark mark, label beneath. */
+/* Home screen icons: four columns of glass squircles holding a line glyph,
+   each labelled beneath. One neutral style, so they read as a set. */
 .apps {
 	display: flex;
 	flex-wrap: wrap;
-	margin: 28dp 15dp 0 15dp;
+	margin: 40dp -2dp 0 -2dp;
 }
 
 .apps .app {
-	width: 33.33%;
+	width: 25%;
+	margin-bottom: 18dp;
 }
 
 button.app {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	transition: transform 0.1s cubic-out;
+	transition: transform 0.12s cubic-out;
 }
 
 button.app:active {
-	transform: scale(0.94);
+	transform: scale(0.92);
 }
 
 .app-icon {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	width: 72dp;
-	height: 72dp;
-	border: 1dp #ffffff33;
-	border-radius: 20dp;
+	width: 62dp;
+	height: 62dp;
+	box-sizing: border-box;
+	decorator: vertical-gradient(#3a3a3f #1f1f23);
+	border: 1dp #ffffff1f;
+	border-radius: 14dp;
+	transition: border-color 0.12s;
+}
+
+button.app:hover .app-icon {
+	border-color: #ffffff47;
+}
+
+.app-icon .icon {
+	font-size: 28dp;
+	line-height: 28dp;
+	color: #f2f2f7;
+}
+
+.app-icon .icon.destructive {
+	color: #ff453a;
 }
 
 .app-label {
 	display: block;
-	margin-top: 7dp;
+	margin-top: 6dp;
 	font-size: 12dp;
-	color: #eef0f2;
+	font-weight: 500;
+	color: #ebebf5;
 }
 
-.app-icon.gold { background-color: #f5c761; }
-.app-icon.teal { background-color: #36dede; }
-.app-icon.purple { background-color: #caacff; }
-.app-icon.silver { background-color: #d4d8dc; }
-.app-icon.red { background-color: #f97770; }
-
-/* Dark marks on the icons; tri is a font glyph, as radii can't make one. */
-.glyph {
-	display: block;
-	width: 26dp;
-	height: 26dp;
-	color: #0c0e10;
-}
-
-.glyph.circle { background-color: #0c0e10; border-radius: 13dp; }
-.glyph.square { background-color: #0c0e10; border-radius: 4dp; }
-.glyph.diamond { width: 22dp; height: 22dp; background-color: #0c0e10; border-radius: 3dp; transform: rotate(45deg); }
-.glyph.bar { height: 8dp; background-color: #0c0e10; border-radius: 2dp; }
-.glyph.tri { font-size: 40dp; line-height: 24dp; text-align: center; }
-
-/* The dock: system apps on a glass shelf above the home bar. */
+/* The dock: a glass shelf of system apps above the home bar, its corners
+   concentric with the screen's. Labelled, unlike iOS, as Quit needs saying. */
 .dock {
 	position: absolute;
-	left: 13dp;
-	right: 13dp;
-	bottom: 30dp;
+	left: 12dp;
+	right: 12dp;
+	bottom: 24dp;
 	display: flex;
 	justify-content: space-around;
-	padding: 13dp 16dp;
-	background-color: #282b30d9;
+	padding: 14dp 10dp 10dp 10dp;
+	background-color: #ffffff14;
 	border: 1dp #ffffff1f;
-	border-radius: 37dp;
+	border-radius: 40dp;
 }
 
-.dock .app-icon {
-	width: 64dp;
-	height: 64dp;
-	border-radius: 18dp;
+.dock .app {
+	width: 25%;
 }
-
-.dock .glyph {
-	width: 22dp;
-	height: 22dp;
-}
-
-.dock .glyph.circle { border-radius: 11dp; }
-.dock .glyph.diamond { width: 18dp; height: 18dp; }
-.dock .glyph.bar { height: 7dp; }
-.dock .glyph.tri { font-size: 34dp; line-height: 20dp; }
 
 .dock .app-label {
 	font-size: 11dp;
+	color: #ebebf5bf;
+}
+
+/* --- Popups ------------------------------------------------------------- */
+
+/* A dimmed screen with a card centred over it. The frame centres the card
+   without taking the pointer, so taps around the card reach the scrim. */
+.scrim {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	background-color: #00000099;
+	animation: 0.2s cubic-out fade-in;
+}
+
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.popup-frame {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	pointer-events: none;
+}
+
+/* 12dp round a list and a capsule, so 34dp corners. */
+.popup {
+	display: block;
+	width: 310dp;
+	padding: 20dp 12dp 12dp 12dp;
+	background-color: #1c1c1ef7;
+	border: 1dp #ffffff26;
+	border-radius: 34dp;
+	pointer-events: auto;
+	animation: 0.22s cubic-out pop-in;
+}
+
+@keyframes pop-in {
+	from { opacity: 0; transform: scale(0.92); }
+	to { opacity: 1; transform: scale(1); }
+}
+
+.popup-title {
+	display: block;
+	padding-bottom: 4dp;
+	font-size: 17dp;
+	font-weight: 600;
+	text-align: center;
+}
+
+.popup-message {
+	display: block;
+	padding: 0 8dp 4dp 8dp;
+	font-size: 14dp;
+	text-align: center;
+	color: #ebebf599;
+}
+
+.popup-list {
+	display: block;
+	max-height: 380dp;
+	margin: 12dp 0;
+	overflow-y: auto;
+	background-color: #ffffff0f;
+	border-radius: 22dp;
+}
+
+button.option {
+	position: relative;
+	display: block;
+	height: 48dp;
+	padding: 0 16dp;
+	font-size: 17dp;
+	line-height: 48dp;
+	color: #ffffff;
+	transition: background-color 0.12s;
+}
+
+button.option + button.option {
+	border-top: 1dp #ffffff14;
+}
+
+/* The list's ends follow its corners when highlighted. */
+button.option:first-child { border-radius: 22dp 22dp 0 0; }
+button.option:last-child { border-radius: 0 0 22dp 22dp; }
+button.option:first-child:last-child { border-radius: 22dp; }
+
+button.option:hover {
+	background-color: #ffffff14;
+}
+
+/* Popup buttons: capsules, stacked. */
+button.popup-cancel,
+button.popup-primary,
+button.popup-destructive {
+	display: block;
+	height: 48dp;
+	margin-top: 8dp;
+	font-size: 17dp;
+	font-weight: 600;
+	line-height: 48dp;
+	text-align: center;
+	border-radius: 24dp;
+	transition: background-color 0.12s;
+}
+
+button.popup-primary.first {
+	margin-top: 16dp;
+}
+
+button.popup-cancel {
+	color: #ffffff;
+	background-color: #3a3a3c;
+}
+
+button.popup-cancel:hover {
+	background-color: #48484a;
+}
+
+button.popup-primary {
+	color: #ffffff;
+	background-color: #0a84ff;
+}
+
+button.popup-primary:hover {
+	background-color: #409cff;
+}
+
+button.popup-destructive {
+	color: #ff453a;
+	background-color: #3a3a3c;
+}
+
+button.popup-destructive:hover {
+	background-color: #48484a;
 }

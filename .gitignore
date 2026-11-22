@@ -7,6 +7,7 @@ out
 *.DS_Store
 compile_commands.json
 CMakeUserPresets.json
+todo.md
 
 # Dear ImGui writes its saved panel layout next to wherever you launched from.
 imgui.ini

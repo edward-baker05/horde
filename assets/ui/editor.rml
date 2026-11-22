@@ -5,9 +5,16 @@
 	<link type="text/rcss" href="editor.rcss"/>
 </head>
 <body data-model="editor">
-	<div class="osd top-left">
-		<span class="line">{{level_name}}</span>
-		<span class="line"><span class="rec-dot" data-class-off="!dirty"/>{{saved_label}}</span>
+	<!-- Top left: undo and redo, then the level's name and whether it's saved. -->
+	<div class="topbar">
+		<div class="history">
+			<button class="round" data-class-disabled="!can_undo" data-event-click="undo"><span class="icon"></span></button>
+			<button class="round" data-class-disabled="!can_redo" data-event-click="redo"><span class="icon"></span></button>
+		</div>
+		<div class="osd title-card">
+			<span class="line">{{level_name}}</span>
+			<span class="line sub"><span class="rec-dot" data-class-off="!dirty"/>{{saved_label}}</span>
+		</div>
 	</div>
 
 	<div class="osd bottom-left">
@@ -48,13 +55,13 @@
 	<!-- The level sheet: tabs along the top; tapping the open tab folds it. -->
 	<div class="sheet" data-class-folded="tab == ''">
 		<div class="tabs">
-			<span class="tab" data-class-on="tab == 'level'" data-event-click="set_tab('level')">{{'LEVEL' | tr}}</span>
-			<span class="tab" data-class-on="tab == 'round'" data-event-click="set_tab('round')">{{'ROUND' | tr}}</span>
-			<span class="tab" data-class-on="tab == 'list'" data-event-click="set_tab('list')">{{'LIST' | tr}}</span>
-			<span class="tab" data-class-on="tab == 'files'" data-event-click="set_tab('files')">{{'FILES' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'level'" data-event-click="set_tab('level')">{{'Level' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'round'" data-event-click="set_tab('round')">{{'Round' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'list'" data-event-click="set_tab('list')">{{'List' | tr}}</span>
+			<span class="tab" data-class-on="tab == 'files'" data-event-click="set_tab('files')">{{'Files' | tr}}</span>
 		</div>
 
-		<div class="body" data-if="tab == 'level'">
+		<div class="body footed" data-if="tab == 'level'">
 			<span class="heading">{{'Bounds' | tr}}</span>
 			<div class="field" data-for="f, i : level_fields">
 				<span class="name">{{f.label}}</span>
@@ -89,6 +96,11 @@
 				<button class="step" data-event-click="step('snap', i, 1, ev.shift_key)">+</button>
 				<span class="unit">{{f.unit}}</span>
 			</div>
+		</div>
+
+		<!-- Pinned to the bottom of the Level tab. -->
+		<div class="footer" data-if="tab == 'level'">
+			<button class="act wide" data-event-click="play"><span class="icon"></span>{{'Test play' | tr}}</button>
 		</div>
 
 		<div class="body" data-if="tab == 'round'">
@@ -199,24 +211,8 @@
 		<div class="slots">
 			<div class="tower" data-for="t, i : tools" data-class-selected="i == tool" data-event-click="pick_tool(i)">
 				<span class="key">{{i + 1}}</span>
-				<div class="icon" data-style-background-color="t.color"><span data-attr-class="'glyph ' + t.shape">{{t.glyph}}</span></div>
+				<div class="icon-tile"><span class="glyph-icon" data-style-color="t.color">{{t.icon}}</span></div>
 				<span class="label">{{t.name}}</span>
-			</div>
-			<div class="tower action" data-class-disabled="!can_undo" data-event-click="undo">
-				<div class="icon plain"><span class="glyph text">←</span></div>
-				<span class="label">{{'Undo' | tr}}</span>
-			</div>
-			<div class="tower" data-class-disabled="!can_redo" data-event-click="redo">
-				<div class="icon plain"><span class="glyph text">→</span></div>
-				<span class="label">{{'Redo' | tr}}</span>
-			</div>
-			<div class="tower" data-event-click="play">
-				<div class="icon play"><span class="glyph text">►</span></div>
-				<span class="label">{{'Test play' | tr}}</span>
-			</div>
-			<div class="tower" data-event-click="menu">
-				<div class="icon plain"><span class="glyph text">×</span></div>
-				<span class="label">{{'Menu' | tr}}</span>
 			</div>
 		</div>
 	</div>

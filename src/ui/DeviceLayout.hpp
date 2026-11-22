@@ -10,9 +10,11 @@ enum class Orientation { Portrait, Landscape };
 // Physical shape of a device in logical px. The screen is what the UI lays out
 // into; the bezel is the frame around it. Logical px are scaled to the window
 // by fitDevice(), so UI authored at 390x844 looks the same at any window size.
+// The body's corner radius is the screen's plus the bezel, so the two are concentric.
 struct DeviceSpec {
     glm::vec2 screenLogical{0.0f};
     float bezelLogical = 0.0f;
+    float screenRadiusLogical = 0.0f;
 };
 
 // Placement of a device in the window. `screenSize` is in window px and equals
@@ -23,8 +25,9 @@ struct DeviceRect {
     float scale = 1.0f;
 };
 
-// Phone is 390x844 (swapped in landscape) with a 14 px bezel; tablet is 1280x800
-// (swapped in portrait) with a 24 px bezel. DeviceKind::None yields an empty spec.
+// Phone is 390x844 (swapped in landscape) with a 12 px bezel and 55 px screen
+// corners; tablet is 1280x800 (swapped in portrait) with a 24 px bezel and 22 px
+// screen corners. DeviceKind::None yields an empty spec.
 DeviceSpec deviceSpec(DeviceKind kind, Orientation orientation);
 
 // Largest scale at which screen plus 2x bezel fits inside the window shrunk by

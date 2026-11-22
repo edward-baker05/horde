@@ -200,10 +200,10 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
             return true;
         }
     }
-    // Esc pauses a round on the device. Only the top scene gets events, and
-    // m_pausePending covers the frame between the push and it taking effect.
-    if (m_options.mode == LevelMode::Player && event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE &&
-        !event.key.repeat) {
+    // Esc pauses: the phone rises over the round's tablet, or over the dev
+    // ground itself. Only the top scene gets events, and m_pausePending
+    // covers the frame between the push and it taking effect.
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
         // Over: the results card's buttons are the only way on.
         const bool ended = m_round && m_round->outcome() != logic::RoundOutcome::Playing;
         if (!m_pausePending && !ended) {
@@ -533,10 +533,6 @@ void LevelScene::debugUi() {
         m_pendingOptions.explosion = m_explosion;
         m_pendingOptions.flingDrag = m_flingDrag;
         m_services->scenes->replace(std::make_unique<LevelScene>(m_pendingOptions));
-    }
-
-    if (ImGui::Button(tr("Back"), ImVec2(160.0f, 0.0f))) {
-        m_services->scenes->pop();
     }
 
     ImGui::End();

@@ -7,7 +7,7 @@ using namespace horde::ui;
 TEST_CASE("phone portrait is height-limited in a landscape window") {
     const DeviceSpec spec = deviceSpec(DeviceKind::Phone, Orientation::Portrait);
     const DeviceRect r = fitDevice(spec, {1600.0f, 900.0f});
-    CHECK((844.0f + 28.0f) * r.scale == doctest::Approx(900.0f * (1.0f - 0.12f)).epsilon(0.5 / 792.0));
+    CHECK((844.0f + 24.0f) * r.scale == doctest::Approx(900.0f * (1.0f - 0.12f)).epsilon(0.5 / 792.0));
     CHECK(r.center.x == doctest::Approx(800.0f));
     CHECK(r.center.y == doctest::Approx(450.0f));
 }

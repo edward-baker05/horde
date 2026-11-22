@@ -23,7 +23,7 @@ ShellTargets computeTargets(std::span<const ScenePresentation> stack) {
     }
 
     const ScenePresentation& top = stack.back();
-    place(targets, top.device, Placement::Centered);
+    place(targets, top.device, top.away ? Placement::Hidden : Placement::Centered);
     if (top.device == DeviceKind::Phone) {
         targets.phoneOrientation = top.orientation;
     }
@@ -34,6 +34,7 @@ ShellTargets computeTargets(std::span<const ScenePresentation> stack) {
         for (size_t i = stack.size() - 1; i-- > 0;) {
             if (stack[i].device != top.device) {
                 place(targets, stack[i].device, Placement::Background);
+                targets.windowBehind = stack[i].device == DeviceKind::None;
                 if (stack[i].device == DeviceKind::Phone) {
                     targets.phoneOrientation = stack[i].orientation;
                 }

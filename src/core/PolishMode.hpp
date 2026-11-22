@@ -4,7 +4,8 @@ namespace horde {
 
 // Polish mode: the game in Polish, in folk colours, with Chopin on the menu
 // and the dancing cow in the levels. Off, it is the plain English game.
-// Toggled from the phone's settings page; every launch starts with it off.
+// Toggled by the blue dot on the home screen (and its exit button in Polish
+// mode); every launch starts with it off.
 namespace polish {
 
 bool enabled();

@@ -16,6 +16,7 @@
 #include "scene/SceneStack.hpp"
 #include "scene/TechTreeScene.hpp"
 #include "ui/RmlLayer.hpp"
+#include "ui/ShellState.hpp"
 
 namespace horde::scene {
 
@@ -44,7 +45,6 @@ bool MainMenuScene::onEnter(Services& services) {
     constructor.Bind("page", &m_page);
     constructor.Bind("clock", &m_clock);
     constructor.Bind("date", &m_date);
-    constructor.Bind("featured", &m_featured);
     constructor.Bind("level_count", &m_levelCount);
     constructor.Bind("polish", &m_polish);
     constructor.BindEventCallback("open", &MainMenuScene::onOpen, this);
@@ -90,14 +90,62 @@ void MainMenuScene::onTogglePolish(Rml::DataModelHandle, Rml::Event&, const Args
     m_togglePending = true;
 }
 
-void MainMenuScene::applyToggle() {
+namespace {
+// The shell's slide plus a frame or two of slack, as it retargets after scenes update.
+constexpr float kPhaseSeconds = ui::DeviceAnimator::slideSeconds + 0.05f;
+// The pause with the phone gone, before the background changes.
+constexpr float kHoldSeconds = 0.3f;
+} // namespace
+
+void MainMenuScene::startToggle() {
     m_togglePending = false;
-    polish::setEnabled(!polish::enabled());
-    m_polish = polish::enabled();
-    m_model.DirtyVariable("polish");
-    // The other mode's menu, still on the settings page, and its music.
-    loadDocument();
-    playMusic();
+    if (m_phase != Phase::Idle) {
+        return;
+    }
+    m_phase = Phase::SlidingOut;
+    m_phaseTimer = 0.0f;
+    if (polish::enabled() && m_services->music != nullptr) {
+        m_services->music->stop(); // leaving Polish mode: the music fades as the phone goes
+    }
+}
+
+void MainMenuScene::updateToggle(float deltaTime) {
+    if (m_phase == Phase::Idle) {
+        return;
+    }
+    m_phaseTimer += deltaTime;
+    float needed = kPhaseSeconds;
+    if (m_phase == Phase::SlidingOut) {
+        needed = kFadeSeconds; // the phone is gone well before the fade to black ends
+    } else if (m_phase == Phase::HoldBeforeSwap) {
+        needed = kHoldSeconds;
+    } else if (m_phase == Phase::FadeBackground) {
+        needed = kFadeSeconds;
+    }
+    if (m_phaseTimer < needed) {
+        return;
+    }
+    m_phaseTimer = 0.0f;
+    switch (m_phase) {
+        case Phase::SlidingOut:
+            m_phase = Phase::HoldBeforeSwap;
+            break;
+        case Phase::HoldBeforeSwap:
+            // The phone is off screen: change the background and the menu under it.
+            polish::setEnabled(!polish::enabled());
+            m_polish = polish::enabled();
+            m_model.DirtyVariable("polish");
+            loadDocument();
+            m_phase = Phase::FadeBackground;
+            break;
+        case Phase::FadeBackground:
+            m_phase = Phase::SlidingIn;
+            playMusic(); // fades in as the phone arrives
+            break;
+        default:
+            m_phase = Phase::Idle;
+            break;
+    }
 }
 
 void MainMenuScene::playMusic() {
@@ -137,20 +185,12 @@ void MainMenuScene::refreshLists() {
         m_presetNames.push_back(presetName(path));
         m_presets.push_back(m_presetNames.back());
     }
-    // As onOpen("play") picks: the built-in level, the only level, or a list.
-    if (m_levels.empty()) {
-        m_featured = "Built-in level";
-    } else if (m_levels.size() == 1) {
-        m_featured = m_levels.front();
-    } else {
-        m_featured = "Choose a level";
-    }
+    // With none saved, Play has the built-in level.
     const std::size_t count = std::max<std::size_t>(m_levels.size(), 1);
-    m_levelCount = std::to_string(count) + (count == 1 ? " LEVEL" : " LEVELS");
+    m_levelCount = std::to_string(count) + (count == 1 ? " level" : " levels");
     if (m_model) {
         m_model.DirtyVariable("levels");
         m_model.DirtyVariable("presets");
-        m_model.DirtyVariable("featured");
         m_model.DirtyVariable("level_count");
     }
 }
@@ -166,10 +206,20 @@ void MainMenuScene::onRevealed() {
     playMusic();
 }
 
+bool MainMenuScene::handleEvent(const SDL_Event& event) {
+    // RmlUi passes Esc on, as nothing in the document binds it.
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat && m_page != "root") {
+        setPage("root");
+        return true;
+    }
+    return false;
+}
+
 void MainMenuScene::update(float deltaTime) {
     if (m_togglePending) {
-        applyToggle();
+        startToggle();
     }
+    updateToggle(deltaTime);
     m_clockTimer += deltaTime;
     if (m_clockTimer >= 1.0f) {
         m_clockTimer = 0.0f;

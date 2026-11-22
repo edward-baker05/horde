@@ -4,6 +4,8 @@
 
 #include <RmlUi/Core.h>
 
+#include <utility>
+
 #include "core/Paths.hpp"
 #include "gfx/GpuContext.hpp"
 #include "ui/RmlInput.hpp"
@@ -36,13 +38,32 @@ bool RmlLayer::init(gfx::GpuContext& gpu, const gfx::ShaderLoader& shaders) {
     }
     m_initialised = true;
 
-    if (!Rml::LoadFontFace(paths::asset("fonts/LiberationSans-Regular.ttf").string())) {
+    // Also the fallback for glyphs another face lacks, such as Inter's missing ≡.
+    if (!Rml::LoadFontFace(paths::asset("fonts/LiberationSans-Regular.ttf").string(), true)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "RmlUi could not load the UI font");
         return false;
     }
     // Bold is optional: without it RmlUi falls back to the regular face.
     if (!Rml::LoadFontFace(paths::asset("fonts/LiberationSans-Bold.ttf").string())) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "RmlUi could not load the bold UI font");
+    }
+    // Inter, the phone and tablet system font. Weights are given, not read, so
+    // font-weight 500 and 600 find Medium and SemiBold. Liberation Sans stands
+    // in for any that fail to load.
+    const std::pair<const char*, Rml::Style::FontWeight> interFaces[]{
+        {"fonts/Inter-Regular.ttf", Rml::Style::FontWeight(400)},
+        {"fonts/Inter-Medium.ttf", Rml::Style::FontWeight(500)},
+        {"fonts/Inter-SemiBold.ttf", Rml::Style::FontWeight(600)},
+        {"fonts/Inter-Bold.ttf", Rml::Style::FontWeight(700)},
+    };
+    for (const auto& [file, weight] : interFaces) {
+        if (!Rml::LoadFontFace(paths::asset(file).string(), false, weight)) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "RmlUi could not load %s", file);
+        }
+    }
+    // The "lucide" icon family; see ui/Icons.hpp.
+    if (!Rml::LoadFontFace(paths::asset("fonts/Lucide.ttf").string())) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "RmlUi could not load the icon font");
     }
 
     // Phone and tablet get logical-pixel sizes until the shell resizes them.

@@ -4,6 +4,7 @@
 #include <RmlUi/Core/Event.h>
 #include <RmlUi/Core/Types.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -27,10 +28,30 @@ public:
     bool onEnter(Services& services) override;
     void onExit() override;
     void onRevealed() override;
+    // Esc closes the level picker or a page, back to the home screen.
+    bool handleEvent(const SDL_Event& event) override;
     void update(float deltaTime) override;
     void onResize(float width, float height) override;
     ui::ScenePresentation presentation() const override {
-        return {ui::DeviceKind::Phone, ui::Orientation::Portrait};
+        return {ui::DeviceKind::Phone, ui::Orientation::Portrait, false, m_phase != Phase::Idle && m_phase != Phase::SlidingIn};
+    }
+
+    float backdropBrightness() const override {
+        const float t = std::min(m_phaseTimer / kFadeSeconds, 1.0f);
+        switch (m_phase) {
+            case Phase::SlidingOut:
+                return 1.0f - t; // fading to black as the phone leaves
+            case Phase::HoldBeforeSwap:
+                return 0.0f;
+            case Phase::FadeBackground:
+                return t;
+            default:
+                return 1.0f;
+        }
+    }
+
+    bool blocksInput() const override {
+        return m_phase != Phase::Idle;
     }
 
     gfx::Camera2D& camera() override {
@@ -62,7 +83,8 @@ private:
     void onEditor(Rml::DataModelHandle, Rml::Event&, const Args& args);
     void onQuit(Rml::DataModelHandle, Rml::Event&, const Args& args);
     void onTogglePolish(Rml::DataModelHandle, Rml::Event&, const Args& args);
-    void applyToggle();
+    void startToggle();
+    void updateToggle(float deltaTime);
 
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;
@@ -75,11 +97,17 @@ private:
     std::string m_page = "root";
     std::string m_clock;
     std::string m_date;
-    // The home screen's Play widget: what Play will start, and how many levels.
-    std::string m_featured;
+    // Under the home screen's title: how many levels there are to play.
     std::string m_levelCount;
     bool m_polish = false; // mirrors polish::enabled() for the settings switch
     bool m_togglePending = false;
+    // Switching mode: the phone slides away while the background fades to black,
+    // a beat, the mode and document swap, the new background fades up from black,
+    // then the new phone slides in and the music fades in.
+    enum class Phase { Idle, SlidingOut, HoldBeforeSwap, FadeBackground, SlidingIn };
+    static constexpr float kFadeSeconds = 0.8f;
+    Phase m_phase = Phase::Idle;
+    float m_phaseTimer = 0.0f;
     float m_clockTimer = 0.0f;
     std::vector<std::filesystem::path> m_levelPaths;
     std::vector<std::string> m_presetNames;

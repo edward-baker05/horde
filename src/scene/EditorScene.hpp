@@ -26,11 +26,18 @@ public:
         m_cow.hide();
         m_overlay.hide();
     }
+    // Under the phone's editor menu the tablet stays in view, blurred, with
+    // its panels; under a test play on the same tablet they must go.
     void onCovered() override {
         m_cow.hide();
-        m_overlay.setVisible(false);
+        if (m_menuOpen) {
+            m_overlay.blur();
+        } else {
+            m_overlay.setVisible(false);
+        }
     }
     void onRevealed() override {
+        m_menuOpen = false;
         m_cow.show(*m_services);
         m_overlay.setVisible(true);
     }
@@ -62,6 +69,10 @@ private:
     // points, and clears it either way.
     void commitDraft();
 
+    // Esc: drops whatever is half drawn, or with nothing to drop, raises the
+    // phone's menu (save, save as, back to the main menu).
+    void escape();
+
     // Handles are drawn and picked at a constant SCREEN size, so their world
     // size falls out of the current zoom.
     float handleWorldSize() const;
@@ -74,6 +85,8 @@ private:
     gfx::CameraController m_cameraController;
 
     editor::EditorState m_state;
+    // The editor menu is pushed (or about to be): the tablet stays dressed.
+    bool m_menuOpen = false;
     glm::vec2 m_cursorWorld{0.0f, 0.0f};
 
     // The box-sweep drag in progress, for the rectangle, triangle and circle

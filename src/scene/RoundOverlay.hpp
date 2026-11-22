@@ -38,9 +38,8 @@ public:
     struct Item {
         Rml::String name;
         int cost = 0;
-        Rml::String color;     // the icon's background: its category's, or its placement class's
-        Rml::String sprite;    // its cell in textures/weapons.png (a sprite in tablet.rcss), or empty
-        Rml::String glyph;     // initials, drawn when there is no sprite
+        Rml::String icon;      // a glyph in the "lucide" font, see ui/Icons.hpp
+        Rml::String color;     // the icon's tint: its category's, or its placement class's, lightened
         bool group = false;    // first of a category group, set apart from the one before
         bool disabled = false; // can't be picked: unaffordable
     };

@@ -1,12 +1,11 @@
 #include "scene/TechTreeScene.hpp"
 
-#include <imgui.h>
-
 #include <cmath>
+#include <memory>
 
-#include "core/PolishMode.hpp"
 #include "gfx/SpriteBatch.hpp"
 #include "gfx/Texture.hpp"
+#include "scene/PauseScene.hpp"
 #include "scene/SceneStack.hpp"
 
 namespace horde::scene {
@@ -18,6 +17,13 @@ bool TechTreeScene::onEnter(Services& services) {
 }
 
 bool TechTreeScene::handleEvent(const SDL_Event& event) {
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
+        if (!m_pausePending) {
+            m_pausePending = true;
+            m_services->scenes->push(std::make_unique<PauseScene>(nullptr, false));
+        }
+        return true;
+    }
     return m_cameraController.handleEvent(event, m_camera);
 }
 
@@ -44,17 +50,6 @@ void TechTreeScene::render(gfx::SpriteBatch& batch) {
         gfx::drawCentered(batch, atlas, position, {kNodeSize, kNodeSize}, 0.0f, gfx::atlasCell(1, 0, 4, 4),
                           {0.7f, 0.9f, 0.7f, 1.0f}, 0.1f);
     }
-}
-
-void TechTreeScene::debugUi() {
-    ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
-    ImGui::Begin(tr("Tech tree"));
-
-    if (ImGui::Button(tr("Back to menu"), ImVec2(160.0f, 0.0f))) {
-        m_services->scenes->pop();
-    }
-
-    ImGui::End();
 }
 
 void TechTreeScene::onResize(float width, float height) {

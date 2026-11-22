@@ -29,19 +29,18 @@
 	</div>
 
 	<div class="hint">
-		<span class="problem" data-if="problem != ''">{{problem}}</span>
-		<span class="name" data-if="problem == ''">{{hint_name}}</span>
-		<span class="text" data-if="problem == ''">{{hint_text}}</span>
+		<span class="pill" data-if="problem != '' || hint_text != ''">
+			<span class="problem" data-if="problem != ''">{{problem}}</span>
+			<span class="name" data-if="problem == ''">{{hint_name}}</span>
+			<span class="text" data-if="problem == ''">{{hint_text}}</span>
+		</span>
 	</div>
-	<button class="act start" data-if="prep" data-event-click="start">START</button>
+	<button class="act start" data-if="prep" data-event-click="start">Start</button>
 
 	<div class="tray">
 		<div class="slots">
 			<div class="tower" data-for="t, i : items" data-class-selected="i == selected" data-class-disabled="t.disabled" data-class-group="t.group" data-event-click="pick(i)" data-event-mouseover="hover(i)" data-event-mouseout="hover(-1)">
-				<div class="icon" data-style-background-color="t.color">
-					<img class="sprite" data-if="t.sprite != ''" data-attr-sprite="t.sprite"/>
-					<span class="glyph" data-if="t.sprite == ''">{{t.glyph}}</span>
-				</div>
+				<div class="icon-tile"><span class="glyph-icon" data-style-color="t.color">{{t.icon}}</span></div>
 				<span class="label">${{t.cost}}</span>
 			</div>
 		</div>
@@ -61,8 +60,8 @@
 			<span class="earned" data-if="won">{{result_earned}}</span>
 			<span class="stat" data-if="won">{{result_total}}</span>
 			<div class="buttons">
-				<button class="act" data-event-click="retry">RETRY</button>
-				<button class="act" data-event-click="quit">QUIT</button>
+				<button class="act" data-event-click="retry">Retry</button>
+				<button class="act quiet" data-event-click="quit">Quit</button>
 			</div>
 		</div>
 	</div>

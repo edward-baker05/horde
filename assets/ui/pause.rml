@@ -20,7 +20,7 @@
 	<div class="page red">
 		<button class="primary" data-event-click="resume">WZNÓW</button>
 
-		<div class="group">
+		<div class="group" data-if="can_restart">
 			<button class="row" data-event-click="restart">Od nowa</button>
 		</div>
 

@@ -52,6 +52,7 @@
 		</div>
 
 		<div class="group">
+			<button class="row" data-event-click="toggle_polish">Wyjdź z trybu polskiego</button>
 			<button class="row danger" data-event-click="quit">Wyjdź z gry</button>
 		</div>
 	</div>
@@ -78,10 +79,6 @@
 	</div>
 
 	<div class="page scroll" data-if="page == 'settings'">
-		<div class="section">GRA</div>
-		<div class="group">
-			<button class="row" data-event-click="toggle_polish">Tryb polski<span class="switch" data-class-on="polish"><span class="knob"/></span></button>
-		</div>
 	</div>
 
 	<div class="home-bar"/>

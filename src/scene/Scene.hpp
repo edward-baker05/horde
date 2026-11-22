@@ -80,6 +80,12 @@ public:
     // the device shell; the default keeps the scene on the swapchain.
     virtual ui::ScenePresentation presentation() const { return {}; }
 
+    // How bright the window background behind the devices is, 0 (black) to 1.
+    virtual float backdropBrightness() const { return 1.0f; }
+
+    // True while the scene is mid-transition and should get no clicks or keys.
+    virtual bool blocksInput() const { return false; }
+
     // Another scene was pushed on top / that scene was popped again.
     virtual void onCovered() {}
     virtual void onRevealed() {}

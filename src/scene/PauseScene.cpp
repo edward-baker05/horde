@@ -27,7 +27,9 @@ bool PauseScene::onEnter(Services& services) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "pause: could not create the data model");
         return false;
     }
+    m_canRestart = static_cast<bool>(m_onRestart);
     constructor.Bind("to_editor", &m_returnsToEditor);
+    constructor.Bind("can_restart", &m_canRestart);
     constructor.BindEventCallback("resume", &PauseScene::onResume, this);
     constructor.BindEventCallback("restart", &PauseScene::onRestartClicked, this);
     constructor.BindEventCallback("quit", &PauseScene::onQuit, this);

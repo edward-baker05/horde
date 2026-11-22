@@ -16,13 +16,14 @@ class ElementDocument;
 
 namespace horde::scene {
 
-// The phone, risen over a round while the tablet blurs behind it: Resume,
-// Restart and a way out. Pushed by LevelScene; being on top is what freezes
-// the round, as only the top scene updates.
+// The phone, risen over a round while the tablet blurs behind it (or over the
+// dev ground or tech tree, blurred behind it): Resume, Restart and a way out.
+// Being on top is what freezes the scene below, as only the top scene updates.
 class PauseScene : public Scene {
 public:
-    // `onRestart` runs after this scene pops. `returnsToEditor` relabels the
-    // way out for a play-test, which leaves to the editor, not the menu.
+    // `onRestart` runs after this scene pops; without one there is no Restart.
+    // `returnsToEditor` relabels the way out for a play-test, which leaves to
+    // the editor, not the menu.
     PauseScene(std::function<void()> onRestart, bool returnsToEditor)
         : m_onRestart(std::move(onRestart)), m_returnsToEditor(returnsToEditor) {}
 
@@ -64,6 +65,7 @@ private:
 
     std::function<void()> m_onRestart;
     bool m_returnsToEditor = false;
+    bool m_canRestart = false;
     bool m_closing = false;
 };
 

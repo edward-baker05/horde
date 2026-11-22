@@ -8,14 +8,17 @@ namespace horde::ui {
 DeviceSpec deviceSpec(DeviceKind kind, Orientation orientation) {
     glm::vec2 screen{0.0f};
     float bezel = 0.0f;
+    float radius = 0.0f;
     switch (kind) {
         case DeviceKind::Phone:
             screen = {390.0f, 844.0f};
-            bezel = 14.0f;
+            bezel = 12.0f;
+            radius = 55.0f;
             break;
         case DeviceKind::Tablet:
             screen = {800.0f, 1280.0f};
             bezel = 24.0f;
+            radius = 22.0f;
             break;
         case DeviceKind::None:
             break;
@@ -24,7 +27,7 @@ DeviceSpec deviceSpec(DeviceKind kind, Orientation orientation) {
     if (orientation == Orientation::Landscape) {
         std::swap(screen.x, screen.y);
     }
-    return {screen, bezel};
+    return {screen, bezel, radius};
 }
 
 DeviceRect fitDevice(const DeviceSpec& spec, glm::vec2 windowPx, float margin) {

@@ -1,78 +1,78 @@
-/* Tablet level editor, on top of tablet.rcss: the same OSD over the level, the
-   same tray along the bottom (holding tools instead of towers), and the round's
-   dark panels for everything that edits. Sizes are dp on the 1280x800
-   landscape tablet; the feed is the 684dp above the tray. */
+/* Tablet level editor, on top of tablet.rcss: the same glass readouts over the
+   level, the same floating dock (holding tools instead of turrets), and
+   iPadOS glass cards for everything that edits: an inspector on the left, the
+   level sheet on the right, the armed tool's card above the dock. Sizes are
+   dp on the 1280x800 landscape tablet; the feed is the 684dp above the tray. */
 
 /* --- Cards -------------------------------------------------------------- */
 
 .card {
 	position: absolute;
 	display: block;
-	padding: 12dp 14dp;
-	background-color: #121417e6;
+	padding: 14dp 16dp;
+	background-color: #1c1c1ef0;
 	border: 1dp #ffffff26;
-	border-radius: 14dp;
+	border-radius: 24dp;
 	pointer-events: auto;
 }
 
 .title {
 	display: block;
-	font-size: 16dp;
-	font-weight: bold;
+	font-size: 17dp;
+	font-weight: 600;
 	margin-bottom: 4dp;
 }
 
 .heading {
 	display: block;
-	margin: 12dp 0 6dp 0;
-	font-size: 11dp;
-	font-weight: bold;
-	letter-spacing: 1.5dp;
-	color: #8c96a0;
+	margin: 14dp 0 6dp 0;
+	font-size: 13dp;
+	font-weight: 600;
+	color: #8e8e93;
 }
 
 .note {
 	display: block;
 	margin: 6dp 0 2dp 0;
 	font-size: 12dp;
-	color: #9aa1a8;
+	color: #8e8e93;
 }
 
 .note.warn {
-	color: #ffd27a;
+	color: #ffd60a;
 }
 
 .empty {
 	display: block;
-	padding: 4dp 8dp;
-	font-size: 12dp;
-	color: #6d747b;
+	padding: 4dp 10dp;
+	font-size: 13dp;
+	color: #636366;
 }
 
-/* Below the top-left OSD and clear of the bottom-left one. */
+/* Below the top bar and clear of the bottom-left readout. */
 .inspector {
-	left: 20dp;
-	top: 92dp;
-	width: 250dp;
-	max-height: 470dp;
+	left: 22dp;
+	top: 98dp;
+	width: 260dp;
+	max-height: 440dp;
 	overflow-y: auto;
 }
 
 .inspector .act {
-	margin-top: 12dp;
+	margin-top: 14dp;
 }
 
 .act.danger {
-	background-color: #c8463e;
+	background-color: #ff453a;
 }
 
 .act.danger:hover {
-	background-color: #e0574f;
+	background-color: #ff6961;
 }
 
 .act.quiet {
 	margin-top: 8dp;
-	background-color: #ffffff1a;
+	background-color: #ffffff1f;
 }
 
 .act.quiet:hover {
@@ -81,75 +81,76 @@
 
 /* --- Number fields ------------------------------------------------------ */
 
+/* Label, then a stepper: round − and + either side of the value. */
 .field {
 	display: flex;
 	align-items: center;
-	height: 28dp;
-	margin: 3dp 0;
+	height: 32dp;
+	margin: 2dp 0;
 }
 
 .field .name {
 	flex: 1;
-	font-size: 13dp;
-	color: #c8cdd2;
+	font-size: 14dp;
+	color: #ebebf5;
 }
 
 .field .unit {
 	width: 26dp;
-	margin-left: 5dp;
-	font-size: 11dp;
-	color: #8c96a0;
+	margin-left: 6dp;
+	font-size: 12dp;
+	color: #8e8e93;
 }
 
 button.step {
-	width: 22dp;
-	height: 24dp;
-	line-height: 24dp;
+	width: 26dp;
+	height: 26dp;
+	line-height: 26dp;
 	text-align: center;
-	font-size: 15dp;
-	font-weight: bold;
-	color: #dfe3e7;
-	background-color: #ffffff12;
-	border-radius: 6dp;
+	font-size: 16dp;
+	font-weight: 600;
+	color: #ffffff;
+	background-color: #7676803d;
+	border-radius: 13dp;
 	transition: background-color 0.12s;
 }
 
 button.step:hover {
-	background-color: #ffffff26;
+	background-color: #7676805c;
 }
 
 button.step:active {
-	background-color: #2a7bff;
+	background-color: #0a84ff;
 }
 
 input.num,
 input.hex,
 input.name-box {
-	height: 24dp;
-	padding: 3dp 6dp;
+	height: 26dp;
+	padding: 4dp 8dp;
 	box-sizing: border-box;
-	font-size: 13dp;
+	font-size: 14dp;
 	color: #ffffff;
-	background-color: #00000066;
-	border: 1dp #ffffff1f;
-	border-radius: 6dp;
+	background-color: #0000004d;
+	border: 1dp #ffffff1a;
+	border-radius: 8dp;
 	cursor: text;
 }
 
 input.num {
 	width: 72dp;
-	margin: 0 4dp;
+	margin: 0 5dp;
 	text-align: right;
 }
 
 input.num:focus,
 input.hex:focus,
 input.name-box:focus {
-	border-color: #2a7bff;
+	border-color: #0a84ff;
 }
 
 input.text selection {
-	background-color: #2a7bff99;
+	background-color: #0a84ff99;
 	color: #ffffff;
 }
 
@@ -162,30 +163,31 @@ input.text selection {
 }
 
 .colour .preview {
-	width: 24dp;
-	height: 24dp;
+	width: 26dp;
+	height: 26dp;
 	margin-right: 8dp;
 	border: 1dp #ffffff40;
-	border-radius: 6dp;
+	border-radius: 13dp;
 }
 
 input.hex {
-	width: 96dp;
+	width: 100dp;
 }
 
 .swatches,
 .palette {
 	display: flex;
 	flex-wrap: wrap;
-	margin: 4dp 0;
+	margin: 6dp 0 2dp 0;
 }
 
+/* Round wells, as in the system colour picker. */
 .swatch {
-	width: 20dp;
-	height: 20dp;
+	width: 22dp;
+	height: 22dp;
 	margin: 0 5dp 5dp 0;
 	border: 1dp #ffffff2e;
-	border-radius: 5dp;
+	border-radius: 11dp;
 	transition: transform 0.1s;
 }
 
@@ -195,15 +197,16 @@ input.hex {
 }
 
 .swatch.big {
-	width: 28dp;
-	height: 26dp;
+	width: 30dp;
+	height: 30dp;
 	margin: 0 5dp 5dp 0;
-	line-height: 26dp;
+	line-height: 28dp;
 	text-align: center;
 	font-size: 11dp;
-	font-weight: bold;
+	font-weight: 700;
 	color: #ffffff;
-	font-effect: outline(1dp #000000);
+	border-radius: 15dp;
+	font-effect: outline(1dp #00000099);
 }
 
 .swatch.on {
@@ -215,59 +218,62 @@ input.hex {
 .toggle {
 	display: flex;
 	align-items: center;
-	height: 30dp;
+	height: 34dp;
 }
 
 .toggle .name {
 	flex: 1;
-	font-size: 13dp;
-	color: #c8cdd2;
+	font-size: 14dp;
+	color: #ebebf5;
 }
 
+/* An iOS switch, green when on. */
 .switch {
 	position: relative;
-	width: 38dp;
-	height: 22dp;
-	border-radius: 11dp;
-	background-color: #ffffff26;
-	transition: background-color 0.18s;
+	width: 44dp;
+	height: 26dp;
+	border-radius: 13dp;
+	background-color: #39393d;
+	transition: background-color 0.2s;
 }
 
 .switch.on {
-	background-color: #2a7bff;
+	background-color: #30d158;
 }
 
 .switch .knob {
 	position: absolute;
-	top: 3dp;
-	left: 3dp;
-	width: 16dp;
-	height: 16dp;
-	border-radius: 8dp;
+	top: 2dp;
+	left: 2dp;
+	width: 22dp;
+	height: 22dp;
+	border-radius: 11dp;
 	background-color: #ffffff;
-	transition: left 0.18s cubic-out;
+	transition: left 0.2s cubic-out;
 }
 
 .switch.on .knob {
-	left: 19dp;
+	left: 20dp;
 }
 
+/* Segmented control: a capsule track with the chosen option raised in it. */
 .seg {
 	display: flex;
 	margin-bottom: 8dp;
-	padding: 3dp;
-	background-color: #ffffff0d;
-	border-radius: 9dp;
+	padding: 2dp;
+	background-color: #7676803d;
+	border-radius: 16dp;
 }
 
 .seg .opt {
 	flex: 1;
-	padding: 5dp 0;
+	height: 28dp;
+	line-height: 28dp;
 	text-align: center;
-	font-size: 12dp;
-	font-weight: bold;
-	color: #c8cdd2;
-	border-radius: 7dp;
+	font-size: 13dp;
+	font-weight: 500;
+	color: #ebebf5;
+	border-radius: 14dp;
 	transition: background-color 0.12s;
 }
 
@@ -276,93 +282,96 @@ input.hex {
 }
 
 .seg .opt.on {
+	font-weight: 600;
 	color: #ffffff;
-	background-color: #ffffff29;
+	background-color: #636366;
 }
 
 /* --- The level sheet ---------------------------------------------------- */
 
 .sheet {
 	position: absolute;
-	right: 20dp;
-	top: 20dp;
-	bottom: 134dp;
-	width: 300dp;
+	right: 22dp;
+	top: 22dp;
+	bottom: 130dp;
+	width: 310dp;
 	display: block;
-	background-color: #121417e6;
+	background-color: #1c1c1ef0;
 	border: 1dp #ffffff26;
-	border-radius: 14dp;
+	border-radius: 26dp;
 	pointer-events: auto;
 }
 
 /* Folded, only the tabs show. */
 .sheet.folded {
 	bottom: auto;
-	height: 42dp;
+	height: 46dp;
 }
 
+/* The tabs: a segmented control 6dp in, concentric with the sheet. */
 .tabs {
 	display: flex;
 	margin: 6dp;
-	padding: 3dp;
-	background-color: #ffffff0d;
-	border-radius: 10dp;
+	padding: 2dp;
+	background-color: #7676803d;
+	border-radius: 20dp;
 }
 
 .tab {
 	flex: 1;
-	padding: 6dp 0;
+	height: 30dp;
+	line-height: 30dp;
 	text-align: center;
-	font-size: 11dp;
-	font-weight: bold;
-	letter-spacing: 1.2dp;
-	color: #8c96a0;
-	border-radius: 8dp;
+	font-size: 13dp;
+	font-weight: 500;
+	color: #ebebf5;
+	border-radius: 15dp;
 	transition: background-color 0.12s;
 }
 
 .tab:hover {
-	color: #dfe3e7;
+	background-color: #ffffff14;
 }
 
 .tab.on {
+	font-weight: 600;
 	color: #ffffff;
-	background-color: #ffffff26;
+	background-color: #636366;
 }
 
 .sheet .body {
 	position: absolute;
-	top: 46dp;
-	bottom: 6dp;
+	top: 50dp;
+	bottom: 8dp;
 	left: 0;
 	right: 0;
 	display: block;
-	padding: 0 14dp 8dp 14dp;
+	padding: 0 16dp 8dp 16dp;
 	overflow-y: auto;
 }
 
 .sheet .heading:first-child {
-	margin-top: 6dp;
+	margin-top: 8dp;
 }
 
 scrollbarvertical {
-	width: 4dp;
-	margin-right: 3dp;
+	width: 3dp;
+	margin-right: 4dp;
 }
 
 scrollbarvertical sliderbar {
 	min-height: 32dp;
-	background-color: #ffffff30;
+	background-color: #ffffff4d;
 	border-radius: 2dp;
 }
 
 /* List rows: tap to select. */
 .row {
 	display: block;
-	padding: 5dp 8dp;
-	font-size: 13dp;
-	color: #dfe3e7;
-	border-radius: 7dp;
+	padding: 7dp 10dp;
+	font-size: 14dp;
+	color: #ebebf5;
+	border-radius: 10dp;
 	transition: background-color 0.12s;
 }
 
@@ -371,12 +380,12 @@ scrollbarvertical sliderbar {
 }
 
 .row.on {
-	background-color: #2a7bff40;
+	background-color: #0a84ff;
 	color: #ffffff;
 }
 
 .row.bad {
-	color: #ff8a80;
+	color: #ff6961;
 }
 
 .save {
@@ -386,13 +395,13 @@ scrollbarvertical sliderbar {
 
 input.name-box {
 	flex: 1;
-	height: 30dp;
+	height: 32dp;
 	margin-right: 8dp;
 	font-size: 14dp;
 }
 
 .save .act {
-	width: 70dp;
+	width: 72dp;
 }
 
 /* --- Tool card ---------------------------------------------------------- */
@@ -402,7 +411,7 @@ input.name-box {
 	position: absolute;
 	left: 0;
 	right: 0;
-	bottom: 128dp;
+	bottom: 124dp;
 	display: flex;
 	justify-content: center;
 	pointer-events: none;
@@ -410,31 +419,119 @@ input.name-box {
 
 .tool-card {
 	position: relative;
-	width: 320dp;
+	width: 330dp;
 }
 
 .tool-card .note {
 	margin-top: 8dp;
 }
 
-/* --- Tray --------------------------------------------------------------- */
+/* --- Top bar ----------------------------------------------------------- */
+
+/* Undo and redo in a glass capsule, then the level's name card. */
+.topbar {
+	position: absolute;
+	left: 22dp;
+	top: 22dp;
+	display: flex;
+	pointer-events: auto;
+}
+
+.topbar .osd {
+	position: static;
+}
+
+.title-card .sub {
+	font-size: 13dp;
+	font-weight: 500;
+	color: #ebebf5bf;
+}
+
+.history {
+	display: flex;
+	align-items: center;
+	margin-right: 8dp;
+	padding: 0 5dp;
+	background-color: #0000008c;
+	border: 1dp #ffffff1f;
+	border-radius: 26dp;
+}
+
+button.round {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 40dp;
+	height: 40dp;
+	border-radius: 20dp;
+	transition: background-color 0.12s;
+}
+
+button.round + button.round {
+	margin-left: 2dp;
+}
+
+button.round:hover {
+	background-color: #ffffff1f;
+}
+
+button.round .icon {
+	font-family: "lucide";
+	font-size: 19dp;
+	line-height: 19dp;
+	color: #ffffff;
+}
+
+button.round.disabled .icon {
+	color: #ffffff40;
+}
+
+button.round.disabled:hover {
+	background-color: #00000000;
+}
+
+/* --- Sheet footer -------------------------------------------------------- */
+
+/* Test play, pinned to the bottom of the Level tab: 12dp in, so a capsule
+   sits concentric in the sheet's corners. */
+.sheet .body.footed {
+	bottom: 68dp;
+}
+
+.sheet .footer {
+	position: absolute;
+	left: 12dp;
+	right: 12dp;
+	bottom: 12dp;
+}
+
+.act.wide {
+	height: 44dp;
+	line-height: 44dp;
+	font-size: 16dp;
+	border-radius: 22dp;
+}
+
+.act .icon {
+	margin-right: 8dp;
+	font-family: "lucide";
+	font-size: 16dp;
+}
+
+/* --- Readouts and dock --------------------------------------------------- */
 
 .osd .problems {
-	color: #ff8a80;
+	color: #ff6961;
 }
 
 .osd .status {
-	color: #ffe08a;
+	color: #ffd60a;
 }
 
-/* Thirteen slots across, so narrower than the round's six. */
+/* Nine tools across. */
 .tray .tower {
-	width: 80dp;
-	margin: 0 3dp;
-}
-
-.tray .tower.action {
-	margin-left: 18dp;
+	width: 76dp;
+	margin: 0 1dp;
 }
 
 .tray .tower .label {
@@ -443,34 +540,9 @@ input.name-box {
 
 .tray .tower .key {
 	position: absolute;
-	top: 5dp;
-	left: 9dp;
+	top: 4dp;
+	left: 6dp;
 	font-size: 10dp;
-	font-weight: bold;
-	color: #8c96a0;
+	font-weight: 600;
+	color: #8e8e93;
 }
-
-.icon.plain {
-	background-color: #ffffff1f;
-}
-
-.icon.play {
-	background-color: #2a7bff;
-}
-
-.icon.plain .glyph.text,
-.icon.play .glyph.text {
-	color: #ffffff;
-}
-
-.glyph.text {
-	width: auto;
-	height: auto;
-	font-size: 20dp;
-	font-weight: bold;
-	line-height: 20dp;
-	text-align: center;
-}
-
-.glyph.rect { width: 18dp; height: 12dp; background-color: #0c0e10; border-radius: 2dp; }
-.glyph.line { width: 18dp; height: 4dp; background-color: #0c0e10; border-radius: 2dp; transform: rotate(-35deg); }

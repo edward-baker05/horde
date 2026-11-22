@@ -1,0 +1,63 @@
+<rml>
+<head>
+	<title>Editor menu</title>
+	<link type="text/rcss" href="phone_normal.rcss"/>
+</head>
+<body data-model="editor_menu">
+	<div class="status-bar"></div>
+
+	<!-- The menu, also under the save-or-discard popup. -->
+	<div class="page" data-if="page != 'save_as'">
+		<div class="hero">
+			<div class="symbol"><span class="icon"></span></div>
+			<span class="hero-title">{{level_name}}</span>
+			<span class="tagline">{{saved_label}}</span>
+		</div>
+
+		<button class="primary" data-event-click="resume">{{'Resume' | tr}}</button>
+
+		<div class="group">
+			<button class="row" data-class-disabled="!can_save" data-event-click="save">{{'Save' | tr}}</button>
+			<button class="row" data-event-click="open_save_as">{{'Save As…' | tr}}<span class="chevron"></span></button>
+		</div>
+
+		<div class="group">
+			<button class="row" data-event-click="leave">{{'Return to Menu' | tr}}</button>
+		</div>
+
+		<span class="status" data-if="status != ''">{{status}}</span>
+	</div>
+
+	<div data-if="page == 'save_as'">
+		<div class="header">
+			<button class="back" data-event-click="back">‹ {{'Back' | tr}}</button>
+		</div>
+		<div class="page-title">{{'Save As' | tr}}</div>
+		<div class="page">
+			<div class="section">{{'Name' | tr}}</div>
+			<div class="group">
+				<input type="text" class="text-field" maxlength="64" data-value="save_name" data-event-focus="typing(true)" data-event-blur="typing(false)" data-event-change="name_change(ev.linebreak)"/>
+			</div>
+			<button class="primary" data-event-click="save_as">{{'Save' | tr}}</button>
+			<span class="status" data-if="status != ''">{{status}}</span>
+		</div>
+	</div>
+
+	<!-- Leaving with unsaved changes. The scrim is a sibling of the card, so
+	     taps on the card don't bubble to it. -->
+	<div data-if="page == 'confirm'">
+		<div class="scrim" data-event-click="back"/>
+		<div class="popup-frame">
+			<div class="popup">
+				<span class="popup-title">{{'Save changes?' | tr}}</span>
+				<span class="popup-message">{{'Unsaved changes are lost if you leave without saving.' | tr}}</span>
+				<button class="popup-primary first" data-event-click="save_and_leave">{{'Save' | tr}}</button>
+				<button class="popup-destructive" data-event-click="discard">{{'Discard' | tr}}</button>
+				<button class="popup-cancel" data-event-click="back">{{'Cancel' | tr}}</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="home-bar"/>
+</body>
+</rml>

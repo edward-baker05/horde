@@ -15,6 +15,8 @@ struct ScenePresentation {
     Orientation orientation = Orientation::Landscape;
     // An overlay (e.g. pause) leaves the scene beneath visible, blurred behind it.
     bool overlay = false;
+    // The scene's device slides off screen while it stays on top of the stack.
+    bool away = false;
 };
 
 enum class Placement { Hidden, Centered, Background };
@@ -23,6 +25,9 @@ struct ShellTargets {
     Placement phone = Placement::Hidden;
     Placement tablet = Placement::Hidden;
     Orientation phoneOrientation = Orientation::Portrait;
+    // An overlay's nearest scene on another device has none: a window-sized
+    // scene (the dev ground, the tech tree) shows, blurred, behind it.
+    bool windowBehind = false;
 };
 
 // Decides where each device sits for a scene stack ordered bottom to top.
