@@ -31,6 +31,7 @@ bool EditorScene::onEnter(Services& services) {
     m_camera.setViewport(screen.x, screen.y);
     fitLevel();
     m_cameraController.setPanButtons(SDL_BUTTON_MMASK);
+    m_cameraController.setCtrlLeftPans(true);
 
     if (!m_overlay.show(services, m_state)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "EditorScene: no tablet overlay");
@@ -503,7 +504,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    // The wheel zooms and the middle button pans; left and right belong to
+    // The wheel zooms and the middle button or Ctrl + left pans; left and right belong to
     // the tools (set in onEnter).
     return m_cameraController.handleEvent(event, m_camera);
 }

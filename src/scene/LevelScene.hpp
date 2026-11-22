@@ -61,7 +61,8 @@ struct LevelOptions {
 };
 
 // The views a level can be watched through. The player sees one view, fitted
-// to the level to start with, which the wheel zooms and the middle button pans;
+// to the level to start with, which the wheel zooms and the middle button (or
+// Ctrl + left) pans;
 // more views and a way to switch between them plug in here later.
 struct FeedCamera {
     std::vector<gfx::Camera2D> views;
@@ -131,7 +132,7 @@ private:
     // Points m_camera at the active feed view.
     void applyFeedCamera();
     // Camera input in Player mode: the wheel zooms over the feed, holding the
-    // middle button pans, and the view stays over the level.
+    // middle button or Ctrl + left pans, and the view stays over the level.
     bool handleCameraGesture(const SDL_Event& event);
     // Live health summary, sampled from the GPU about once a second.
     void healthUi();

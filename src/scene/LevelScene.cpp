@@ -141,8 +141,9 @@ bool LevelScene::onEnter(Services& services) {
         // The round opens in prep: turrets are placed and nothing moves.
         m_round.emplace(m_level.round);
         // The left button places and strikes, and the right cancels placing,
-        // so only the middle one pans.
+        // so the middle one pans, as does Ctrl + left.
         m_cameraController.setPanButtons(SDL_BUTTON_MMASK);
+        m_cameraController.setCtrlLeftPans(true);
         m_prep.init(m_level, *m_walls);
         m_prep.setBudget(m_round->money());
     }
@@ -927,7 +928,7 @@ void LevelScene::onResize(float width, float height) {
     m_camera.setViewport(width, height);
     if (m_options.mode == LevelMode::Player) {
         // The view starts fitted to the level above the turret tray, and is
-        // fitted again for a new screen size; the wheel and middle drag move
+        // fitted again for a new screen size; the wheel and a middle or Ctrl drag move
         // it from there.
         const FeedFit fit = fitFeed(m_level.size, {width, height}, height * kRoundTrayFraction);
         // Zoomed all the way out is the whole level.

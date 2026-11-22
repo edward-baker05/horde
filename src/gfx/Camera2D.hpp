@@ -81,6 +81,12 @@ public:
         m_panButtons = mask;
     }
 
+    // Whether Ctrl + left drag pans too, whatever the pan buttons are: for
+    // mice whose middle button scrolls while held instead of clicking.
+    void setCtrlLeftPans(bool enabled) {
+        m_ctrlLeftPans = enabled;
+    }
+
     // Whether a pan button is held: the scene should keep the pointer until
     // it is let go, so a panel the drag passes over doesn't take the release.
     bool dragging() const {
@@ -89,10 +95,14 @@ public:
 
 private:
     bool pans(Uint8 button) const {
+        if (m_ctrlLeftPans && button == SDL_BUTTON_LEFT && (SDL_GetModState() & SDL_KMOD_CTRL) != 0) {
+            return true;
+        }
         return (m_panButtons & SDL_BUTTON_MASK(button)) != 0;
     }
 
     SDL_MouseButtonFlags m_panButtons = SDL_BUTTON_LMASK | SDL_BUTTON_MMASK;
+    bool m_ctrlLeftPans = false;
     Uint8 m_dragButton = 0;
     bool m_dragging = false;
     glm::vec2 m_lastMouse{0.0f, 0.0f};
