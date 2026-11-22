@@ -135,6 +135,14 @@ body {
 	transform: scale(0.96);
 }
 
+/* The icon and label leave the pointer to the item itself, so the whole item
+   is one hover target: a mouseout bubbling up from a child would otherwise
+   clear the hint while the pointer is still on the item. */
+.tower .icon,
+.tower .label {
+	pointer-events: none;
+}
+
 .tower.selected {
 	background-color: #ffffff1a;
 	border-color: #ffffff59;
