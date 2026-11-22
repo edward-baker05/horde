@@ -195,6 +195,10 @@ private:
     // What each source applies (TurretEffects::statusTable), uploaded when
     // the turrets are set.
     SDL_GPUBuffer* m_statusTable = nullptr;
+    // This step's explosions and turret effects for unit_integrate (Effects in
+    // unit_integrate.comp.hlsl), and the upload they go through each step.
+    SDL_GPUBuffer* m_effects = nullptr;
+    SDL_GPUTransferBuffer* m_effectsTransfer = nullptr;
 
     // The bullet pool, kMaxBullets of each: positions as BaseUnitData (so
     // m_renderer draws them), last step's positions, and per-bullet hits.

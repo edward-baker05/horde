@@ -36,6 +36,11 @@ StructuredBuffer<uint> CellRanges : register(t1, space0);
 #include "unit_status.hlsli"
 // What each source applies: [0] nothing, [1 + slot] that turret's effects.
 StructuredBuffer<UnitStatus> StatusTable : register(t2, space0);
+// This step's blasts and turret effects, uploaded each step: two float4s per
+// explosion from 0 (ExplosionCount of them), then two per turret effect from
+// EffectsTurretBase (TurretCount of them). Not in IntegrateParams: SDL_GPU
+// binds only the first 4 KiB of a uniform push, and these don't fit in it.
+StructuredBuffer<float4> Effects : register(t3, space0);
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float2> PrevPos : register(u1, space1);
 // Velocity from flinging explosions, on top of the walking velocity in Units.
@@ -51,6 +56,7 @@ RWStructuredBuffer<UnitStatus> Status : register(u5, space1);
 
 #define MAX_MARKERS 8
 #define MAX_FIELDS 32
+// The two parts of Effects. Match sim::kMaxExplosions and logic::kMaxTurrets.
 #define MAX_EXPLOSIONS 256
 #define MAX_TURRETS 64
 
@@ -84,13 +90,12 @@ cbuffer IntegrateParams : register(b0, space2) {
     uint ExplosionCount;
     float FlingDrag;     // per second: how quickly fling velocity dies away
     float FlingMaxSpeed; // fling speed cap, so no step can skip through a wall
-    uint ExplosionPadding;
-    // Two per debug explosion: [2i] xy = centre, z = radius, w = this step's
-    // push at the centre (negative pulls inward); [2i+1] x = falloff
-    // (0 constant, 1 linear, 2 quadratic), y = 1 to fling rather than shove,
-    // z = this step's damage at the centre, in hit points, w = its index
-    // into StatusTable (0: none).
-    float4 Explosions[MAX_EXPLOSIONS * 2];
+    uint EffectsTurretBase; // where the turret effects start in Effects
+    // Explosions live in Effects, two per explosion: [2i] xy = centre, z =
+    // radius, w = this step's push at the centre (negative pulls inward);
+    // [2i+1] x = falloff (0 constant, 1 linear, 2 quadratic), y = 1 to fling
+    // rather than shove, z = this step's damage at the centre, in hit points,
+    // w = its index into StatusTable (0: none).
     float Time;        // seconds of simulation
     float WobbleAngle; // radians either side of the heading; 0 turns it off
     float WobbleRate;  // Hz
@@ -104,11 +109,11 @@ cbuffer IntegrateParams : register(b0, space2) {
     uint3 CongestionPadding;
     uint TurretCount;
     uint3 TurretPadding;
-    // Two per turret effect active this step: [2i] xy = centre, zw =
-    // direction (unit length); [2i+1] x = range, y = the cone's cos half-angle
-    // or the beam's half-width, z = this step's damage, w = TURRET_* shape |
-    // turret slot << TURRET_SHAPE_BITS.
-    float4 Turrets[MAX_TURRETS * 2];
+    // Turret effects live in Effects from EffectsTurretBase, two per effect
+    // active this step: [2i] xy = centre, zw = direction (unit length);
+    // [2i+1] x = range, y = the cone's cos half-angle or the beam's
+    // half-width, z = this step's damage, w = TURRET_* shape | turret slot
+    // << TURRET_SHAPE_BITS.
 };
 
 // How far this unit's heading sways from straight at this moment, in radians.
@@ -134,9 +139,10 @@ void explosionPush(float2 centre, uint id, inout UnitStatus status, out float2 p
     launch = float2(0.0f, 0.0f);
     damage = 0.0f;
     for (uint i = 0; i < ExplosionCount; ++i) {
-        float4 blast = Explosions[i * 2];
-        float falloff = Explosions[i * 2 + 1].x;
-        bool fling = Explosions[i * 2 + 1].y > 0.5f;
+        float4 blast = Effects[i * 2];
+        float4 blastEffect = Effects[i * 2 + 1];
+        float falloff = blastEffect.x;
+        bool fling = blastEffect.y > 0.5f;
         float2 d = centre - blast.xy;
         float distance = length(d);
         if (distance >= blast.z) {
@@ -148,8 +154,8 @@ void explosionPush(float2 centre, uint id, inout UnitStatus status, out float2 p
         float t = distance / blast.z;
         float scale = falloff < 0.5f ? 1.0f : (falloff < 1.5f ? 1.0f - t : (1.0f - t) * (1.0f - t));
         float amount = blast.w * scale;
-        damage += Explosions[i * 2 + 1].z * scale;
-        uint effect = (uint)Explosions[i * 2 + 1].w;
+        damage += blastEffect.z * scale;
+        uint effect = (uint)blastEffect.w;
         if (effect != 0) {
             applyStatus(status, StatusTable[effect]);
         }
@@ -168,8 +174,8 @@ void explosionPush(float2 centre, uint id, inout UnitStatus status, out float2 p
 float turretDamage(float2 centre, inout UnitStatus status) {
     float damage = 0.0f;
     for (uint i = 0; i < TurretCount; ++i) {
-        float4 at = Turrets[i * 2];
-        float4 effect = Turrets[i * 2 + 1];
+        float4 at = Effects[EffectsTurretBase + i * 2];
+        float4 effect = Effects[EffectsTurretBase + i * 2 + 1];
         float2 d = centre - at.xy;
         float along = dot(d, at.zw);
         uint packed = (uint)effect.w;
