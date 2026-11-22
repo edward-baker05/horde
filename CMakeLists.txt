@@ -40,12 +40,13 @@ add_executable(horde
     src/sim/WallColliders.cpp
     src/sim/TowerSite.cpp
     src/sim/GpuReadback.cpp
-    src/editor/EditorUi.cpp
+    src/editor/Actions.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp
     src/editor/HitTest.cpp
     src/editor/Paint.cpp
     src/editor/Tools.cpp
+    src/scene/EditorOverlay.cpp
     src/scene/EditorScene.cpp
     src/scene/LevelScene.cpp
     src/scene/MainMenuScene.cpp

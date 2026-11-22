@@ -251,7 +251,7 @@ sprite icons, which is a world-space rendering problem rather than a widget
 problem — so it uses exactly the same batch and camera as the level does.
 
 **Dear ImGui is for tooling only.** Inspectors, timings, toggles. Game-facing UI
-(the phone and tablet menus) is RmlUi, drawn into each device's screen texture; the tech tree is sprites. Keeping that line clear is
+(the phone and tablet menus, the round and the level editor) is RmlUi, drawn into each device's screen texture; the tech tree is sprites. Keeping that line clear is
 what stops the tech tree turning into a fight with a widget toolkit.
 
 **Scenes are a stack.** `scene::SceneStack` lets a transient view sit on top of

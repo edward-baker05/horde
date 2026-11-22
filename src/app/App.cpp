@@ -374,8 +374,12 @@ void App::pumpEvents() {
             }
         }
 
-        // RmlUi next, so a menu under the pointer keeps clicks from the scene.
-        if (m_rml.handleEvent(kind, routed)) {
+        // RmlUi next, so a menu under the pointer keeps clicks from the scene,
+        // unless the scene is mid-drag and the pointer is its.
+        const bool pointerEvent = event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+                                  event.type == SDL_EVENT_MOUSE_BUTTON_UP || event.type == SDL_EVENT_MOUSE_WHEEL;
+        const bool captured = pointerEvent && active != nullptr && active->capturesPointer();
+        if (!captured && m_rml.handleEvent(kind, routed)) {
             continue;
         }
 

@@ -11,33 +11,36 @@
 #include "gfx/Camera2D.hpp"
 #include "logic/WallGridShapes.hpp"
 #include "scene/DancingCow.hpp"
+#include "scene/EditorOverlay.hpp"
 #include "scene/Scene.hpp"
 
 namespace horde::scene {
 
-// The level editor.
-//
-// Dear ImGui drives its panels, which is consistent with the project's
-// "ImGui is for tooling" rule: a level editor is tooling. Direct manipulation
-// happens in world space through the shared Camera2D.
+// The level editor, a tablet app like the round: the level is the feed, the
+// tools sit in the tray, and EditorOverlay's panels edit what the tools can't.
+// Direct manipulation happens in world space through the shared Camera2D.
 class EditorScene : public Scene {
 public:
     bool onEnter(Services& services) override;
     void onExit() override {
         m_cow.hide();
+        m_overlay.hide();
     }
     void onCovered() override {
         m_cow.hide();
+        m_overlay.setVisible(false);
     }
     void onRevealed() override {
         m_cow.show(*m_services);
+        m_overlay.setVisible(true);
     }
-    void update(float deltaTime) override {
-        m_cow.update(deltaTime);
+    ui::ScenePresentation presentation() const override {
+        return {ui::DeviceKind::Tablet, ui::Orientation::Landscape};
     }
+    void update(float deltaTime) override;
     bool handleEvent(const SDL_Event& event) override;
+    bool capturesPointer() const override;
     void render(gfx::SpriteBatch& batch) override;
-    void debugUi() override;
     void onResize(float width, float height) override;
 
     gfx::Camera2D& camera() override {
@@ -52,6 +55,9 @@ private:
     // World-space position of the mouse, updated every motion event.
     glm::vec2 mouseWorld(float screenX, float screenY) const;
 
+    // Frames the whole level in the feed above the tray.
+    void fitLevel();
+
     // Turns the in-progress polyline draft into a wall, if it has enough
     // points, and clears it either way.
     void commitDraft();
@@ -63,6 +69,7 @@ private:
 
     Services* m_services = nullptr;
     DancingCow m_cow;
+    EditorOverlay m_overlay;
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
 

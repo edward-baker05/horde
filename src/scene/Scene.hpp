@@ -87,6 +87,13 @@ public:
         return false;
     }
 
+    // True while the scene is in the middle of a mouse gesture (a drag, a
+    // stroke), so mouse events skip the UI and reach it even over a panel:
+    // releasing the button there still ends the gesture.
+    virtual bool capturesPointer() const {
+        return false;
+    }
+
     virtual void update(float deltaTime) {
         (void)deltaTime;
     }

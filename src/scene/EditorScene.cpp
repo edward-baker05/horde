@@ -1,13 +1,13 @@
 #include "scene/EditorScene.hpp"
 
-#include <imgui.h>
+#include <SDL3/SDL_log.h>
 
 #include <algorithm>
 #include <cmath>
 #include <optional>
 #include <variant>
 
-#include "editor/EditorUi.hpp"
+#include "editor/Actions.hpp"
 #include "editor/HitTest.hpp"
 #include "editor/Snap.hpp"
 #include "gfx/LevelRenderer.hpp"
@@ -15,6 +15,7 @@
 #include "gfx/Texture.hpp"
 #include "logic/LevelGeometry.hpp"
 #include "logic/LevelValidation.hpp"
+#include "scene/LevelMode.hpp"
 #include "scene/LevelScene.hpp"
 #include "scene/SceneStack.hpp"
 #include "ui/DeviceShell.hpp"
@@ -25,18 +26,65 @@ bool EditorScene::onEnter(Services& services) {
     m_services = &services;
 
     // The stack's onResize sets the viewport after this; the fit below needs it now.
-    const glm::vec2 window = services.shell != nullptr ? services.shell->windowPx() : glm::vec2(1.0f);
-    m_camera.setViewport(window.x, window.y);
+    const glm::vec2 screen =
+        services.shell != nullptr ? glm::vec2(services.shell->screenSize(ui::DeviceKind::Tablet)) : glm::vec2(1.0f);
+    m_camera.setViewport(screen.x, screen.y);
+    fitLevel();
 
-    // Frame the whole level with a margin, so a new editor opens on something
-    // sensible rather than on the origin.
-    m_camera.setCenter(m_state.level.size * 0.5f);
-    const float fit = std::min(window.x / (m_state.level.size.x * 1.2f),
-                               window.y / (m_state.level.size.y * 1.2f));
-    m_camera.setZoom(fit);
-
+    if (!m_overlay.show(services, m_state)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "EditorScene: no tablet overlay");
+        return false;
+    }
     m_cow.show(services);
     return true;
+}
+
+void EditorScene::fitLevel() {
+    // The whole level with a margin, above the tray, so the editor opens on
+    // something sensible rather than on the origin.
+    const glm::vec2 screen = m_camera.viewport();
+    const FeedFit fit = fitFeed(m_state.level.size, screen, screen.y * kRoundTrayFraction, 0.8f);
+    m_camera.setZoom(fit.zoom);
+    m_camera.setCenter(fit.center);
+}
+
+void EditorScene::update(float deltaTime) {
+    m_cow.update(deltaTime);
+    m_overlay.update(deltaTime, m_camera.zoom(), m_cursorWorld);
+
+    if (m_overlay.takeLevelSwapped()) {
+        // Whatever was half drawn belonged to the old level.
+        m_draft.clear();
+        m_placement.active = false;
+        m_painting = false;
+        m_hasLastStamp = false;
+        fitLevel();
+    }
+
+    switch (m_overlay.takeAction()) {
+        case EditorOverlay::Action::Menu:
+            m_services->scenes->pop();
+            break;
+        case EditorOverlay::Action::Play: {
+            // Over the editor, on the same tablet, so leaving the round comes
+            // straight back here.
+            LevelOptions options;
+            options.level = m_state.level;
+            options.physics = m_state.testPhysics;
+            options.spawn = sim::SpawnPattern::Markers;
+            options.fitCamera = true;
+            options.mode = LevelMode::Player;
+            m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
+            break;
+        }
+        case EditorOverlay::Action::None:
+            break;
+    }
+}
+
+bool EditorScene::capturesPointer() const {
+    return m_painting || m_draggingBody || m_markerDrag != 0 || m_placement.active ||
+           m_activeHandle.kind != editor::HandleKind::None;
 }
 
 glm::vec2 EditorScene::mouseWorld(float screenX, float screenY) const {
@@ -64,15 +112,26 @@ void EditorScene::commitDraft() {
 }
 
 bool EditorScene::handleEvent(const SDL_Event& event) {
-    // ImGui gets first refusal on the mouse, so dragging a panel never also
-    // drags the world behind it.
-    const ImGuiIO& io = ImGui::GetIO();
-
+    // The overlay's panels have already had the event and kept what landed on
+    // them; what's left is the level's.
     if (event.type == SDL_EVENT_MOUSE_MOTION) {
         m_cursorWorld = mouseWorld(event.motion.x, event.motion.y);
     }
 
-    if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard && m_state.tool == editor::Tool::Paint) {
+    // A press on the level takes the keyboard back from a text field.
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        m_overlay.blur();
+    }
+
+    // While a field is being typed in, keys are the field's: Esc lets go of it.
+    if (m_overlay.typing() && (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)) {
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+            m_overlay.blur();
+        }
+        return true;
+    }
+
+    if (event.type == SDL_EVENT_KEY_DOWN && m_state.tool == editor::Tool::Paint) {
         // Shift and a number picks a palette colour; without shift, numbers
         // still switch tools.
         if ((event.key.mod & SDL_KMOD_SHIFT) != 0 && event.key.key >= SDLK_1 && event.key.key <= SDLK_8) {
@@ -86,7 +145,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    if (event.type == SDL_EVENT_KEY_DOWN && !io.WantCaptureKeyboard) {
+    if (event.type == SDL_EVENT_KEY_DOWN) {
         switch (event.key.key) {
             case SDLK_1:
                 m_state.tool = editor::Tool::Select;
@@ -140,18 +199,14 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
 
             case SDLK_Z:
                 if ((event.key.mod & SDL_KMOD_CTRL) != 0) {
-                    m_state.undo.undo(m_state.level);
-                    m_state.selection.clear();
-                    m_state.dirty = true;
+                    editor::undo(m_state);
                     return true;
                 }
                 break;
 
             case SDLK_Y:
                 if ((event.key.mod & SDL_KMOD_CTRL) != 0) {
-                    m_state.undo.redo(m_state.level);
-                    m_state.selection.clear();
-                    m_state.dirty = true;
+                    editor::redo(m_state);
                     return true;
                 }
                 break;
@@ -161,15 +216,15 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    // A stroke already under way keeps going even over a panel, so releasing
-    // the button there still ends it.
-    if (m_state.tool == editor::Tool::Paint && (m_painting || !io.WantCaptureMouse)) {
+    // A stroke already under way keeps going even over a panel (see
+    // capturesPointer), so releasing the button there still ends it.
+    if (m_state.tool == editor::Tool::Paint) {
         if (handlePaintEvent(event)) {
             return true;
         }
     }
 
-    if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Polyline) {
+    if (m_state.tool == editor::Tool::Polyline) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION:
                 m_draft.cursor = editor::snapPosition(m_cursorWorld, m_state.snap);
@@ -194,7 +249,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    if (!io.WantCaptureMouse && (m_state.tool == editor::Tool::Spawn || m_state.tool == editor::Tool::Exit)) {
+    if ((m_state.tool == editor::Tool::Spawn || m_state.tool == editor::Tool::Exit)) {
         const logic::MarkerKind kind =
             m_state.tool == editor::Tool::Spawn ? logic::MarkerKind::Spawn : logic::MarkerKind::Exit;
 
@@ -231,7 +286,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    if (!io.WantCaptureMouse && editor::isBoxTool(m_state.tool)) {
+    if (editor::isBoxTool(m_state.tool)) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (event.button.button == SDL_BUTTON_LEFT) {
@@ -278,7 +333,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    if (!io.WantCaptureMouse && m_state.tool == editor::Tool::Select) {
+    if (m_state.tool == editor::Tool::Select) {
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION: {
                 if (m_activeHandle.kind != editor::HandleKind::None && m_state.selection.isWall()) {
@@ -443,7 +498,7 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
                               event.button.button == SDL_BUTTON_MIDDLE) ||
                              (event.type == SDL_EVENT_MOUSE_MOTION && (event.motion.state & SDL_BUTTON_MMASK) != 0);
 
-    if (cameraEvent && !io.WantCaptureMouse) {
+    if (cameraEvent) {
         return m_cameraController.handleEvent(event, m_camera);
     }
 
@@ -685,25 +740,6 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
         for (const glm::vec2& position : {low, high}) {
             gfx::drawCentered(batch, atlas, position, {size, size}, 0.0f, gfx::cellSolid(), {1.0f, 1.0f, 1.0f, 1.0f});
         }
-    }
-}
-
-void EditorScene::debugUi() {
-    bool wantsExit = false;
-    bool wantsPlay = false;
-    editor::drawEditorUi(m_state, wantsExit, wantsPlay);
-
-    if (wantsExit) {
-        m_services->scenes->pop();
-    } else if (wantsPlay) {
-        // Over the editor, so leaving the level comes straight back here.
-        LevelOptions options;
-        options.level = m_state.level;
-        options.physics = m_state.testPhysics;
-        options.spawn = sim::SpawnPattern::Markers;
-        options.fitCamera = true;
-        options.mode = LevelMode::Player;
-        m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));
     }
 }
 

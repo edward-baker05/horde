@@ -1,0 +1,476 @@
+/* Tablet level editor, on top of tablet.rcss: the same OSD over the level, the
+   same tray along the bottom (holding tools instead of towers), and the round's
+   dark panels for everything that edits. Sizes are dp on the 1280x800
+   landscape tablet; the feed is the 684dp above the tray. */
+
+/* --- Cards -------------------------------------------------------------- */
+
+.card {
+	position: absolute;
+	display: block;
+	padding: 12dp 14dp;
+	background-color: #121417e6;
+	border: 1dp #ffffff26;
+	border-radius: 14dp;
+	pointer-events: auto;
+}
+
+.title {
+	display: block;
+	font-size: 16dp;
+	font-weight: bold;
+	margin-bottom: 4dp;
+}
+
+.heading {
+	display: block;
+	margin: 12dp 0 6dp 0;
+	font-size: 11dp;
+	font-weight: bold;
+	letter-spacing: 1.5dp;
+	color: #8c96a0;
+}
+
+.note {
+	display: block;
+	margin: 6dp 0 2dp 0;
+	font-size: 12dp;
+	color: #9aa1a8;
+}
+
+.note.warn {
+	color: #ffd27a;
+}
+
+.empty {
+	display: block;
+	padding: 4dp 8dp;
+	font-size: 12dp;
+	color: #6d747b;
+}
+
+/* Below the top-left OSD and clear of the bottom-left one. */
+.inspector {
+	left: 20dp;
+	top: 92dp;
+	width: 250dp;
+	max-height: 470dp;
+	overflow-y: auto;
+}
+
+.inspector .act {
+	margin-top: 12dp;
+}
+
+.act.danger {
+	background-color: #c8463e;
+}
+
+.act.danger:hover {
+	background-color: #e0574f;
+}
+
+.act.quiet {
+	margin-top: 8dp;
+	background-color: #ffffff1a;
+}
+
+.act.quiet:hover {
+	background-color: #ffffff2e;
+}
+
+/* --- Number fields ------------------------------------------------------ */
+
+.field {
+	display: flex;
+	align-items: center;
+	height: 28dp;
+	margin: 3dp 0;
+}
+
+.field .name {
+	flex: 1;
+	font-size: 13dp;
+	color: #c8cdd2;
+}
+
+.field .unit {
+	width: 26dp;
+	margin-left: 5dp;
+	font-size: 11dp;
+	color: #8c96a0;
+}
+
+button.step {
+	width: 22dp;
+	height: 24dp;
+	line-height: 24dp;
+	text-align: center;
+	font-size: 15dp;
+	font-weight: bold;
+	color: #dfe3e7;
+	background-color: #ffffff12;
+	border-radius: 6dp;
+	transition: background-color 0.12s;
+}
+
+button.step:hover {
+	background-color: #ffffff26;
+}
+
+button.step:active {
+	background-color: #2a7bff;
+}
+
+input.num,
+input.hex,
+input.name-box {
+	height: 24dp;
+	padding: 3dp 6dp;
+	box-sizing: border-box;
+	font-size: 13dp;
+	color: #ffffff;
+	background-color: #00000066;
+	border: 1dp #ffffff1f;
+	border-radius: 6dp;
+	cursor: text;
+}
+
+input.num {
+	width: 72dp;
+	margin: 0 4dp;
+	text-align: right;
+}
+
+input.num:focus,
+input.hex:focus,
+input.name-box:focus {
+	border-color: #2a7bff;
+}
+
+input.text selection {
+	background-color: #2a7bff99;
+	color: #ffffff;
+}
+
+/* --- Colours ------------------------------------------------------------ */
+
+.colour {
+	display: flex;
+	align-items: center;
+	margin: 4dp 0;
+}
+
+.colour .preview {
+	width: 24dp;
+	height: 24dp;
+	margin-right: 8dp;
+	border: 1dp #ffffff40;
+	border-radius: 6dp;
+}
+
+input.hex {
+	width: 96dp;
+}
+
+.swatches,
+.palette {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 4dp 0;
+}
+
+.swatch {
+	width: 20dp;
+	height: 20dp;
+	margin: 0 5dp 5dp 0;
+	border: 1dp #ffffff2e;
+	border-radius: 5dp;
+	transition: transform 0.1s;
+}
+
+.swatch:hover {
+	transform: scale(1.12);
+	border-color: #ffffffa0;
+}
+
+.swatch.big {
+	width: 28dp;
+	height: 26dp;
+	margin: 0 5dp 5dp 0;
+	line-height: 26dp;
+	text-align: center;
+	font-size: 11dp;
+	font-weight: bold;
+	color: #ffffff;
+	font-effect: outline(1dp #000000);
+}
+
+.swatch.on {
+	border: 2dp #ffffff;
+}
+
+/* --- Toggles and segments ---------------------------------------------- */
+
+.toggle {
+	display: flex;
+	align-items: center;
+	height: 30dp;
+}
+
+.toggle .name {
+	flex: 1;
+	font-size: 13dp;
+	color: #c8cdd2;
+}
+
+.switch {
+	position: relative;
+	width: 38dp;
+	height: 22dp;
+	border-radius: 11dp;
+	background-color: #ffffff26;
+	transition: background-color 0.18s;
+}
+
+.switch.on {
+	background-color: #2a7bff;
+}
+
+.switch .knob {
+	position: absolute;
+	top: 3dp;
+	left: 3dp;
+	width: 16dp;
+	height: 16dp;
+	border-radius: 8dp;
+	background-color: #ffffff;
+	transition: left 0.18s cubic-out;
+}
+
+.switch.on .knob {
+	left: 19dp;
+}
+
+.seg {
+	display: flex;
+	margin-bottom: 8dp;
+	padding: 3dp;
+	background-color: #ffffff0d;
+	border-radius: 9dp;
+}
+
+.seg .opt {
+	flex: 1;
+	padding: 5dp 0;
+	text-align: center;
+	font-size: 12dp;
+	font-weight: bold;
+	color: #c8cdd2;
+	border-radius: 7dp;
+	transition: background-color 0.12s;
+}
+
+.seg .opt:hover {
+	background-color: #ffffff14;
+}
+
+.seg .opt.on {
+	color: #ffffff;
+	background-color: #ffffff29;
+}
+
+/* --- The level sheet ---------------------------------------------------- */
+
+.sheet {
+	position: absolute;
+	right: 20dp;
+	top: 20dp;
+	bottom: 134dp;
+	width: 300dp;
+	display: block;
+	background-color: #121417e6;
+	border: 1dp #ffffff26;
+	border-radius: 14dp;
+	pointer-events: auto;
+}
+
+/* Folded, only the tabs show. */
+.sheet.folded {
+	bottom: auto;
+	height: 42dp;
+}
+
+.tabs {
+	display: flex;
+	margin: 6dp;
+	padding: 3dp;
+	background-color: #ffffff0d;
+	border-radius: 10dp;
+}
+
+.tab {
+	flex: 1;
+	padding: 6dp 0;
+	text-align: center;
+	font-size: 11dp;
+	font-weight: bold;
+	letter-spacing: 1.2dp;
+	color: #8c96a0;
+	border-radius: 8dp;
+	transition: background-color 0.12s;
+}
+
+.tab:hover {
+	color: #dfe3e7;
+}
+
+.tab.on {
+	color: #ffffff;
+	background-color: #ffffff26;
+}
+
+.sheet .body {
+	position: absolute;
+	top: 46dp;
+	bottom: 6dp;
+	left: 0;
+	right: 0;
+	display: block;
+	padding: 0 14dp 8dp 14dp;
+	overflow-y: auto;
+}
+
+.sheet .heading:first-child {
+	margin-top: 6dp;
+}
+
+scrollbarvertical {
+	width: 4dp;
+	margin-right: 3dp;
+}
+
+scrollbarvertical sliderbar {
+	min-height: 32dp;
+	background-color: #ffffff30;
+	border-radius: 2dp;
+}
+
+/* List rows: tap to select. */
+.row {
+	display: block;
+	padding: 5dp 8dp;
+	font-size: 13dp;
+	color: #dfe3e7;
+	border-radius: 7dp;
+	transition: background-color 0.12s;
+}
+
+.row:hover {
+	background-color: #ffffff14;
+}
+
+.row.on {
+	background-color: #2a7bff40;
+	color: #ffffff;
+}
+
+.row.bad {
+	color: #ff8a80;
+}
+
+.save {
+	display: flex;
+	align-items: center;
+}
+
+input.name-box {
+	flex: 1;
+	height: 30dp;
+	margin-right: 8dp;
+	font-size: 14dp;
+}
+
+.save .act {
+	width: 70dp;
+}
+
+/* --- Tool card ---------------------------------------------------------- */
+
+/* A strip above the tray that centres the card without taking clicks. */
+.dock {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 128dp;
+	display: flex;
+	justify-content: center;
+	pointer-events: none;
+}
+
+.tool-card {
+	position: relative;
+	width: 320dp;
+}
+
+.tool-card .note {
+	margin-top: 8dp;
+}
+
+/* --- Tray --------------------------------------------------------------- */
+
+.osd .problems {
+	color: #ff8a80;
+}
+
+.osd .status {
+	color: #ffe08a;
+}
+
+/* Thirteen slots across, so narrower than the round's six. */
+.tray .tower {
+	width: 80dp;
+	margin: 0 3dp;
+}
+
+.tray .tower.action {
+	margin-left: 18dp;
+}
+
+.tray .tower .label {
+	font-size: 11dp;
+}
+
+.tray .tower .key {
+	position: absolute;
+	top: 5dp;
+	left: 9dp;
+	font-size: 10dp;
+	font-weight: bold;
+	color: #8c96a0;
+}
+
+.icon.plain {
+	background-color: #ffffff1f;
+}
+
+.icon.play {
+	background-color: #2a7bff;
+}
+
+.icon.plain .glyph.text,
+.icon.play .glyph.text {
+	color: #ffffff;
+}
+
+.glyph.text {
+	width: auto;
+	height: auto;
+	font-size: 20dp;
+	font-weight: bold;
+	line-height: 20dp;
+	text-align: center;
+}
+
+.glyph.rect { width: 18dp; height: 12dp; background-color: #0c0e10; border-radius: 2dp; }
+.glyph.line { width: 18dp; height: 4dp; background-color: #0c0e10; border-radius: 2dp; transform: rotate(-35deg); }
