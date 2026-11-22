@@ -23,7 +23,7 @@ namespace {
 constexpr int kBasePips = 10;
 
 std::string twoDigits(int value) {
-    char text[8];
+    char text[12];
     std::snprintf(text, sizeof(text), "%02d", value);
     return text;
 }

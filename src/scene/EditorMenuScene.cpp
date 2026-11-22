@@ -31,12 +31,6 @@ bool EditorMenuScene::onEnter(Services& services) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "editor menu: could not create the data model");
         return false;
     }
-    constructor.RegisterTransformFunc("tr", [](const Rml::VariantList& args) -> Rml::Variant {
-        if (args.empty()) {
-            return {};
-        }
-        return Rml::Variant(Rml::String(tr(args[0].Get<Rml::String>().c_str())));
-    });
     constructor.Bind("page", &m_page);
     constructor.Bind("level_name", &m_levelName);
     constructor.Bind("saved_label", &m_savedLabel);

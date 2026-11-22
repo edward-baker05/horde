@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "core/Paths.hpp"
+#include "core/PolishMode.hpp"
 #include "gfx/GpuContext.hpp"
 #include "ui/RmlInput.hpp"
 #include "ui/ScreenInput.hpp"
@@ -16,6 +17,23 @@ namespace horde::ui {
 namespace {
 
 constexpr const char* kContextNames[] = {"none", "phone", "tablet"};
+
+// Transform funcs live in the context's shared type register, not the model,
+// so they outlast RemoveDataModel. Registering once here keeps scenes that
+// recreate their models from registering the same name again.
+void registerTransforms(Rml::Context& context) {
+    Rml::DataModelConstructor constructor = context.CreateDataModel("_transforms");
+    if (!constructor) {
+        return;
+    }
+    constructor.RegisterTransformFunc("tr", [](const Rml::VariantList& args) -> Rml::Variant {
+        if (args.empty()) {
+            return {};
+        }
+        return Rml::Variant(Rml::String(tr(args[0].Get<Rml::String>().c_str())));
+    });
+    context.RemoveDataModel("_transforms");
+}
 
 } // namespace
 
@@ -77,6 +95,7 @@ bool RmlLayer::init(gfx::GpuContext& gpu, const gfx::ShaderLoader& shaders) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Rml::CreateContext(%s) failed", kContextNames[i]);
             return false;
         }
+        registerTransforms(*m_contexts[i]);
     }
 
     int width = 0;
