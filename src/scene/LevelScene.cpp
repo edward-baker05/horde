@@ -174,9 +174,9 @@ void LevelScene::onExit() {
 }
 
 bool LevelScene::handleEvent(const SDL_Event& event) {
-    // Placement first: it has its own use for Esc (cancel, disarm), clicks
-    // and keys. Nothing is placed once the round is over.
-    if (m_round && m_round->outcome() == logic::RoundOutcome::Playing) {
+    // Placement first, in prep only: it has its own use for Esc (cancel,
+    // disarm), clicks and keys. Once the round starts the turrets are fixed.
+    if (m_round && !m_round->started()) {
         const std::size_t before = m_prep.turrets().size();
         if (m_prep.handleEvent(event, m_camera)) {
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
@@ -733,13 +733,7 @@ void LevelScene::updateRound(float dt) {
         }
         m_physics->setSpawnRate(round.spawnRate());
 
-        // In play, a turret is paid for and in action the moment it lands.
-        const std::vector<logic::Turret> placed = m_prep.takePlaced(false);
-        if (!placed.empty()) {
-            round.spend(costOf(placed));
-            m_physics->addTurrets(placed);
-        }
-        // Spent mines and broken blockers free their ground.
+        // Spent mines and broken blockers can no longer be tapped.
         if (const sim::TurretEffects* effects = m_physics->turretEffects()) {
             for (std::size_t i = 0; i < effects->turrets().size(); ++i) {
                 if (effects->spent(i)) {
@@ -747,9 +741,11 @@ void LevelScene::updateRound(float dt) {
                 }
             }
         }
+    } else if (!round.started()) {
+        // Turrets laid out in prep count against what the round has.
+        m_prep.setBudget(round.money());
+        m_prep.update(dt);
     }
-    // Pending turrets count against what the round has.
-    m_prep.setBudget(round.money());
 
     for (auto& [blast, age] : m_recentBlasts) {
         age += dt;
@@ -766,6 +762,8 @@ void LevelScene::updateRound(float dt) {
 void LevelScene::presentRound() {
     logic::Round& round = *m_round;
     const bool playing = round.outcome() == logic::RoundOutcome::Playing;
+    // Turrets are bought and placed only before START.
+    const bool prep = !round.started();
 
     // In prep, what is left once the turrets laid out so far are paid for.
     const int money = round.money() - m_prep.pendingCost();
@@ -774,14 +772,13 @@ void LevelScene::presentRound() {
                       round.seconds()});
     const std::vector<logic::TurretKind>& kinds = RoundOverlay::trayKinds();
     for (std::size_t i = 0; i < kinds.size(); ++i) {
-        m_overlay.setTrayState(static_cast<int>(i),
-                               playing && money >= static_cast<int>(logic::turretDef(kinds[i]).cost));
+        m_overlay.setTrayState(static_cast<int>(i), prep && money >= static_cast<int>(logic::turretDef(kinds[i]).cost));
     }
     // Only while the pointer is over the feed: over the tray, the line above
     // it is about the tray.
     const float feedBottom = m_camera.viewport().y * (1.0f - kRoundTrayFraction);
     const bool overFeed = m_cursor && m_cursor->y < feedBottom;
-    m_overlay.setProblem(playing && overFeed ? m_prep.ghostProblem() : nullptr);
+    m_overlay.setProblem(prep && overFeed ? m_prep.ghostProblem() : nullptr);
 
     const sim::TurretEffects* effects = m_physics->turretEffects();
     if (m_inspected && round.started() && playing && *m_inspected < m_prep.turrets().size()) {
@@ -896,13 +893,12 @@ void LevelScene::renderRound(gfx::SpriteBatch& batch) {
     if (m_inspected && *m_inspected < m_prep.turrets().size()) {
         renderTurretReach(batch, atlas, m_prep.turrets()[*m_inspected], {1.0f, 1.0f, 1.0f, 0.1f});
     }
-    // Turrets in play, as the simulation has them; then the ones still being
-    // placed, and the ghost.
-    if (const sim::TurretEffects* effects = m_physics->turretEffects(); effects != nullptr && m_round->started()) {
-        renderWaveTurrets(batch, atlas, weapons, *effects);
-    }
-    if (m_round->outcome() == logic::RoundOutcome::Playing) {
+    // In prep, the turrets being laid out and the ghost; once started, the
+    // turrets as the simulation has them.
+    if (!m_round->started()) {
         m_prep.render(batch, atlas, weapons);
+    } else if (const sim::TurretEffects* effects = m_physics->turretEffects()) {
+        renderWaveTurrets(batch, atlas, weapons, *effects);
     }
 }
 

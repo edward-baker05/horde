@@ -86,8 +86,8 @@ corrected or deleted before the level can be written to disk.
 _Avoid_: clean level, well-formed level
 
 **Turret**:
-Something the player buys and places, in the prep phase or during a round,
-that damages or obstructs units. Every turret is a mount, a blocker or a floor trap.
+Something the player buys and places in the prep phase that damages or
+obstructs units. Turrets are fixed once the round starts. Every turret is a mount, a blocker or a floor trap.
 _Avoid_: tower, defence, weapon
 
 **Mount**:

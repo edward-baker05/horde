@@ -99,12 +99,6 @@ public:
     // Replaces every turret, with timers reset.
     void set(const std::vector<logic::Turret>& turrets);
 
-    // Adds turrets after those already set, which keep their timers and wear.
-    // Each takes the next unused slot, so feedback a slot ran up before never
-    // lands on a newcomer. Refuses all of them, returning false, if they would
-    // go past logic::kMaxTurrets.
-    bool add(const std::vector<logic::Turret>& turrets);
-
     // What each source applies, kStatusTableSize entries: [0] nothing, then
     // each turret slot's effects from its definition.
     std::vector<StatusEffect> statusTable() const;

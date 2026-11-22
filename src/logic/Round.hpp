@@ -29,8 +29,9 @@ inline constexpr float kClickDamage = 10.0f;
 // SDL or GPU, so it runs in tests. The turrets themselves are the
 // simulation's (sim::TurretEffects); the round only pays for them.
 //
-// A round opens in its prep phase: turrets can be bought, but the clock is
-// stopped and nothing is reported. start() begins play. The scene feeds it the
+// A round opens in its prep phase: turrets are bought, the clock is stopped
+// and nothing is reported. start() begins play, after which the turrets are
+// fixed: nothing more is bought, moved or upgraded. The scene feeds it the
 // player's actions and the crowd's reports (applyCounters). Reports arrive a
 // frame or so late and can arrive out of order, so every count it reads only
 // ever moves forward. Once the round is won or lost, nothing changes it any
@@ -78,8 +79,8 @@ public:
     // What winning pays toward upgrades; 0 unless the round was won.
     int upgradeMoney() const;
 
-    // Pays `cost`, for turrets, in prep or in play. False, and nothing paid,
-    // if there isn't enough money or the round is over.
+    // Pays `cost`, for turrets, in prep only. False, and nothing paid, if
+    // there isn't enough money or the round has started.
     bool spend(int cost);
 
     void applyCounters(const RoundCounters& counters);

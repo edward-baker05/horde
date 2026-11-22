@@ -311,8 +311,8 @@ public:
         (void)perSecond;
     }
 
-    // Whether the system can run a round: setTurrets, addTurrets, tally and
-    // setSpawnRate all do something.
+    // Whether the system can run a round: setTurrets, tally and setSpawnRate
+    // all do something.
     virtual bool supportsRounds() const {
         return false;
     }
@@ -326,14 +326,6 @@ public:
     // Arms these turrets from the next step, replacing any before. Returns
     // false for systems without turrets.
     virtual bool setTurrets(const std::vector<logic::Turret>& turrets) {
-        (void)turrets;
-        return false;
-    }
-
-    // Arms more turrets alongside those already in play, which keep their
-    // timers and wear. Returns false for systems without turrets, or if
-    // they would go past logic::kMaxTurrets.
-    virtual bool addTurrets(const std::vector<logic::Turret>& turrets) {
         (void)turrets;
         return false;
     }

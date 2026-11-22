@@ -63,22 +63,6 @@ void TurretEffects::set(const std::vector<logic::Turret>& turrets) {
     m_blockersChanged = false;
 }
 
-bool TurretEffects::add(const std::vector<logic::Turret>& turrets) {
-    if (m_turrets.size() + turrets.size() > logic::kMaxTurrets) {
-        return false;
-    }
-    for (const logic::Turret& turret : turrets) {
-        const logic::TurretDef& def = logic::turretDef(turret.kind);
-        m_turrets.push_back(turret);
-        State state;
-        // A full period first, as at the start of the wave.
-        state.cooldown = def.period;
-        state.hp = def.maxHp;
-        m_states.push_back(state);
-    }
-    return true;
-}
-
 std::vector<WallPrimitive> TurretEffects::blockerWalls() const {
     std::vector<WallPrimitive> out;
     for (std::size_t i = 0; i < m_turrets.size(); ++i) {

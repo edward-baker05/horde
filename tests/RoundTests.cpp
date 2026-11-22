@@ -45,17 +45,20 @@ TEST_CASE("prep holds the clock, reports and the click") {
     CHECK(round.seconds() == doctest::Approx(1.0f));
 }
 
-TEST_CASE("turrets are paid for in prep and in play") {
+TEST_CASE("turrets are paid for in prep, never once the round has started") {
     Round round(small());
     CHECK(round.spend(150));
     CHECK(round.money() == 250);
     round.start();
-    CHECK(round.spend(250));
-    CHECK(round.money() == 0);
+    CHECK_FALSE(round.spend(50));
+    CHECK(round.money() == 250);
+    // Kill money still comes in; there is just nothing to spend it on.
+    round.applyCounters(counters(5));
+    CHECK(round.money() == 260);
 }
 
 TEST_CASE("spending more than the round has is refused") {
-    Round round = started();
+    Round round(small());
     CHECK_FALSE(round.spend(401));
     CHECK(round.money() == 400);
     CHECK_FALSE(round.spend(-5));
@@ -92,7 +95,6 @@ TEST_CASE("ended rounds ignore actions") {
     round.applyCounters(counters(95, 5));
     REQUIRE(round.outcome() == RoundOutcome::Won);
     const int money = round.money();
-    CHECK_FALSE(round.spend(10));
     round.applyCounters(counters(100, 9));
     CHECK(round.money() == money);
     CHECK(round.outcome() == RoundOutcome::Won);

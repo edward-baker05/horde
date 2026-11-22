@@ -87,7 +87,6 @@ public:
     }
 
     bool setTurrets(const std::vector<logic::Turret>& turrets) override;
-    bool addTurrets(const std::vector<logic::Turret>& turrets) override;
 
     const TurretEffects* turretEffects() const override {
         return &m_turrets;

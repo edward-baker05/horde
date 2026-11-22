@@ -10,15 +10,12 @@ add_executable(horde_tests
     InputTests.cpp
     LevelIoTests.cpp
     RoundTests.cpp
-    TurretEffectsTests.cpp
     SaveDataTests.cpp
-    ${PROJECT_SOURCE_DIR}/src/sim/TurretEffects.cpp
     ${PROJECT_SOURCE_DIR}/src/sim/WallColliders.cpp
     ${PROJECT_SOURCE_DIR}/src/logic/LevelGeometry.cpp
     ${PROJECT_SOURCE_DIR}/src/logic/WallGridShapes.cpp
     ${PROJECT_SOURCE_DIR}/src/core/SaveData.cpp
     ${PROJECT_SOURCE_DIR}/src/logic/Round.cpp
-    ${PROJECT_SOURCE_DIR}/src/logic/Turret.cpp
     ${PROJECT_SOURCE_DIR}/src/logic/Level.cpp
     ${PROJECT_SOURCE_DIR}/src/logic/LevelIO.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/DeviceLayout.cpp

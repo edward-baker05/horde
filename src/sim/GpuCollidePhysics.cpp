@@ -576,20 +576,6 @@ bool GpuCollidePhysics::setTurrets(const std::vector<logic::Turret>& turrets) {
     return true;
 }
 
-bool GpuCollidePhysics::addTurrets(const std::vector<logic::Turret>& turrets) {
-    if (!m_turrets.add(turrets)) {
-        return false;
-    }
-    const bool blocker = std::any_of(turrets.begin(), turrets.end(), [](const logic::Turret& turret) {
-        return logic::turretDef(turret.kind).placement == logic::TurretClass::Blocker;
-    });
-    if (blocker) {
-        rebuildWalls();
-    }
-    uploadStatusTable();
-    return true;
-}
-
 void GpuCollidePhysics::uploadStatusTable() {
     const std::vector<StatusEffect> table = m_turrets.statusTable();
     if (!uploadBytesNow(m_device, table.data(), static_cast<std::uint32_t>(sizeof(StatusEffect) * table.size()),

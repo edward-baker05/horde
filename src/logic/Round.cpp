@@ -26,7 +26,7 @@ int Round::upgradeMoney() const {
 }
 
 bool Round::spend(int cost) {
-    if (m_outcome != RoundOutcome::Playing || cost < 0 || m_money < cost) {
+    if (m_started || cost < 0 || m_money < cost) {
         return false;
     }
     m_money -= cost;

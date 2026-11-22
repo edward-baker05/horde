@@ -25,14 +25,15 @@ class WallColliders;
 
 namespace horde::scene {
 
-// Turret placement for a round: a ghost of the armed kind that follows the
-// cursor, and placing, moving, rotating and removing turrets, all undoable.
-// The round's tray arms a kind (arm), and the round pays for what is placed.
+// Turret placement in a round's prep phase: a ghost of the armed kind that
+// follows the cursor, and placing, moving, rotating and removing turrets, all
+// undoable. The round's tray arms a kind (arm), and the round pays for what is
+// placed when it starts.
 //
 // Turrets placed since the last takePlaced() are pending: they can still be
-// moved, turned and removed, and placing more is refused past the budget. In
-// the prep phase everything is pending until the round starts; in play the
-// scene takes each placement as it lands, so it is fixed at once.
+// moved, turned and removed, and placing more is refused past the budget. The
+// scene takes them all when the round starts, and from then on they are fixed.
+// A newly placed turret grows in, purely as a look.
 //
 // Mouse and keys, while the cursor isn't over a panel:
 //   left click        place the armed kind; or, with none armed, grab a pending turret to drag it
@@ -53,6 +54,9 @@ public:
 
     // Returns true if it used the event.
     bool handleEvent(const SDL_Event& event, const gfx::Camera2D& camera);
+
+    // Advances newly placed turrets growing in.
+    void update(float dt);
 
     // Arms `kind` for placing, or disarms.
     void arm(std::optional<logic::TurretKind> kind);
@@ -125,6 +129,8 @@ private:
     const sim::WallColliders* m_walls = nullptr;
 
     std::vector<logic::Turret> m_turrets;
+    // By index: how far each has grown in, 0 to 1.
+    std::vector<float> m_grow;
     // Turrets before this index are fixed; the rest are pending.
     std::size_t m_fixed = 0;
     // By index: gone from play, so neither blocking nor pickable.

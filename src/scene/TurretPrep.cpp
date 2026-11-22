@@ -175,19 +175,24 @@ glm::vec4 reachColor(const logic::TurretDef& def) {
     return logic::turretColor(def);
 }
 
-// `color` multiplies a sprite's own colours, or is a box's colour.
+// How long a newly placed turret takes to grow to full size. Only a look:
+// turrets go down in prep, with no units about to be pushed aside.
+constexpr float kGrowSeconds = 1.0f / 3.0f;
+
+// `color` multiplies a sprite's own colours, or is a box's colour. `scale`
+// shrinks it about its centre, for growing in.
 void drawTurret(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTexture* weapons, const logic::Turret& turret,
-                glm::vec4 color) {
+                glm::vec4 color, float scale = 1.0f) {
     const logic::TurretDef& def = logic::turretDef(turret.kind);
+    const glm::vec2 size = def.halfSize * 2.0f * scale;
     if (hasSprite(def, weapons)) {
-        gfx::drawCentered(batch, weapons, turret.center, def.halfSize * 2.0f, turret.facing,
-                          weaponSpriteCell(def.spriteId), color);
+        gfx::drawCentered(batch, weapons, turret.center, size, turret.facing, weaponSpriteCell(def.spriteId), color);
     } else {
-        gfx::drawCentered(batch, atlas, turret.center, def.halfSize * 2.0f, turret.facing, gfx::cellSolid(), color);
+        gfx::drawCentered(batch, atlas, turret.center, size, turret.facing, gfx::cellSolid(), color);
     }
     if (def.directional) {
         // A small arrowhead along the facing.
-        const float head = std::min(def.halfSize.x, def.halfSize.y) * 1.2f;
+        const float head = std::min(def.halfSize.x, def.halfSize.y) * 1.2f * scale;
         gfx::drawCentered(batch, atlas, turret.center, {head, head}, turret.facing + 1.5707964f, gfx::cellTriangle(),
                           glm::vec4(0.1f, 0.1f, 0.1f, color.a));
     }
@@ -203,12 +208,20 @@ void TurretPrep::init(const logic::Level& level, const sim::WallColliders& walls
     m_level = &level;
     m_walls = &walls;
     m_turrets.clear();
+    m_grow.clear();
     m_fixed = 0;
     m_gone.clear();
     m_undo.clear();
     m_armed.reset();
     m_dragging.reset();
     m_lineStart.reset();
+}
+
+void TurretPrep::update(float dt) {
+    m_grow.resize(m_turrets.size(), 1.0f);
+    for (float& grow : m_grow) {
+        grow = std::min(grow + dt / kGrowSeconds, 1.0f);
+    }
 }
 
 void TurretPrep::arm(std::optional<logic::TurretKind> kind) {
@@ -424,6 +437,7 @@ std::optional<std::size_t> TurretPrep::pendingAt(glm::vec2 point) const {
 void TurretPrep::remove(std::size_t index) {
     m_undo.push(m_turrets);
     m_turrets.erase(m_turrets.begin() + static_cast<std::ptrdiff_t>(index));
+    m_grow.erase(m_grow.begin() + static_cast<std::ptrdiff_t>(index));
 }
 
 void TurretPrep::rotate(float radians) {
@@ -485,6 +499,7 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
                     } else if (placementProblem(turret, std::nullopt) == nullptr) {
                         m_undo.push(m_turrets);
                         m_turrets.push_back(turret);
+                        m_grow.push_back(0.0f);
                     }
                     return true; // not a pan, even where it can't go
                 }
@@ -522,6 +537,7 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
                 for (const logic::Turret& turret : lineTurrets()) {
                     if (placementProblem(turret, std::nullopt) == nullptr) {
                         m_turrets.push_back(turret);
+                        m_grow.push_back(0.0f);
                     }
                 }
                 if (m_turrets.size() != before.size()) {
@@ -586,12 +602,15 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
                         } else {
                             m_undo.undo(m_turrets);
                         }
+                        // Whatever came back is there already: no growing in.
+                        m_grow.assign(m_turrets.size(), 1.0f);
                         return true;
                     }
                     return false;
                 case SDLK_Y:
                     if (ctrl) {
                         m_undo.redo(m_turrets);
+                        m_grow.assign(m_turrets.size(), 1.0f);
                         return true;
                     }
                     return false;
@@ -614,8 +633,11 @@ void TurretPrep::render(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUT
         if (m_dragging && *m_dragging == i && placementProblem(turret, m_dragging) != nullptr) {
             color = previewColor(def, weapons, false);
         }
-        drawReach(batch, atlas, turret, glm::vec4(glm::vec3(reachColor(def)), 0.12f));
-        drawTurret(batch, atlas, weapons, turret, color);
+        // Growing in: eased out, so it pops up fast and settles.
+        const float t = i < m_grow.size() ? m_grow[i] : 1.0f;
+        const float grown = 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t);
+        drawReach(batch, atlas, turret, glm::vec4(glm::vec3(reachColor(def)), 0.12f * grown));
+        drawTurret(batch, atlas, weapons, turret, color, grown);
     }
 
     // Hidden while the cursor is over a panel: ImGui would get the click.
