@@ -56,15 +56,16 @@ glm::mat4 Camera2D::viewProjection() const {
 bool CameraController::handleEvent(const SDL_Event& event, Camera2D& camera) {
     switch (event.type) {
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_MIDDLE) {
+            if (!m_dragging && pans(event.button.button)) {
                 m_dragging = true;
+                m_dragButton = event.button.button;
                 m_lastMouse = {event.button.x, event.button.y};
                 return true;
             }
             return false;
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_MIDDLE) {
+            if (m_dragging && event.button.button == m_dragButton) {
                 m_dragging = false;
                 return true;
             }
@@ -88,12 +89,10 @@ bool CameraController::handleEvent(const SDL_Event& event, Camera2D& camera) {
                 return false;
             }
 
-            float mouseX = 0.0f;
-            float mouseY = 0.0f;
-            SDL_GetMouseState(&mouseX, &mouseY);
-
+            // The event's own position: on a device screen it has been mapped
+            // to the screen's pixels, which SDL_GetMouseState's are not.
             const float factor = event.wheel.y > 0.0f ? m_zoomSpeed : 1.0f / m_zoomSpeed;
-            camera.zoomAround(factor, {mouseX, mouseY});
+            camera.zoomAround(factor, {event.wheel.mouse_x, event.wheel.mouse_y});
             return true;
         }
 

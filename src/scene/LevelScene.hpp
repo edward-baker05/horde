@@ -60,9 +60,9 @@ struct LevelOptions {
     float flingDrag = 3.0f;
 };
 
-// The views a level can be watched through. The player sees one fixed view
-// fitted to the level; more views and gestures to switch between them (pan,
-// zoom, multiple cameras) plug in here later.
+// The views a level can be watched through. The player sees one view, fitted
+// to the level to start with, which the wheel zooms and the middle button pans;
+// more views and a way to switch between them plug in here later.
 struct FeedCamera {
     std::vector<gfx::Camera2D> views;
     std::size_t active = 0;
@@ -97,6 +97,11 @@ public:
         return levelPresentation(m_options.mode);
     }
 
+    // Mid-pan, the pointer stays the scene's even over the tray or a panel.
+    bool capturesPointer() const override {
+        return m_cameraController.dragging();
+    }
+
     sim::PhysicsSystem& physics() {
         return *m_physics;
     }
@@ -125,7 +130,8 @@ private:
     void fitCameraToLevel(float width, float height);
     // Points m_camera at the active feed view.
     void applyFeedCamera();
-    // The seam for camera input in Player mode; no gestures yet.
+    // Camera input in Player mode: the wheel zooms over the feed, holding the
+    // middle button pans, and the view stays over the level.
     bool handleCameraGesture(const SDL_Event& event);
     // Live health summary, sampled from the GPU about once a second.
     void healthUi();

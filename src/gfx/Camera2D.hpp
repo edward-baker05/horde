@@ -62,19 +62,38 @@ private:
     float m_maxZoom = 10.0f;
 };
 
-// Mouse-driven pan and zoom, so the level view and the tech tree share one
-// implementation instead of drifting apart.
-//
-// Returns true if the event was consumed.
+// Mouse-driven pan and zoom, so the level view, the editor and the tech tree
+// share one implementation instead of drifting apart: the wheel zooms about
+// the pointer, and holding a pan button drags the view.
 class CameraController {
 public:
+    // Returns true if the event was consumed. Mouse positions are taken from
+    // the event, so they are in whatever pixels the scene's events are in.
     bool handleEvent(const SDL_Event& event, Camera2D& camera);
 
     void setZoomSpeed(float speed) {
         m_zoomSpeed = speed;
     }
 
+    // Which buttons drag the view, as SDL_BUTTON_MASK bits. Left and middle by
+    // default; scenes whose left button does something else use middle alone.
+    void setPanButtons(SDL_MouseButtonFlags mask) {
+        m_panButtons = mask;
+    }
+
+    // Whether a pan button is held: the scene should keep the pointer until
+    // it is let go, so a panel the drag passes over doesn't take the release.
+    bool dragging() const {
+        return m_dragging;
+    }
+
 private:
+    bool pans(Uint8 button) const {
+        return (m_panButtons & SDL_BUTTON_MASK(button)) != 0;
+    }
+
+    SDL_MouseButtonFlags m_panButtons = SDL_BUTTON_LMASK | SDL_BUTTON_MMASK;
+    Uint8 m_dragButton = 0;
     bool m_dragging = false;
     glm::vec2 m_lastMouse{0.0f, 0.0f};
     float m_zoomSpeed = 1.1f;

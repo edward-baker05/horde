@@ -140,6 +140,9 @@ bool LevelScene::onEnter(Services& services) {
     if (m_options.mode == LevelMode::Player) {
         // The round opens in prep: turrets are placed and nothing moves.
         m_round.emplace(m_level.round);
+        // The left button places and strikes, and the right cancels placing,
+        // so only the middle one pans.
+        m_cameraController.setPanButtons(SDL_BUTTON_MMASK);
         m_prep.init(m_level, *m_walls);
         m_prep.setBudget(m_round->money());
     }
@@ -174,6 +177,12 @@ void LevelScene::onExit() {
 }
 
 bool LevelScene::handleEvent(const SDL_Event& event) {
+    // A pan holds the pointer until its button is let go, ahead of placement,
+    // so the view can move while a turret is being dragged.
+    if (m_options.mode == LevelMode::Player &&
+        (m_cameraController.dragging() || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) && handleCameraGesture(event)) {
+        return true;
+    }
     // Placement first, in prep only: it has its own use for Esc (cancel,
     // disarm), clicks and keys. Once the round starts the turrets are fixed.
     if (m_round && !m_round->started()) {
@@ -235,8 +244,20 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
 }
 
 bool LevelScene::handleCameraGesture(const SDL_Event& event) {
-    (void)event;
-    return false;
+    // The wheel zooms only over the feed: over the tray it belongs there.
+    if (event.type == SDL_EVENT_MOUSE_WHEEL &&
+        event.wheel.mouse_y >= m_camera.viewport().y * (1.0f - kRoundTrayFraction)) {
+        return false;
+    }
+    if (!m_cameraController.handleEvent(event, m_camera)) {
+        return false;
+    }
+    // Never so far that the level leaves the feed: its middle stays on the level.
+    m_camera.setCenter(glm::clamp(m_camera.center(), glm::vec2(0.0f), m_level.size));
+    if (m_feed.active < m_feed.views.size()) {
+        m_feed.views[m_feed.active] = m_camera;
+    }
+    return true;
 }
 
 void LevelScene::update(float dt) {
@@ -905,10 +926,12 @@ void LevelScene::renderRound(gfx::SpriteBatch& batch) {
 void LevelScene::onResize(float width, float height) {
     m_camera.setViewport(width, height);
     if (m_options.mode == LevelMode::Player) {
-        // One static view fitted to the level above the turret tray, rebuilt for
-        // the new screen size.
+        // The view starts fitted to the level above the turret tray, and is
+        // fitted again for a new screen size; the wheel and middle drag move
+        // it from there.
         const FeedFit fit = fitFeed(m_level.size, {width, height}, height * kRoundTrayFraction);
-        m_camera.setZoomLimits(std::min(fit.zoom, 0.1f), 10.0f);
+        // Zoomed all the way out is the whole level.
+        m_camera.setZoomLimits(fit.zoom, 10.0f);
         m_camera.setZoom(fit.zoom);
         m_camera.setCenter(fit.center);
         m_feed.views.assign(1, m_camera);

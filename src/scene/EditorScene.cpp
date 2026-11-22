@@ -30,6 +30,7 @@ bool EditorScene::onEnter(Services& services) {
         services.shell != nullptr ? glm::vec2(services.shell->screenSize(ui::DeviceKind::Tablet)) : glm::vec2(1.0f);
     m_camera.setViewport(screen.x, screen.y);
     fitLevel();
+    m_cameraController.setPanButtons(SDL_BUTTON_MMASK);
 
     if (!m_overlay.show(services, m_state)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "EditorScene: no tablet overlay");
@@ -84,7 +85,7 @@ void EditorScene::update(float deltaTime) {
 
 bool EditorScene::capturesPointer() const {
     return m_painting || m_draggingBody || m_markerDrag != 0 || m_placement.active ||
-           m_activeHandle.kind != editor::HandleKind::None;
+           m_activeHandle.kind != editor::HandleKind::None || m_cameraController.dragging();
 }
 
 glm::vec2 EditorScene::mouseWorld(float screenX, float screenY) const {
@@ -121,6 +122,17 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
     // A press on the level takes the keyboard back from a text field.
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
         m_overlay.blur();
+    }
+
+    // Panning comes before the tools, so the view can move mid-stroke or
+    // partway through a polyline. Other buttons still reach the tools.
+    if ((m_cameraController.dragging() || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) &&
+        m_cameraController.handleEvent(event, m_camera)) {
+        if (event.type == SDL_EVENT_MOUSE_MOTION) {
+            // The world under the pointer moves as the view does.
+            m_cursorWorld = mouseWorld(event.motion.x, event.motion.y);
+        }
+        return true;
     }
 
     // While a field is being typed in, keys are the field's: Esc lets go of it.
@@ -491,18 +503,9 @@ bool EditorScene::handleEvent(const SDL_Event& event) {
         }
     }
 
-    // CameraController pans on left OR middle drag, but in the editor the left
-    // button belongs to the tools. Forward only wheel and middle-button events.
-    const bool cameraEvent = event.type == SDL_EVENT_MOUSE_WHEEL ||
-                             ((event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
-                              event.button.button == SDL_BUTTON_MIDDLE) ||
-                             (event.type == SDL_EVENT_MOUSE_MOTION && (event.motion.state & SDL_BUTTON_MMASK) != 0);
-
-    if (cameraEvent) {
-        return m_cameraController.handleEvent(event, m_camera);
-    }
-
-    return false;
+    // The wheel zooms and the middle button pans; left and right belong to
+    // the tools (set in onEnter).
+    return m_cameraController.handleEvent(event, m_camera);
 }
 
 bool EditorScene::handlePaintEvent(const SDL_Event& event) {
