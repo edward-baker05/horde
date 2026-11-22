@@ -87,6 +87,36 @@ std::array<TurretDef, kTurretKindCount> makeDefs() {
 
 } // namespace
 
+const char* weaponCategoryName(WeaponCategory category) {
+    switch (category) {
+        case WeaponCategory::Merch:
+            return "Merch";
+        case WeaponCategory::Sound:
+            return "Sound";
+        case WeaponCategory::Chemical:
+            return "Chemical";
+        case WeaponCategory::Physical:
+            return "Physical";
+    }
+    return "";
+}
+
+glm::vec4 weaponCategoryColor(WeaponCategory category) {
+    // 0-255 to match tools/make_weapon_atlas.py's CATEGORY_COLOURS.
+    auto rgb = [](float r, float g, float b) { return glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f); };
+    switch (category) {
+        case WeaponCategory::Merch:
+            return rgb(214, 60, 160); // magenta
+        case WeaponCategory::Sound:
+            return rgb(60, 120, 220); // blue
+        case WeaponCategory::Chemical:
+            return rgb(90, 180, 70); // green
+        case WeaponCategory::Physical:
+            return rgb(230, 140, 40); // orange
+    }
+    return {1.0f, 1.0f, 1.0f, 1.0f};
+}
+
 const TurretDef& turretDef(TurretKind kind) {
     static const std::array<TurretDef, kTurretKindCount> defs = makeDefs();
     return defs[static_cast<std::size_t>(kind)];

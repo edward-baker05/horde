@@ -124,9 +124,52 @@ void drawReach(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const logic::Turr
     }
 }
 
-void drawTurret(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const logic::Turret& turret, glm::vec4 color) {
+// textures/weapons.png is a 4x4 grid; sprite n is cell n - 1, left to right
+// then top to bottom. See tools/make_weapon_atlas.py.
+constexpr int kWeaponSheetColumns = 4;
+constexpr int kWeaponSheetRows = 4;
+
+glm::vec4 weaponSpriteCell(std::uint8_t spriteId) {
+    const int index = spriteId - 1;
+    return gfx::atlasCell(index % kWeaponSheetColumns, index / kWeaponSheetColumns, kWeaponSheetColumns,
+                          kWeaponSheetRows);
+}
+
+bool hasSprite(const logic::TurretDef& def, SDL_GPUTexture* weapons) {
+    return weapons != nullptr && def.spriteId != 0;
+}
+
+// A turret's colour at rest: a sprite keeps its own colours, a plain box takes
+// its placement class's.
+glm::vec4 restColor(const logic::TurretDef& def, SDL_GPUTexture* weapons) {
+    return hasSprite(def, weapons) ? glm::vec4(1.0f) : classColor(def.placement);
+}
+
+// A placement the player is still deciding on: green where it can go, red
+// where it can't. Sprites are only tinted toward red, so they stay readable.
+glm::vec4 previewColor(const logic::TurretDef& def, SDL_GPUTexture* weapons, bool ok) {
+    if (hasSprite(def, weapons)) {
+        return ok ? glm::vec4(1.0f, 1.0f, 1.0f, 0.7f) : glm::vec4(1.0f, 0.35f, 0.35f, 0.7f);
+    }
+    return ok ? glm::vec4(0.3f, 0.9f, 0.4f, 0.7f) : glm::vec4(0.9f, 0.2f, 0.2f, 0.7f);
+}
+
+// The colour of what a placed turret reaches: its weapon category's, or its
+// placement class's for the kinds that predate categories.
+glm::vec4 reachColor(const logic::TurretDef& def) {
+    return def.category ? logic::weaponCategoryColor(*def.category) : classColor(def.placement);
+}
+
+// `color` multiplies a sprite's own colours, or is a box's colour.
+void drawTurret(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTexture* weapons, const logic::Turret& turret,
+                glm::vec4 color) {
     const logic::TurretDef& def = logic::turretDef(turret.kind);
-    gfx::drawCentered(batch, atlas, turret.center, def.halfSize * 2.0f, turret.facing, gfx::cellSolid(), color);
+    if (hasSprite(def, weapons)) {
+        gfx::drawCentered(batch, weapons, turret.center, def.halfSize * 2.0f, turret.facing,
+                          weaponSpriteCell(def.spriteId), color);
+    } else {
+        gfx::drawCentered(batch, atlas, turret.center, def.halfSize * 2.0f, turret.facing, gfx::cellSolid(), color);
+    }
     if (def.directional) {
         // A small arrowhead along the facing.
         const float head = std::min(def.halfSize.x, def.halfSize.y) * 1.2f;
@@ -374,29 +417,34 @@ bool TurretPrep::handleEvent(const SDL_Event& event, const gfx::Camera2D& camera
     }
 }
 
-void TurretPrep::render(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas) const {
+void TurretPrep::render(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTexture* weapons) const {
     for (std::size_t i = 0; i < m_turrets.size(); ++i) {
         const logic::Turret& turret = m_turrets[i];
-        glm::vec4 color = classColor(logic::turretDef(turret.kind).placement);
+        const logic::TurretDef& def = logic::turretDef(turret.kind);
+        glm::vec4 color = restColor(def, weapons);
         // A drag that would snap back shows red.
         if (m_dragging && *m_dragging == i && placementProblem(turret, m_dragging) != nullptr) {
-            color = {0.9f, 0.2f, 0.2f, 0.8f};
+            color = previewColor(def, weapons, false);
         }
-        drawReach(batch, atlas, turret, glm::vec4(glm::vec3(color), 0.12f));
-        drawTurret(batch, atlas, turret, color);
+        drawReach(batch, atlas, turret, glm::vec4(glm::vec3(reachColor(def)), 0.12f));
+        drawTurret(batch, atlas, weapons, turret, color);
     }
 
     // Hidden while the cursor is over a panel: ImGui would get the click.
     if (m_armed && m_cursorInWorld && !ImGui::GetIO().WantCaptureMouse) {
         const logic::Turret ghost = logic::makeTurret(*m_armed, m_cursor, m_ghostFacing);
+        const logic::TurretDef& def = logic::turretDef(ghost.kind);
         const bool ok = placementProblem(ghost, std::nullopt) == nullptr;
-        const glm::vec4 color = ok ? glm::vec4(0.3f, 0.9f, 0.4f, 0.7f) : glm::vec4(0.9f, 0.2f, 0.2f, 0.7f);
-        drawReach(batch, atlas, ghost, glm::vec4(glm::vec3(color), 0.15f));
-        drawTurret(batch, atlas, ghost, color);
+        const glm::vec4 color = previewColor(def, weapons, ok);
+        // The reach shows where it can go even when the sprite keeps its colours.
+        const glm::vec4 reach = ok ? glm::vec4(0.3f, 0.9f, 0.4f, 0.15f) : glm::vec4(0.9f, 0.2f, 0.2f, 0.15f);
+        drawReach(batch, atlas, ghost, reach);
+        drawTurret(batch, atlas, weapons, ghost, color);
     }
 }
 
-void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const sim::TurretEffects& effects) {
+void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTexture* weapons,
+                       const sim::TurretEffects& effects) {
     const std::vector<logic::Turret>& turrets = effects.turrets();
     for (std::size_t i = 0; i < turrets.size(); ++i) {
         if (effects.spent(i)) {
@@ -404,7 +452,7 @@ void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const sim
         }
         logic::Turret turret = turrets[i];
         const logic::TurretDef& def = logic::turretDef(turret.kind);
-        glm::vec4 color = classColor(def.placement);
+        glm::vec4 color = restColor(def, weapons);
         if (def.maxHp > 0.0f) {
             // Down to a third of its colour as it nears breaking.
             const float left = std::clamp(effects.hp(i) / def.maxHp, 0.0f, 1.0f);
@@ -425,7 +473,7 @@ void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const sim
             }
             turret.facing = aimed.facing;
         }
-        drawTurret(batch, atlas, turret, color);
+        drawTurret(batch, atlas, weapons, turret, color);
     }
 }
 

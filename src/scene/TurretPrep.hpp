@@ -52,7 +52,8 @@ public:
     void finish();
 
     // Placed turrets, their reach, and the ghost.
-    void render(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas) const;
+    // `weapons` is the weapon sprite sheet, or null to draw every turret as a box.
+    void render(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTexture* weapons) const;
 
     // The palette and hints, for the inside of the wave window.
     void ui();
@@ -92,6 +93,7 @@ private:
 
 // The turrets as the wave has them: beams where they point now, blockers
 // darkening as they wear down, and spent mines and broken blockers gone.
-void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, const sim::TurretEffects& effects);
+void renderWaveTurrets(gfx::SpriteBatch& batch, SDL_GPUTexture* atlas, SDL_GPUTexture* weapons,
+                       const sim::TurretEffects& effects);
 
 } // namespace horde::scene

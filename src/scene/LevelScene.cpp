@@ -191,10 +191,11 @@ void LevelScene::render(gfx::SpriteBatch& batch) {
     gfx::renderLevel(m_level, batch, m_services->atlas->handle(), m_showFieldRegions, &m_gridPieces);
     // In prep, the turrets being placed; after it, the wave's own.
     const sim::TurretEffects* effects = m_physics->turretEffects();
+    SDL_GPUTexture* weapons = m_services->weapons ? m_services->weapons->handle() : nullptr;
     if (m_phase == Phase::Prep || effects == nullptr) {
-        m_prep.render(batch, m_services->atlas->handle());
+        m_prep.render(batch, m_services->atlas->handle(), weapons);
     } else {
-        renderWaveTurrets(batch, m_services->atlas->handle(), *effects);
+        renderWaveTurrets(batch, m_services->atlas->handle(), weapons, *effects);
     }
 
     // Explosions: red pushes, blue pulls. Units are drawn over these.
