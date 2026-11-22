@@ -1,9 +1,11 @@
 // Last step of the gpu-collide pipeline: keep units out of walls and inside
 // the level, set each unit's velocity from where it actually ended up (so
 // collisions slow and deflect units rather than only moving them, and soak up
-// fling velocity: position-based dynamics), damage units that reached an
-// exit and send them back to a spawn, and despawn units with no hit points
-// left (see unit_state.hlsli).
+// fling velocity: position-based dynamics), deal with units that reached an
+// exit (send them back to a spawn, damaged, or despawn them as leaks), wear
+// down any blocker a unit is pressed against (and let spikes hurt it back),
+// and despawn units with no hit points left (see unit_state.hlsli), counting
+// kills and leaks.
 //
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
@@ -21,8 +23,26 @@ RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float> Health : register(u1, space1); // hit points, 0 to the max
 // Velocity from flinging explosions, which is free of the speed cap.
 RWStructuredBuffer<float2> Fling : register(u2, space1);
+// See sim/TurretEffects.hpp: [0] units killed, [1] units leaked, running
+// totals since the level started, then per turret slot; blockers are worn
+// down in thousandths of a hit point at FEEDBACK_HITS.
+RWStructuredBuffer<uint> Feedback : register(u3, space1);
+// Thousandths of a hit point bullets dealt each unit this step (bullet_step),
+// applied and cleared here.
+RWStructuredBuffer<uint> PendingDamage : register(u4, space1);
 
 #define MAX_MARKERS 8
+#define MAX_TURRETS 64
+#define FEEDBACK_HEADER 4
+#define FEEDBACK_PER_TURRET 4
+#define FEEDBACK_HITS 3
+// How close counts as touching a blocker, beyond the unit's radius.
+#define CONTACT_SLACK 0.5f
+
+// What a unit at an exit does: matches sim::ExitBehaviour.
+#define EXIT_STOP 0
+#define EXIT_RESPAWN 1
+#define EXIT_DESPAWN 2
 
 // Matches GPUFinalizeUniforms in sim/GpuCollidePhysics.cpp
 cbuffer FinalizeParams : register(b0, space2) {
@@ -38,11 +58,15 @@ cbuffer FinalizeParams : register(b0, space2) {
     uint ExitCount;
     uint SpawnCount;
     uint Frame;         // varies the respawn position from frame to frame
-    uint RespawnOnExit; // 0: units that reach an exit stay there
-    float ExitDamage;   // hit points lost on reaching an exit
+    uint ExitMode;      // EXIT_STOP, EXIT_RESPAWN or EXIT_DESPAWN
+    float ExitDamage;   // hit points lost on respawning at an exit
     uint3 HealthPadding;
     float4 Exits[MAX_MARKERS];  // xy = centre, zw = half size
     float4 Spawns[MAX_MARKERS]; // xy = centre, zw = half size
+    // Per turret slot, what one unit touching that blocker does this step:
+    // x = thousandths of a hit point the blocker loses, y = hit points the
+    // unit loses. Zero for slots that aren't standing blockers.
+    float4 BlockerContacts[MAX_TURRETS];
 };
 
 #define WALL_PRIMS_SLOT t1
@@ -96,6 +120,36 @@ float2 sweepTowards(float2 start, float2 end) {
     return end;
 }
 
+// Wears down every blocker the unit at `centre` is touching, and returns the
+// hit points it loses to them this step. Blockers are wall boxes whose radius
+// holds 1 + their turret slot (see sim/WallColliders.hpp).
+float blockerContacts(float2 centre) {
+    if (WallCount == 0) {
+        return 0.0f;
+    }
+    int2 cell = clamp((int2)floor(centre / WallBinSize), int2(0, 0), (int2)WallBinDim - 1);
+    uint2 bin = WallBins[(uint)cell.x + (uint)cell.y * WallBinDim.x];
+
+    float damage = 0.0f;
+    for (uint i = 0; i < bin.y; ++i) {
+        WallPrimitive w = WallPrims[WallBinIndices[bin.x + i]];
+        if (w.kind != WALL_BOX || w.radius < 0.5f) {
+            continue;
+        }
+        float2 n;
+        if (wallDistance(w, centre, n) >= Radius + CONTACT_SLACK) {
+            continue;
+        }
+        uint slot = min((uint)(w.radius + 0.5f) - 1u, MAX_TURRETS - 1u);
+        float4 contact = BlockerContacts[slot];
+        if (contact.x > 0.0f) {
+            InterlockedAdd(Feedback[FEEDBACK_HEADER + slot * FEEDBACK_PER_TURRET + FEEDBACK_HITS], (uint)contact.x);
+        }
+        damage += contact.y;
+    }
+    return damage;
+}
+
 bool reachedExit(float2 centre) {
     for (uint i = 0; i < ExitCount; ++i) {
         if (all(abs(centre - Exits[i].xy) <= Exits[i].zw + Radius)) {
@@ -112,9 +166,19 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
         return;
     }
 
+    // Cleared even for the dead: units are reordered, and a dead unit's
+    // index may hold a live one next step.
+    uint pending = PendingDamage[index];
+    if (pending != 0) {
+        PendingDamage[index] = 0;
+    }
+
     UnitData unit = Units[index];
     if (isDead(unit.pos)) {
         return;
+    }
+    if (pending != 0) {
+        Health[index] = max(Health[index] - (float)pending / 1000.0f, 0.0f);
     }
     float2 centre = sweepTowards(PrevPos[index] + Radius, unit.pos + Radius);
     centre = resolveWalls(centre, Radius);
@@ -139,9 +203,23 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     }
     unit.vel = vel;
 
+    float contactDamage = blockerContacts(unit.pos + Radius);
+    if (contactDamage > 0.0f) {
+        Health[index] = max(Health[index] - contactDamage, 0.0f);
+    }
+
+    // Through the exit for good: a leak, not a kill.
+    if (ExitMode == EXIT_DESPAWN && reachedExit(unit.pos + Radius)) {
+        InterlockedAdd(Feedback[1], 1u);
+        Fling[index] = float2(0.0f, 0.0f);
+        Units[index].pos = float2(DEAD_POSITION, DEAD_POSITION);
+        Units[index].vel = float2(0.0f, 0.0f);
+        return;
+    }
+
     // Through the exit: take the damage, then back in at a random point of a
     // random spawn, at rest, keeping whatever health is left.
-    if (RespawnOnExit != 0 && SpawnCount > 0 && reachedExit(unit.pos + Radius)) {
+    if (ExitMode == EXIT_RESPAWN && SpawnCount > 0 && reachedExit(unit.pos + Radius)) {
         Health[index] = max(Health[index] - ExitDamage, 0.0f);
 
         uint h = hash(index ^ hash(Frame));
@@ -155,6 +233,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     // Out of hit points, from an exit or an explosion: despawn. Every pass
     // skips it from here on.
     if (Health[index] <= 0.0f) {
+        InterlockedAdd(Feedback[0], 1u);
         unit.pos = float2(DEAD_POSITION, DEAD_POSITION);
         unit.vel = float2(0.0f, 0.0f);
         fling = float2(0.0f, 0.0f);

@@ -30,6 +30,7 @@ bool MainMenuScene::onEnter(Services& services) {
 void MainMenuScene::playLevel(const std::filesystem::path& path) {
     // Empty path: the built-in level. Zoomed to fit, so the whole level is in view.
     LevelOptions options;
+    options.mode = LevelMode::Wave;
     options.levelPath = path;
     options.fitCamera = true;
     m_services->scenes->push(std::make_unique<LevelScene>(std::move(options)));

@@ -99,4 +99,11 @@ std::size_t countMarkers(const Level& level, MarkerKind kind) {
     return count;
 }
 
+std::uint32_t waveUnitCount(const WaveSettings& wave) {
+    if (wave.length == WaveLength::Time && wave.spawnRate > 0.0f) {
+        return static_cast<std::uint32_t>(std::ceil(static_cast<double>(wave.spawnRate) * wave.duration));
+    }
+    return wave.unitCount;
+}
+
 } // namespace horde::logic

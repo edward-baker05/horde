@@ -12,7 +12,8 @@ namespace horde::sim {
 // One convex piece of a wall, in world space. Matches WallPrimitive in
 // shaders/src/walls.hlsli: 32 bytes, read straight from a structured buffer.
 //
-//   Box       p0 = centre, p1 = unit x axis (cos, sin of rotation), p2 = half extents
+//   Box       p0 = centre, p1 = unit x axis (cos, sin of rotation), p2 = half extents,
+//             radius = 1 + the turret slot of the blocker it is, or 0 for one of the level's own walls
 //   Circle    p0 = centre, radius
 //   Triangle  p0, p1, p2 = corners
 struct WallPrimitive {
@@ -37,6 +38,10 @@ public:
     // `reach` is the furthest from a wall anything will ask about: a unit's
     // radius. Primitives are binned into every cell within `reach` of them.
     void build(const logic::Level& level, float reach);
+
+    // These walls plus `extra` primitives, binned afresh: the level's walls
+    // with a wave's blockers standing in it.
+    WallColliders withExtra(const std::vector<WallPrimitive>& extra) const;
 
     bool empty() const {
         return m_primitives.empty();
@@ -73,6 +78,11 @@ public:
     }
 
 private:
+    // Bins m_primitives over a level of m_size.
+    void bin();
+
+    glm::vec2 m_size{0.0f, 0.0f};
+    float m_reach = 0.0f;
     std::vector<WallPrimitive> m_primitives;
     std::vector<glm::uvec2> m_bins;
     std::vector<std::uint32_t> m_binIndices;

@@ -39,9 +39,12 @@ struct alignas(16) UnitDrawUniforms {
     Uint32 rotate;
     Uint32 directionSteps;
     float minTurnSpeed;
-    glm::vec2 padding;
+    float time;
+    Uint32 hasStatus;
+    Uint32 markFirst;
+    float padding[3];
 };
-static_assert(sizeof(UnitDrawUniforms) == 176);
+static_assert(sizeof(UnitDrawUniforms) == 192);
 
 // Matches HLSL cbuffer UnitSpriteUniforms in unit_sprite.frag.hlsl
 struct alignas(16) UnitSpriteUniforms {
@@ -77,11 +80,11 @@ bool UnitRenderer::init(scene::Services& services) {
         }
     }
 
-    // unit.vert: 5 storage buffers (units t0, previous positions t1, health t2, IDs t3, slots t4, space0), 1 uniform
-    // buffer (b0, space1)
+    // unit.vert: 6 storage buffers (units t0, previous positions t1, health t2, IDs t3, slots t4, status t5,
+    // space0), 1 uniform buffer (b0, space1)
     SDL_GPUShader* vertexShader = services.shaders->loadGraphics(
         "unit.vert", SDL_GPU_SHADERSTAGE_VERTEX,
-        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 5, .uniformBuffers = 1});
+        ShaderResources{.samplers = 0, .storageTextures = 0, .storageBuffers = 6, .uniformBuffers = 1});
 
     // unit_sprite.frag: 1 sampler (s0, space2), 1 sampled texture (t0, space2), 1 uniform buffer (b0, space3)
     SDL_GPUShader* fragmentShader = services.shaders->loadGraphics(
@@ -166,21 +169,27 @@ void UnitRenderer::draw(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* pass,
 
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
     // Slots the shader won't read still need something bound.
-    SDL_GPUBuffer* buffers[5] = {units, options.previous ? options.previous : units,
-                                 options.health ? options.health : units, options.ids ? options.ids : units,
-                                 options.slots ? options.slots : units};
-    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 5);
+    SDL_GPUBuffer* buffers[6] = {units,
+                                 options.previous ? options.previous : units,
+                                 options.health ? options.health : units,
+                                 options.ids ? options.ids : units,
+                                 options.slots ? options.slots : units,
+                                 options.status ? options.status : units};
+    SDL_BindGPUVertexStorageBuffers(pass, 0, buffers, 6);
 
     UnitDrawUniforms uniforms{};
     uniforms.viewProjection = viewProjection;
     uniforms.uvRect = atlasCell(1, 0, 4, 4);
-    uniforms.color = glm::vec4(0.0f, 1.0f, 0.2f, 1.0f);
+    uniforms.color = options.color;
     uniforms.unitSize = glm::vec2(unitSize, unitSize);
     uniforms.alpha = options.alpha;
     uniforms.maxJump = options.previous ? options.maxJump : 0.0f;
     uniforms.invMaxHealth = options.health && options.maxHealth > 0.0f ? 1.0f / options.maxHealth : 0.0f;
     uniforms.hasIds = options.ids ? 1u : 0u;
     uniforms.hasSlots = options.slots ? 1u : 0u;
+    uniforms.time = options.time;
+    uniforms.hasStatus = options.status ? 1u : 0u;
+    uniforms.markFirst = options.markFirst ? 1u : 0u;
 
     // Screen pixels per world unit, from the orthographic projection's x scale.
     int width = 0;

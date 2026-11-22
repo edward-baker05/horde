@@ -697,6 +697,7 @@ void EditorScene::debugUi() {
     } else if (wantsPlay) {
         // Over the editor, so leaving the level comes straight back here.
         LevelOptions options;
+        options.mode = LevelMode::Wave;
         options.level = m_state.level;
         options.physics = m_state.testPhysics;
         options.unitCount = static_cast<std::uint32_t>(m_state.testUnits);

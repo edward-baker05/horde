@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "logic/Turret.hpp"
 #include "logic/UnitData.hpp"
 
 namespace horde::scene {
@@ -18,6 +19,7 @@ struct Services;
 
 namespace horde::sim {
 
+class TurretEffects;
 class WallColliders;
 
 // How a collision pass combines a unit's pair corrections. Both are Jacobi:
@@ -117,6 +119,13 @@ struct MarkerArea {
     glm::vec2 halfSize{0.0f, 0.0f};
 };
 
+// What happens to a unit that reaches an exit.
+enum class ExitBehaviour {
+    Stop,    // it stays there, pressed against the level's edge
+    Respawn, // it takes HealthSettings::exitDamage and re-enters at a spawn
+    Despawn, // it leaves the level for good and counts as a leak
+};
+
 // How units enter and leave a level, for systems that support it
 // (PhysicsSystem::supportsFlow).
 struct FlowSettings {
@@ -126,14 +135,19 @@ struct FlowSettings {
     // second; 0 brings them all in on the first frame.
     std::uint32_t toSpawn = 0;
     float spawnRate = 1000.0f;
-    // A unit that reaches an exit re-enters at a spawn, keeping the flow
-    // going. Otherwise it stops there.
-    bool respawnAtExit = true;
+    ExitBehaviour onExit = ExitBehaviour::Respawn;
     std::uint32_t seed = 1;
 };
 
+// How many units have left play so far, by how they left. Sampled from the
+// GPU without waiting for it, so a frame or two behind.
+struct UnitTally {
+    std::uint32_t kills = 0; // ran out of hit points
+    std::uint32_t leaks = 0; // despawned at an exit (ExitBehaviour::Despawn)
+};
+
 // Unit hit points. Units start at maxHp, are drawn from full colour at maxHp
-// down to black at 0, and lose exitDamage each time they reach an exit.
+// down to black at 0, and lose exitDamage each time they respawn at an exit.
 // Health is a float so damage can be fractional; maxHp is a whole number.
 struct HealthSettings {
     std::uint32_t maxHp = 30;
@@ -189,6 +203,9 @@ struct Explosion {
     // toward the edge by `falloff` like the push. A unit left with none is
     // despawned.
     float damage = 0.0f;
+    // Status effects it sets on every unit it reaches: an index into the
+    // status table (TurretEffects::statusTable), 1 + a turret's slot. 0: none.
+    std::uint32_t status = 0;
 };
 
 // Where a despawned unit is kept: far outside any level, so every GPU pass
@@ -201,8 +218,10 @@ inline bool isDeadUnit(glm::vec2 pos) {
 }
 
 // GPU shaders hold at most this many explosions at once; a new one replaces
-// the oldest.
-inline constexpr std::size_t kMaxExplosions = 8;
+// the oldest. High enough that turrets firing together should never reach it;
+// each unit only loops over the active ones, so the headroom costs nothing.
+// Matches MAX_EXPLOSIONS in unit_integrate.comp.hlsl.
+inline constexpr std::size_t kMaxExplosions = 256;
 
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
@@ -275,6 +294,18 @@ public:
         return false;
     }
 
+    // The latest kills and leaks sample. Cheap: never waits for the GPU.
+    // Returns false for systems that don't count them.
+    virtual bool tally(UnitTally& out) const {
+        (void)out;
+        return false;
+    }
+
+    // Units still to spawn, for systems that stream them in.
+    virtual std::uint32_t pendingSpawns() const {
+        return 0;
+    }
+
     // The collision settings actually in use. Null for systems that don't use
     // CollisionSettings.
     virtual const CollisionSettings* collisionSettings() const {
@@ -316,6 +347,19 @@ public:
     // the fling speed in one second.
     virtual void setFlingDrag(float perSecond) {
         (void)perSecond;
+    }
+
+    // Arms these turrets from the next step, replacing any before. Returns
+    // false for systems without turrets.
+    virtual bool setTurrets(const std::vector<logic::Turret>& turrets) {
+        (void)turrets;
+        return false;
+    }
+
+    // The turrets in play and their timers, for drawing. Null for systems
+    // without turrets.
+    virtual const TurretEffects* turretEffects() const {
+        return nullptr;
     }
 };
 

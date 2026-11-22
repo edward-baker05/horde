@@ -177,6 +177,24 @@ glm::ivec2 wallGridDimFor(glm::vec2 size);
 // now past the edge are dropped.
 void resizeWallGrid(WallGrid& grid, glm::vec2 size);
 
+// What ends a level's wave: spawning stops after a number of units, or after
+// a length of time.
+enum class WaveLength : std::uint8_t { UnitCount, Time };
+
+// How a level's wave spawns. Spawning stops at whichever `length` says, and
+// the wave ends once the last unit has died or leaked.
+struct WaveSettings {
+    WaveLength length = WaveLength::UnitCount;
+    std::uint32_t unitCount = 10000;
+    float duration = 60.0f;    // seconds
+    float spawnRate = 1000.0f; // units per second across all spawns; 0 is all at once
+};
+
+// How many units a wave with these settings spawns in all. A timed wave with
+// no spawn rate would bring everyone in at once, so it falls back to its
+// unit count.
+std::uint32_t waveUnitCount(const WaveSettings& wave);
+
 // A rectangular arena and everything placed in it.
 //
 // Bounds run from (0,0) to `size`. The background exactly fills those bounds;
@@ -189,6 +207,7 @@ struct Level {
     std::vector<Marker> markers; // always at least one spawn and one exit
     std::vector<FieldRegion> fieldRegions;
     WallGrid wallGrid; // sized to `size` by makeDefaultLevel and loadLevel
+    WaveSettings wave;
 };
 
 // Length of one edge of a level, in world units.

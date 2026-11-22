@@ -83,8 +83,19 @@ bool LevelScene::onEnter(Services& services) {
         config.fieldRegions.push_back(
             {region.center, region.halfExtents, logic::fieldRegionDirection(region), region.strength});
     }
-    config.flow.spawnRate = m_options.spawnRate;
-    config.flow.respawnAtExit = m_options.respawnAtExit;
+    // A wave comes from the level itself; a sandbox from the options.
+    const bool wave = m_options.mode == LevelMode::Wave;
+    m_phase = wave ? Phase::Prep : Phase::Running;
+    m_prep.init(m_level, *m_walls);
+    m_waveUnits = wave ? logic::waveUnitCount(m_level.wave) : 0;
+    const std::uint32_t unitCount = wave ? m_waveUnits : m_options.unitCount;
+    const sim::SpawnPattern spawn = wave ? sim::SpawnPattern::Markers : m_options.spawn;
+    config.flow.spawnRate = wave ? m_level.wave.spawnRate : m_options.spawnRate;
+    if (wave) {
+        config.flow.onExit = sim::ExitBehaviour::Despawn;
+    } else {
+        config.flow.onExit = m_options.respawnAtExit ? sim::ExitBehaviour::Respawn : sim::ExitBehaviour::Stop;
+    }
     config.health = m_options.health;
     config.flow.seed = m_options.seed;
     // Systems that don't steer to exits head for the first exit's centre, or
@@ -92,22 +103,22 @@ bool LevelScene::onEnter(Services& services) {
     config.movement.goal = (config.flow.exits.empty() ? m_level.size * 0.5f : config.flow.exits.front().center) -
                            glm::vec2(enemy_size * 0.5f);
 
-    if (m_options.spawn == sim::SpawnPattern::Markers) {
+    if (spawn == sim::SpawnPattern::Markers) {
         if (m_physics->supportsFlow()) {
             // Streamed in at the spawns as the level runs.
-            config.flow.toSpawn = m_options.unitCount;
+            config.flow.toSpawn = unitCount;
         } else {
             std::mt19937 rng(m_options.seed);
-            config.initialUnits = sim::spawnInAreas(m_options.unitCount, config.flow.spawns, m_level.size,
-                                                    enemy_size, rng, m_walls.get());
+            config.initialUnits =
+                sim::spawnInAreas(unitCount, config.flow.spawns, m_level.size, enemy_size, rng, m_walls.get());
         }
     } else {
-        config.initialUnits = sim::spawnUnits(m_options.spawn, m_options.unitCount, m_level.size, enemy_size,
-                                              m_options.seed, m_walls.get());
+        config.initialUnits =
+            sim::spawnUnits(spawn, unitCount, m_level.size, enemy_size, m_options.seed, m_walls.get());
     }
 
     SDL_Log("LevelScene: %u units, physics '%s', spawn '%s' (%zu spawns, %zu exits), %zu walls (%zu primitives)",
-            m_options.unitCount, m_options.physics.c_str(), sim::spawnPatternName(m_options.spawn),
+            unitCount, m_options.physics.c_str(), sim::spawnPatternName(spawn),
             config.flow.spawns.size(), config.flow.exits.size(), m_level.walls.size(), m_walls->primitives().size());
 
     if (!m_physics->init(services, config)) {
@@ -125,6 +136,9 @@ void LevelScene::onExit() {
 }
 
 bool LevelScene::handleEvent(const SDL_Event& event) {
+    if (m_phase == Phase::Prep && m_prep.handleEvent(event, m_camera)) {
+        return true;
+    }
     // Right-click: the camera pans with the left and middle buttons.
     if (m_explosionArmed && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT) {
         sim::Explosion explosion = m_explosion;
@@ -135,8 +149,20 @@ bool LevelScene::handleEvent(const SDL_Event& event) {
 }
 
 void LevelScene::update(float dt) {
-    // Rate 0: one step per frame, as long as the frame took.
-    if (m_options.physicsRate <= 0.0f) {
+    // The wave is over once nothing is left to spawn and everyone spawned has
+    // died or leaked. The tally runs a frame or two behind, so this does too.
+    sim::UnitTally tally;
+    if (m_phase == Phase::Running && m_options.mode == LevelMode::Wave && m_physics->tally(tally) &&
+        m_physics->pendingSpawns() == 0 && tally.kills + tally.leaks >= m_physics->unitCount()) {
+        m_phase = Phase::Over;
+    }
+
+    // Nothing moves before the wave starts, or after it ends.
+    if (m_phase != Phase::Running) {
+        m_stepsThisFrame = 0;
+        m_stepAccumulator = 0.0f;
+    } else if (m_options.physicsRate <= 0.0f) {
+        // Rate 0: one step per frame, as long as the frame took.
         m_stepsThisFrame = 1;
         m_stepAccumulator = 0.0f;
         m_physics->update(dt);
@@ -163,6 +189,13 @@ void LevelScene::compute(SDL_GPUCommandBuffer* commands) {
 void LevelScene::render(gfx::SpriteBatch& batch) {
     // Render world geometry through SpriteBatch
     gfx::renderLevel(m_level, batch, m_services->atlas->handle(), m_showFieldRegions, &m_gridPieces);
+    // In prep, the turrets being placed; after it, the wave's own.
+    const sim::TurretEffects* effects = m_physics->turretEffects();
+    if (m_phase == Phase::Prep || effects == nullptr) {
+        m_prep.render(batch, m_services->atlas->handle());
+    } else {
+        renderWaveTurrets(batch, m_services->atlas->handle(), *effects);
+    }
 
     // Explosions: red pushes, blue pulls. Units are drawn over these.
     const auto explosionColor = [](float strength, float alpha) {
@@ -191,7 +224,54 @@ void LevelScene::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURenderPass* p
     m_physics->renderPass(commands, pass, m_camera.viewProjection(), alpha);
 }
 
+void LevelScene::waveUi() {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + 16.0f),
+                            ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::Begin("Wave", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+
+    sim::UnitTally tally;
+    m_physics->tally(tally);
+    switch (m_phase) {
+        case Phase::Prep:
+            ImGui::TextUnformatted("Prep phase");
+            if (m_level.wave.length == logic::WaveLength::Time && m_level.wave.spawnRate > 0.0f) {
+                ImGui::TextDisabled("Wave: %.0f s at %.0f units/s", m_level.wave.duration, m_level.wave.spawnRate);
+            } else {
+                ImGui::TextDisabled("Wave: %u units", m_waveUnits);
+            }
+            if (ImGui::Button("Start wave", ImVec2(160.0f, 0.0f))) {
+                m_prep.finish();
+                m_physics->setTurrets(m_prep.turrets());
+                m_phase = Phase::Running;
+            }
+            m_prep.ui();
+            break;
+        case Phase::Running: {
+            const std::uint32_t spawned = m_physics->unitCount();
+            const std::uint32_t gone = std::min(tally.kills + tally.leaks, spawned);
+            ImGui::Text("Spawned %u / %u", spawned, m_waveUnits);
+            ImGui::Text("Alive %u   Killed %u   Leaked %u", spawned - gone, tally.kills, tally.leaks);
+            break;
+        }
+        case Phase::Over:
+            ImGui::TextUnformatted("Wave over");
+            ImGui::Text("Killed %u   Leaked %u", tally.kills, tally.leaks);
+            if (ImGui::Button("Play again", ImVec2(160.0f, 0.0f))) {
+                m_services->scenes->replace(std::make_unique<LevelScene>(m_options));
+                ImGui::End();
+                return;
+            }
+            break;
+    }
+    ImGui::End();
+}
+
 void LevelScene::debugUi() {
+    if (m_options.mode == LevelMode::Wave) {
+        waveUi();
+    }
+
     ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Level");
 
@@ -251,6 +331,19 @@ void LevelScene::debugUi() {
             }
         }
         ImGui::EndCombo();
+    }
+
+    int mode = m_pendingOptions.mode == LevelMode::Wave ? 1 : 0;
+    ImGui::TextUnformatted("Mode");
+    ImGui::SameLine();
+    const bool toSandbox = ImGui::RadioButton("Sandbox", &mode, 0);
+    ImGui::SameLine();
+    const bool toWave = ImGui::RadioButton("Wave", &mode, 1);
+    if (toSandbox || toWave) {
+        m_pendingOptions.mode = mode == 1 ? LevelMode::Wave : LevelMode::Sandbox;
+    }
+    if (m_pendingOptions.mode == LevelMode::Wave) {
+        ImGui::TextDisabled("Units and spawn rate come from the level's wave");
     }
 
     int units = static_cast<int>(m_pendingOptions.unitCount);

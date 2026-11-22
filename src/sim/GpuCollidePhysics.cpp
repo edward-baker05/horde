@@ -36,7 +36,7 @@ struct alignas(16) GPUIntegrateUniforms {
     float flingMaxSpeed;
     Uint32 explosionPadding;
     // Two per explosion: (centre, radius, this step's push at the centre),
-    // then (falloff, fling 0 or 1, unused x2).
+    // then (falloff, fling 0 or 1, this step's damage, status table index).
     glm::vec4 explosions[kMaxExplosions * 2];
     float time; // seconds of simulation
     float wobbleAngle;
@@ -47,9 +47,15 @@ struct alignas(16) GPUIntegrateUniforms {
     float congestionStart;
     float congestionStop;
     Uint32 congestionPadding[3];
+    Uint32 turretCount;
+    Uint32 turretPadding[3];
+    // Two per turret effect, as TurretEffects::step writes them.
+    glm::vec4 turrets[logic::kMaxTurrets * 2];
 };
-static_assert(sizeof(GPUIntegrateUniforms) ==
-              32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 + 32 * kMaxExplosions + 48);
+static_assert(sizeof(GPUIntegrateUniforms) == 32 + 16 * kMaxFlowMarkers + 16 + 32 * kMaxFieldRegions + 16 +
+                                                  32 * kMaxExplosions + 48 + 16 + 32 * logic::kMaxTurrets);
+// SDL_GPU's uniform buffers hold 32 KiB per slot.
+static_assert(sizeof(GPUIntegrateUniforms) <= 32768);
 
 // Matches cbuffer FinalizeParams in unit_finalize.comp.hlsl
 struct alignas(16) GPUFinalizeUniforms {
@@ -65,13 +71,72 @@ struct alignas(16) GPUFinalizeUniforms {
     Uint32 exitCount;
     Uint32 spawnCount;
     Uint32 frame;
-    Uint32 respawnOnExit;
+    Uint32 exitMode; // ExitBehaviour
     float exitDamage;
     Uint32 healthPadding[3];
     glm::vec4 exits[kMaxFlowMarkers];
     glm::vec4 spawns[kMaxFlowMarkers];
+    // Per turret slot: TurretEffects::packContacts.
+    glm::vec4 blockerContacts[logic::kMaxTurrets];
 };
-static_assert(sizeof(GPUFinalizeUniforms) == 80 + 32 * kMaxFlowMarkers);
+static_assert(sizeof(GPUFinalizeUniforms) == 80 + 32 * kMaxFlowMarkers + 16 * logic::kMaxTurrets);
+
+// Matches cbuffer AimParams in turret_aim.comp.hlsl
+struct alignas(16) GPUAimUniforms {
+    glm::uvec2 gridDim;
+    float cellSize;
+    Uint32 requestCount;
+    glm::vec4 requests[logic::kMaxTurrets];    // centre, range, unused
+    glm::uvec4 requestIds[logic::kMaxTurrets]; // slot, shot ID, unused x2
+};
+static_assert(sizeof(GPUAimUniforms) == 16 + 32 * logic::kMaxTurrets);
+
+// Matches cbuffer FireParams in turret_fire.comp.hlsl
+struct alignas(16) GPUFireUniforms {
+    glm::uvec2 gridDim;
+    float cellSize;
+    Uint32 shotCount;
+    float unitRadius;
+    float bulletRadius;
+    float spread;
+    Uint32 seed;
+    glm::vec4 shotAim[logic::kMaxTurrets];  // centre, range, speed
+    glm::vec4 shotHit[logic::kMaxTurrets];  // damage, life, unused x2
+    glm::uvec4 shotIds[logic::kMaxTurrets]; // pool slot, pierce, status, unused
+};
+static_assert(sizeof(GPUFireUniforms) == 32 + 48 * logic::kMaxTurrets);
+
+// Matches cbuffer BulletStepParams in bullet_step.comp.hlsl
+struct alignas(16) GPUBulletStepUniforms {
+    float dt;
+    Uint32 bulletCount;
+    float unitRadius;
+    float cellSize;
+    glm::uvec2 gridDim;
+    glm::vec2 worldSize;
+    glm::uvec2 wallBinDim;
+    float wallBinSize;
+    Uint32 wallCount;
+};
+static_assert(sizeof(GPUBulletStepUniforms) == 48);
+
+// Matches BulletParams in bullets.hlsli
+struct GPUBulletParams {
+    float damage;
+    float life;
+    Uint32 pierce;
+    Uint32 status;
+    Uint32 lastHit;
+    float radius;
+    Uint32 clear;
+    Uint32 padding;
+};
+static_assert(sizeof(GPUBulletParams) == 32);
+
+// Bullets are drawn and hit as discs this wide, in world units.
+constexpr float kBulletSize = 2.0f;
+// Radians either side of where a gun aims that its bullets may stray.
+constexpr float kBulletSpread = 0.03f;
 
 // Packs up to kMaxFlowMarkers areas as (centre, half size).
 Uint32 packAreas(const std::vector<MarkerArea>& areas, glm::vec4* out) {
@@ -134,6 +199,7 @@ GpuCollidePhysics::~GpuCollidePhysics() {
 bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config) {
     m_device = services.gpu->device();
     m_config = config;
+    m_baseWalls = config.walls;
     m_unitCount = static_cast<std::uint32_t>(config.initialUnits.size());
     m_capacity = m_unitCount + config.flow.toSpawn;
     m_config.initialUnits.clear(); // only needed for the upload below
@@ -147,13 +213,21 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         SDL_Log("GpuCollidePhysics: only the first %zu field regions are used", kMaxFieldRegions);
     }
 
-    // unit_integrate.comp: 1 ro buffer (IDs), 4 rw buffers (units, previous positions, fling, health), 1 uniform
-    // buffer
-    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 2, 0, 4, 1, 256, 1, 1);
-    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 3 rw buffers (units, health, fling),
-    // 1 uniform buffer
-    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 3, 1, 256, 1, 1);
-    if (!m_integratePipeline || !m_finalizePipeline) {
+    // unit_integrate.comp: 3 ro buffers (IDs, cell ranges, status table), 6 rw buffers (units, previous positions,
+    // fling, health, feedback, status), 1 uniform buffer
+    m_integratePipeline = services.shaders->loadCompute("unit_integrate.comp", 0, 0, 3, 0, 6, 1, 256, 1, 1);
+    // unit_finalize.comp: 4 ro buffers (previous positions, 3 wall buffers), 5 rw buffers (units, health, fling,
+    // feedback, pending damage), 1 uniform buffer
+    m_finalizePipeline = services.shaders->loadCompute("unit_finalize.comp", 0, 0, 4, 0, 5, 1, 256, 1, 1);
+    // turret_aim.comp: 1 ro buffer (cell ranges), 1 rw buffer (feedback), 1 uniform buffer
+    m_aimPipeline = services.shaders->loadCompute("turret_aim.comp", 0, 0, 1, 0, 1, 1, 256, 1, 1);
+    // turret_fire.comp: 3 ro buffers (cell ranges, sorted keys, units), 3 rw buffers (bullets, bullet previous
+    // positions, bullet params), 1 uniform buffer
+    m_firePipeline = services.shaders->loadCompute("turret_fire.comp", 0, 0, 3, 0, 3, 1, 64, 1, 1);
+    // bullet_step.comp: 8 ro buffers (3 wall buffers, cell ranges, sorted keys, units, IDs, status table), 5 rw
+    // buffers (bullets, bullet previous positions, bullet params, pending damage, status), 1 uniform buffer
+    m_bulletPipeline = services.shaders->loadCompute("bullet_step.comp", 0, 0, 8, 0, 5, 1, 256, 1, 1);
+    if (!m_integratePipeline || !m_finalizePipeline || !m_aimPipeline || !m_firePipeline || !m_bulletPipeline) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to load pipelines");
         return false;
     }
@@ -192,6 +266,34 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
     SDL_GPUBufferCreateInfo idsInfo = healthInfo;
     m_ids = SDL_CreateGPUBuffer(m_device, &idsInfo);
 
+    // Read by unit.vert too, for the tints.
+    SDL_GPUBufferCreateInfo statusInfo{};
+    statusInfo.usage = usage;
+    statusInfo.size = static_cast<Uint32>(sizeof(StatusEffect) * std::max<std::uint32_t>(m_capacity, 1));
+    m_status = SDL_CreateGPUBuffer(m_device, &statusInfo);
+    SDL_GPUBufferCreateInfo pendingInfo{};
+    pendingInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    pendingInfo.size = static_cast<Uint32>(sizeof(std::uint32_t) * std::max<std::uint32_t>(m_capacity, 1));
+    m_pendingDamage = SDL_CreateGPUBuffer(m_device, &pendingInfo);
+
+    // Bullets are drawn too.
+    m_bullets = createUnitBuffer(m_device, kMaxBullets, usage);
+    SDL_GPUBufferCreateInfo bulletPrevInfo{};
+    bulletPrevInfo.usage = usage;
+    bulletPrevInfo.size = static_cast<Uint32>(sizeof(glm::vec2) * kMaxBullets);
+    m_bulletPrev = SDL_CreateGPUBuffer(m_device, &bulletPrevInfo);
+    SDL_GPUBufferCreateInfo bulletParamsInfo{};
+    bulletParamsInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    bulletParamsInfo.size = static_cast<Uint32>(sizeof(GPUBulletParams) * kMaxBullets);
+    m_bulletParams = SDL_CreateGPUBuffer(m_device, &bulletParamsInfo);
+    m_nextBullet = 0;
+    m_bulletExpiry.assign(kMaxBullets, 0.0f);
+
+    SDL_GPUBufferCreateInfo statusTableInfo{};
+    statusTableInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ;
+    statusTableInfo.size = static_cast<Uint32>(sizeof(StatusEffect) * kStatusTableSize);
+    m_statusTable = SDL_CreateGPUBuffer(m_device, &statusTableInfo);
+
     bool spares = true;
     if (collision.reorderUnits) {
         m_prevSpare = SDL_CreateGPUBuffer(m_device, &prevInfo);
@@ -199,10 +301,23 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
         m_flingSpare = SDL_CreateGPUBuffer(m_device, &flingInfo);
         m_idsSpare = SDL_CreateGPUBuffer(m_device, &idsInfo);
         m_slots = SDL_CreateGPUBuffer(m_device, &idsInfo);
-        spares = m_prevSpare && m_healthSpare && m_flingSpare && m_idsSpare && m_slots;
+        m_statusSpare = SDL_CreateGPUBuffer(m_device, &statusInfo);
+        spares = m_prevSpare && m_healthSpare && m_flingSpare && m_idsSpare && m_slots && m_statusSpare;
     }
 
-    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling || !m_ids || !spares) {
+    SDL_GPUBufferCreateInfo feedbackInfo{};
+    feedbackInfo.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE;
+    feedbackInfo.size = sizeof(std::uint32_t) * kFeedbackWords;
+    m_feedback = SDL_CreateGPUBuffer(m_device, &feedbackInfo);
+    SDL_GPUTransferBufferCreateInfo feedbackTransferInfo{};
+    feedbackTransferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    feedbackTransferInfo.size = feedbackInfo.size;
+    m_feedbackTransfer = SDL_CreateGPUTransferBuffer(m_device, &feedbackTransferInfo);
+    m_tally = {};
+
+    if (!m_units[0] || !m_units[1] || !m_prevPositions || !m_health || !m_fling || !m_ids || !spares ||
+        !m_feedback || !m_feedbackTransfer || !m_status || !m_statusTable || !m_pendingDamage || !m_bullets ||
+        !m_bulletPrev || !m_bulletParams) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to create buffers: %s",
                      SDL_GetError());
         return false;
@@ -246,6 +361,40 @@ bool GpuCollidePhysics::init(scene::Services& services, const SimConfig& config)
             return false;
         }
     }
+    const std::vector<std::uint32_t> noFeedback(kFeedbackWords, 0u);
+    if (!uploadBytesNow(m_device, noFeedback.data(), sizeof(std::uint32_t) * kFeedbackWords, m_feedback)) {
+        return false;
+    }
+    // No unit is under any effect, and no source applies one until turrets are set.
+    const std::vector<StatusEffect> noStatus(std::max<std::uint32_t>(m_capacity, 1));
+    const auto statusSize = static_cast<std::uint32_t>(sizeof(StatusEffect) * noStatus.size());
+    for (SDL_GPUBuffer* buffer : {m_status, m_statusSpare}) {
+        if (buffer && !uploadBytesNow(m_device, noStatus.data(), statusSize, buffer)) {
+            return false;
+        }
+    }
+    const std::vector<std::uint32_t> noDamage(std::max<std::uint32_t>(m_capacity, 1), 0u);
+    if (!uploadBytesNow(m_device, noDamage.data(), static_cast<std::uint32_t>(sizeof(std::uint32_t) * noDamage.size()),
+                        m_pendingDamage)) {
+        return false;
+    }
+    // Every bullet starts spent.
+    const std::vector<BaseUnitData> noBullets(kMaxBullets, BaseUnitData{glm::vec2(kDeadPosition), glm::vec2(0.0f)});
+    const std::vector<glm::vec2> noBulletPrev(kMaxBullets, glm::vec2(kDeadPosition));
+    const std::vector<GPUBulletParams> noBulletParams(kMaxBullets, GPUBulletParams{});
+    if (!uploadBytesNow(m_device, noBullets.data(), static_cast<std::uint32_t>(sizeof(BaseUnitData) * kMaxBullets),
+                        m_bullets) ||
+        !uploadBytesNow(m_device, noBulletPrev.data(), static_cast<std::uint32_t>(sizeof(glm::vec2) * kMaxBullets),
+                        m_bulletPrev) ||
+        !uploadBytesNow(m_device, noBulletParams.data(),
+                        static_cast<std::uint32_t>(sizeof(GPUBulletParams) * kMaxBullets), m_bulletParams)) {
+        return false;
+    }
+    const std::vector<StatusEffect> noTable(kStatusTableSize);
+    if (!uploadBytesNow(m_device, noTable.data(), static_cast<std::uint32_t>(sizeof(StatusEffect) * kStatusTableSize),
+                        m_statusTable)) {
+        return false;
+    }
     return uploadUnitsNow(m_device, config.initialUnits.data(), m_unitCount, m_units, 1) &&
            uploadBytesNow(m_device, health.data(), static_cast<std::uint32_t>(sizeof(float) * health.size()), m_health);
 }
@@ -261,7 +410,8 @@ void GpuCollidePhysics::shutdown() {
         return;
     }
 
-    SDL_GPUComputePipeline** pipelines[] = {&m_integratePipeline, &m_finalizePipeline};
+    SDL_GPUComputePipeline** pipelines[] = {&m_integratePipeline, &m_finalizePipeline, &m_aimPipeline,
+                                            &m_firePipeline, &m_bulletPipeline};
     for (SDL_GPUComputePipeline** pipeline : pipelines) {
         if (*pipeline) {
             SDL_ReleaseGPUComputePipeline(m_device, *pipeline);
@@ -269,7 +419,13 @@ void GpuCollidePhysics::shutdown() {
         }
     }
 
-    for (SDL_GPUTransferBuffer** transfer : {&m_spawnTransfer, &m_spawnHealthTransfer}) {
+    if (m_feedbackFence) {
+        SDL_WaitForGPUFences(m_device, true, &m_feedbackFence, 1);
+        SDL_ReleaseGPUFence(m_device, m_feedbackFence);
+        m_feedbackFence = nullptr;
+    }
+
+    for (SDL_GPUTransferBuffer** transfer : {&m_spawnTransfer, &m_spawnHealthTransfer, &m_feedbackTransfer}) {
         if (*transfer) {
             SDL_ReleaseGPUTransferBuffer(m_device, *transfer);
             *transfer = nullptr;
@@ -278,7 +434,9 @@ void GpuCollidePhysics::shutdown() {
 
     SDL_GPUBuffer** buffers[] = {&m_units[0], &m_units[1],   &m_prevPositions, &m_health,
                                  &m_fling,    &m_ids,        &m_prevSpare,     &m_healthSpare,
-                                 &m_flingSpare, &m_idsSpare, &m_slots};
+                                 &m_flingSpare, &m_idsSpare, &m_slots,       &m_feedback,
+                                 &m_status,     &m_statusSpare, &m_statusTable, &m_pendingDamage,
+                                 &m_bullets,    &m_bulletPrev,  &m_bulletParams};
     for (SDL_GPUBuffer** buffer : buffers) {
         if (*buffer) {
             SDL_ReleaseGPUBuffer(m_device, *buffer);
@@ -372,9 +530,173 @@ void GpuCollidePhysics::spawnPending(SDL_GPUCommandBuffer* commands) {
     m_unitCount += count;
 }
 
+// The download goes on a command buffer submitted now, ahead of the frame's
+// own, so it reads the feedback as of the last frame: fine for a HUD, and
+// turrets allow for it.
+void GpuCollidePhysics::sampleFeedback() {
+    if (m_feedbackFence) {
+        if (!SDL_QueryGPUFence(m_device, m_feedbackFence)) {
+            return;
+        }
+        SDL_ReleaseGPUFence(m_device, m_feedbackFence);
+        m_feedbackFence = nullptr;
+        if (const auto* words =
+                static_cast<const std::uint32_t*>(SDL_MapGPUTransferBuffer(m_device, m_feedbackTransfer, false))) {
+            m_tally.kills = words[0];
+            m_tally.leaks = words[1];
+            m_turrets.readFeedback(words + kFeedbackHeader, m_grid.cellSize(), m_grid.gridDim());
+            SDL_UnmapGPUTransferBuffer(m_device, m_feedbackTransfer);
+        }
+    }
+
+    SDL_GPUCommandBuffer* commands = SDL_AcquireGPUCommandBuffer(m_device);
+    if (commands == nullptr) {
+        return;
+    }
+    if (SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(commands)) {
+        SDL_GPUBufferRegion src{};
+        src.buffer = m_feedback;
+        src.size = sizeof(std::uint32_t) * kFeedbackWords;
+        SDL_GPUTransferBufferLocation dst{};
+        dst.transfer_buffer = m_feedbackTransfer;
+        SDL_DownloadFromGPUBuffer(copy, &src, &dst);
+        SDL_EndGPUCopyPass(copy);
+    }
+    m_feedbackFence = SDL_SubmitGPUCommandBufferAndAcquireFence(commands);
+}
+
+bool GpuCollidePhysics::setTurrets(const std::vector<logic::Turret>& turrets) {
+    m_turrets.set(turrets);
+    rebuildWalls();
+    const std::vector<StatusEffect> table = m_turrets.statusTable();
+    if (!uploadBytesNow(m_device, table.data(), static_cast<std::uint32_t>(sizeof(StatusEffect) * table.size()),
+                        m_statusTable)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to upload the status table");
+    }
+    return true;
+}
+
+// Blockers are walls while they stand: the level's own walls plus a box per
+// blocker, binned afresh, so every pass that keeps units out of walls keeps
+// them out of blockers too. Only when blockers change, which is rarely.
+void GpuCollidePhysics::rebuildWalls() {
+    const std::vector<WallPrimitive> blockers = m_turrets.blockerWalls();
+    if (blockers.empty() && m_config.walls == m_baseWalls) {
+        return;
+    }
+    const WallColliders base = m_baseWalls ? *m_baseWalls : WallColliders{};
+    m_config.walls = blockers.empty() ? m_baseWalls : std::make_shared<const WallColliders>(base.withExtra(blockers));
+    m_walls.shutdown();
+    if (!m_walls.init(m_device, m_config.walls.get())) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GpuCollidePhysics: failed to rebuild walls for blockers");
+    }
+}
+
+void GpuCollidePhysics::aimMortars(SDL_GPUCommandBuffer* commands, const std::vector<AimRequest>& aims) {
+    if (aims.empty()) {
+        return;
+    }
+    GPUAimUniforms uniforms{};
+    uniforms.gridDim = m_grid.gridDim();
+    uniforms.cellSize = m_grid.cellSize();
+    uniforms.requestCount = static_cast<Uint32>(std::min(aims.size(), logic::kMaxTurrets));
+    for (Uint32 i = 0; i < uniforms.requestCount; ++i) {
+        uniforms.requests[i] = glm::vec4(aims[i].center, aims[i].range, 0.0f);
+        uniforms.requestIds[i] = glm::uvec4(aims[i].slot, aims[i].shotId, 0u, 0u);
+    }
+    SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
+
+    SDL_GPUStorageBufferReadWriteBinding binding{};
+    binding.buffer = m_feedback;
+    if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, &binding, 1)) {
+        SDL_BindGPUComputePipeline(pass, m_aimPipeline);
+        SDL_GPUBuffer* ranges = m_grid.gridB();
+        SDL_BindGPUComputeStorageBuffers(pass, 0, &ranges, 1);
+        SDL_DispatchGPUCompute(pass, uniforms.requestCount, 1, 1);
+        SDL_EndGPUComputePass(pass);
+    }
+}
+
+void GpuCollidePhysics::fireGuns(SDL_GPUCommandBuffer* commands, const std::vector<FireRequest>& fires) {
+    if (fires.empty()) {
+        return;
+    }
+    const float now = static_cast<float>(m_frame) * m_dt;
+    GPUFireUniforms uniforms{};
+    uniforms.gridDim = m_grid.gridDim();
+    uniforms.cellSize = m_grid.cellSize();
+    uniforms.shotCount = static_cast<Uint32>(std::min(fires.size(), logic::kMaxTurrets));
+    uniforms.unitRadius = m_config.unitSize * 0.5f;
+    uniforms.bulletRadius = kBulletSize * 0.5f;
+    uniforms.spread = kBulletSpread;
+    uniforms.seed = m_frame;
+    for (Uint32 i = 0; i < uniforms.shotCount; ++i) {
+        const FireRequest& shot = fires[i];
+        const std::uint32_t slot = m_nextBullet;
+        m_nextBullet = (m_nextBullet + 1) % kMaxBullets;
+        m_bulletExpiry[slot] = now + shot.life;
+        uniforms.shotAim[i] = glm::vec4(shot.center, shot.range, shot.speed);
+        uniforms.shotHit[i] = glm::vec4(shot.damage, shot.life, 0.0f, 0.0f);
+        uniforms.shotIds[i] = glm::uvec4(slot, shot.pierce, shot.status, 0u);
+    }
+    SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
+
+    SDL_GPUStorageBufferReadWriteBinding bindings[3]{};
+    bindings[0].buffer = m_bullets;
+    bindings[1].buffer = m_bulletPrev;
+    bindings[2].buffer = m_bulletParams;
+    if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 3)) {
+        SDL_BindGPUComputePipeline(pass, m_firePipeline);
+        SDL_GPUBuffer* readOnly[3] = {m_grid.gridB(), m_grid.gridA(), m_units[m_current]};
+        SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 3);
+        SDL_DispatchGPUCompute(pass, 1, 1, 1);
+        SDL_EndGPUComputePass(pass);
+    }
+}
+
+void GpuCollidePhysics::stepBullets(SDL_GPUCommandBuffer* commands) {
+    // Nothing to move if no bullet could still be flying.
+    const float since = static_cast<float>(m_frame - 1) * m_dt;
+    if (std::none_of(m_bulletExpiry.begin(), m_bulletExpiry.end(), [since](float t) { return t > since; })) {
+        return;
+    }
+    GPUBulletStepUniforms uniforms{};
+    uniforms.dt = m_dt;
+    uniforms.bulletCount = kMaxBullets;
+    uniforms.unitRadius = m_config.unitSize * 0.5f;
+    uniforms.cellSize = m_grid.cellSize();
+    uniforms.gridDim = m_grid.gridDim();
+    uniforms.worldSize = m_config.worldSize;
+    uniforms.wallBinDim = m_walls.binDim();
+    uniforms.wallBinSize = m_walls.binSize();
+    uniforms.wallCount = m_walls.primitiveCount();
+    SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
+
+    SDL_GPUStorageBufferReadWriteBinding bindings[5]{};
+    bindings[0].buffer = m_bullets;
+    bindings[1].buffer = m_bulletPrev;
+    bindings[2].buffer = m_bulletParams;
+    bindings[3].buffer = m_pendingDamage;
+    bindings[4].buffer = m_status;
+    if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 5)) {
+        SDL_BindGPUComputePipeline(pass, m_bulletPipeline);
+        SDL_GPUBuffer* readOnly[8] = {m_walls.buffers()[0], m_walls.buffers()[1], m_walls.buffers()[2],
+                                      m_grid.gridB(),       m_grid.gridA(),       m_units[m_current],
+                                      m_ids,                m_statusTable};
+        SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 8);
+        SDL_DispatchGPUCompute(pass, groups(kMaxBullets), 1, 1);
+        SDL_EndGPUComputePass(pass);
+    }
+}
+
 void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
     if (!m_finalizePipeline || m_dt <= 0.0f) {
         return;
+    }
+
+    sampleFeedback();
+    if (m_turrets.takeBlockersChanged()) {
+        rebuildWalls();
     }
 
     // 0. Bring in whoever is due.
@@ -387,6 +709,11 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
     const glm::vec2 worldMax = glm::max(m_config.worldSize - glm::vec2(m_config.unitSize), glm::vec2(0.0f));
     const float radius = m_config.unitSize * 0.5f;
 
+    // Mortars wanting a target this step: aimed once the grid is built. Guns
+    // firing: aimed once units are in grid order.
+    std::vector<AimRequest> aims;
+    std::vector<FireRequest> fires;
+
     // 1. Steer and predict.
     {
         GPUIntegrateUniforms uniforms{};
@@ -398,6 +725,12 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.radius = radius;
         uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
         uniforms.fieldCount = packFields(m_config.fieldRegions, uniforms.fields);
+        // Turrets first: their bursts join this step's explosions.
+        std::vector<Explosion> blasts;
+        uniforms.turretCount = m_turrets.step(m_dt, uniforms.turrets, blasts, aims, fires);
+        for (const Explosion& blast : blasts) {
+            addExplosion(blast);
+        }
         uniforms.explosionCount = static_cast<Uint32>(m_explosions.size());
         for (std::size_t i = 0; i < m_explosions.size(); ++i) {
             ActiveExplosion& active = m_explosions[i];
@@ -407,8 +740,8 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
             uniforms.explosions[i * 2] = glm::vec4(e.center, e.radius, e.strength * share);
             // Damage is given out in the same shares as the push, so it all
             // lands over the blast's duration.
-            uniforms.explosions[i * 2 + 1] =
-                glm::vec4(static_cast<float>(e.falloff), e.fling ? 1.0f : 0.0f, e.damage * share, 0.0f);
+            uniforms.explosions[i * 2 + 1] = glm::vec4(static_cast<float>(e.falloff), e.fling ? 1.0f : 0.0f,
+                                                       e.damage * share, static_cast<float>(e.status));
         }
         uniforms.flingDrag = m_flingDrag;
         // The same limit as a shove's, per step.
@@ -425,16 +758,18 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         std::erase_if(m_explosions, [](const ActiveExplosion& active) { return active.left <= 1e-5f; });
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding bindings[4]{};
+        SDL_GPUStorageBufferReadWriteBinding bindings[6]{};
         bindings[0].buffer = m_units[m_current];
         bindings[1].buffer = m_prevPositions;
         bindings[2].buffer = m_fling;
         bindings[3].buffer = m_health;
+        bindings[4].buffer = m_feedback;
+        bindings[5].buffer = m_status;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 4)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 6)) {
             SDL_BindGPUComputePipeline(pass, m_integratePipeline);
-            SDL_GPUBuffer* readOnly[2] = {m_ids, m_grid.gridB()};
-            SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 2);
+            SDL_GPUBuffer* readOnly[3] = {m_ids, m_grid.gridB(), m_statusTable};
+            SDL_BindGPUComputeStorageBuffers(pass, 0, readOnly, 3);
             SDL_DispatchGPUCompute(pass, groups(m_unitCount), 1, 1);
             SDL_EndGPUComputePass(pass);
         }
@@ -443,6 +778,7 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
     // 2. Broadphase over the predicted positions.
     m_grid.build(commands, m_units[m_current], m_unitCount);
     m_gridBuilt = true;
+    aimMortars(commands, aims);
 
     // Units into grid order, every per-unit buffer alike. Previous positions
     // too, so drawing still blends each unit from where it was.
@@ -453,10 +789,15 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
             {&m_health, &m_healthSpare, sizeof(float)},
             {&m_fling, &m_flingSpare, sizeof(glm::vec2)},
             {&m_ids, &m_idsSpare, sizeof(std::uint32_t)},
+            {&m_status, &m_statusSpare, sizeof(StatusEffect)},
         };
         m_reorder.reorder(commands, m_grid, m_unitCount, streams);
         m_reorder.writeSlots(commands, m_ids, m_slots, m_unitCount);
     }
+
+    // Bullets, against units where they now are.
+    fireGuns(commands, fires);
+    stepBullets(commands);
 
     // 3. Separate overlapping units.
     m_current = m_collisions.resolve(commands, m_units, m_current, m_unitCount, m_grid, m_walls);
@@ -476,16 +817,19 @@ void GpuCollidePhysics::compute(SDL_GPUCommandBuffer* commands) {
         uniforms.exitCount = packAreas(m_config.flow.exits, uniforms.exits);
         uniforms.spawnCount = packAreas(m_config.flow.spawns, uniforms.spawns);
         uniforms.frame = m_frame;
-        uniforms.respawnOnExit = m_config.flow.respawnAtExit ? 1u : 0u;
+        uniforms.exitMode = static_cast<Uint32>(m_config.flow.onExit);
         uniforms.exitDamage = m_config.health.exitDamage;
+        m_turrets.packContacts(m_dt, uniforms.blockerContacts);
         SDL_PushGPUComputeUniformData(commands, 0, &uniforms, sizeof(uniforms));
 
-        SDL_GPUStorageBufferReadWriteBinding bindings[3]{};
+        SDL_GPUStorageBufferReadWriteBinding bindings[5]{};
         bindings[0].buffer = m_units[m_current];
         bindings[1].buffer = m_health;
         bindings[2].buffer = m_fling;
+        bindings[3].buffer = m_feedback;
+        bindings[4].buffer = m_pendingDamage;
 
-        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 3)) {
+        if (SDL_GPUComputePass* pass = SDL_BeginGPUComputePass(commands, nullptr, 0, bindings, 5)) {
             SDL_BindGPUComputePipeline(pass, m_finalizePipeline);
             SDL_GPUBuffer* readOnly[4] = {m_prevPositions, m_walls.buffers()[0], m_walls.buffers()[1],
                                           m_walls.buffers()[2]};
@@ -522,7 +866,20 @@ void GpuCollidePhysics::renderPass(SDL_GPUCommandBuffer* commands, SDL_GPURender
     options.minTurnSpeed = 0.05f * m_config.movement.maxSpeed;
     options.integerScale = m_sprites.integerScale;
     options.seed = m_config.flow.seed;
+    options.status = m_status;
+    options.time = static_cast<float>(m_frame) * m_dt;
     m_renderer.draw(commands, pass, m_units[m_current], m_unitCount, viewProjection, m_config.unitSize, options);
+
+    // Bullets on top, blended between steps like units. A fresh bullet's
+    // previous position is where it was fired from, so it never jumps.
+    gfx::UnitRenderer::DrawOptions bulletOptions;
+    bulletOptions.previous = m_frame > 0 ? m_bulletPrev : nullptr;
+    bulletOptions.alpha = alpha;
+    bulletOptions.maxJump = 1.0e6f;
+    bulletOptions.color = glm::vec4(1.0f, 0.92f, 0.35f, 1.0f);
+    bulletOptions.markFirst = false;
+    bulletOptions.sprites = false; // plain discs, not crowd sprites
+    m_renderer.draw(commands, pass, m_bullets, kMaxBullets, viewProjection, kBulletSize, bulletOptions);
 }
 
 void GpuCollidePhysics::debugUi() {
@@ -532,6 +889,11 @@ void GpuCollidePhysics::debugUi() {
         m_config.movement.wobbleAngle = glm::radians(wobbleDegrees);
     }
     ImGui::SliderFloat("Wobble rate", &m_config.movement.wobbleRate, 0.1f, 5.0f, "%.1f Hz");
+
+    // An upper bound: bullets that hit something are spent before their life is up.
+    const float now = static_cast<float>(m_frame) * m_dt;
+    const auto flying = std::count_if(m_bulletExpiry.begin(), m_bulletExpiry.end(), [now](float t) { return t > now; });
+    ImGui::Text("Bullets: up to %td / %u in flight", flying, kMaxBullets);
 
     using Renderer = gfx::UnitRenderer;
     ImGui::SeparatorText("Unit sprites");

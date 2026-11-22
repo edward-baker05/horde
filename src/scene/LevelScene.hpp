@@ -12,15 +12,28 @@
 #include "logic/Level.hpp"
 #include "logic/WallGridShapes.hpp"
 #include "scene/Scene.hpp"
+#include "scene/TurretPrep.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
 #include "sim/WallColliders.hpp"
 
 namespace horde::scene {
 
+// How a level plays.
+enum class LevelMode {
+    // Units as the options below say, flowing for as long as the level runs.
+    // For presets, the benchmark and tuning.
+    Sandbox,
+    // The game: a prep phase, then the level's own wave (logic::WaveSettings),
+    // in which units that reach an exit despawn as leaks. Ignores unitCount,
+    // spawn, spawnRate and respawnAtExit below.
+    Wave,
+};
+
 // How a level is set up: which level, which physics system, and how many units
 // start in it. The benchmark builds one of these from the command line.
 struct LevelOptions {
+    LevelMode mode = LevelMode::Sandbox;
     // Empty means the built-in default level.
     std::filesystem::path levelPath;
     // Play this level instead of loading one: the editor's test play.
@@ -106,6 +119,21 @@ private:
     void healthUi();
     // The debug explosion tool's settings.
     void explosionUi();
+    // Wave mode's own window: the prep phase's start button, the wave's
+    // progress, and the result once it is over.
+    void waveUi();
+
+    // Where a wave-mode level is up to. Sandbox levels are always Running.
+    enum class Phase {
+        Prep,    // turrets are placed; nothing spawns or moves
+        Running, // units stream in until the wave's length is reached
+        Over,    // every unit has died or leaked
+    };
+    Phase m_phase = Phase::Running;
+    // Units the wave brings in, in all.
+    std::uint32_t m_waveUnits = 0;
+    // Turrets placed in the prep phase; wave mode only.
+    TurretPrep m_prep;
 
     Services* m_services = nullptr;
     gfx::Camera2D m_camera;

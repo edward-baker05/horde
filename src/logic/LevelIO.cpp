@@ -429,6 +429,40 @@ std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* e
         }
     }
 
+    // Optional: levels saved before waves existed get the default wave.
+    if (root.contains("wave")) {
+        const json& node = root["wave"];
+        if (!node.is_object() || !node.contains("length") || !node["length"].is_string() ||
+            !node.contains("unitCount") || !node["unitCount"].is_number_unsigned()) {
+            if (error) {
+                *error = "'wave' is missing 'length' or 'unitCount'";
+            }
+            return std::nullopt;
+        }
+        const std::string length = node["length"].get<std::string>();
+        if (length == "unitCount") {
+            level.wave.length = WaveLength::UnitCount;
+        } else if (length == "time") {
+            level.wave.length = WaveLength::Time;
+        } else {
+            if (error) {
+                *error = "unknown wave length: " + length;
+            }
+            return std::nullopt;
+        }
+        level.wave.unitCount = node["unitCount"].get<std::uint32_t>();
+        if (!readFloat(node, "duration", level.wave.duration, error) ||
+            !readFloat(node, "spawnRate", level.wave.spawnRate, error)) {
+            return std::nullopt;
+        }
+        if (level.wave.duration < 0.0f || level.wave.spawnRate < 0.0f) {
+            if (error) {
+                *error = "wave has a negative duration or spawn rate";
+            }
+            return std::nullopt;
+        }
+    }
+
     // A level on disk with no markers predates nothing and means a hand-edited
     // file lost them. Restore the minimum rather than refusing to load.
     if (countMarkers(level, MarkerKind::Spawn) == 0) {
@@ -475,6 +509,13 @@ bool saveLevel(const Level& level, const std::filesystem::path& path, std::strin
     }
     root["fieldRegions"] = std::move(regions);
     root["wallGrid"] = writeWallGrid(level.wallGrid);
+
+    json wave;
+    wave["length"] = level.wave.length == WaveLength::Time ? "time" : "unitCount";
+    wave["unitCount"] = level.wave.unitCount;
+    wave["duration"] = level.wave.duration;
+    wave["spawnRate"] = level.wave.spawnRate;
+    root["wave"] = std::move(wave);
 
     std::error_code code;
     std::filesystem::create_directories(path.parent_path(), code);

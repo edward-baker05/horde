@@ -12,6 +12,11 @@
 // velocity that is free of the speed cap and dies away under drag; either
 // way collisions and walls still have the last word on where units end up.
 //
+// Status effects (unit_status.hlsli) act here too: a stunned unit stops
+// trying to walk, a slowed one walks slower, and a burning one loses hit
+// points. Explosions and turrets that hit a unit set its status from the
+// status table.
+//
 // SDL_GPU compute binding rules:
 //   (t[n], space0) - read-only storage buffers
 //   (u[n], space1) - read-write storage buffers
@@ -28,6 +33,9 @@ StructuredBuffer<uint> Ids : register(t0, space0);
 // The previous step's cell ranges from sim/GpuSpatialGrid (first key, one past
 // the last, per cell; 0xFFFFFFFF first if empty), read as a density map.
 StructuredBuffer<uint> CellRanges : register(t1, space0);
+#include "unit_status.hlsli"
+// What each source applies: [0] nothing, [1 + slot] that turret's effects.
+StructuredBuffer<UnitStatus> StatusTable : register(t2, space0);
 RWStructuredBuffer<UnitData> Units : register(u0, space1);
 RWStructuredBuffer<float2> PrevPos : register(u1, space1);
 // Velocity from flinging explosions, on top of the walking velocity in Units.
@@ -35,12 +43,28 @@ RWStructuredBuffer<float2> Fling : register(u2, space1);
 // Hit points, 0 to the max. Explosions take some away; unit_finalize
 // despawns a unit that reaches 0.
 RWStructuredBuffer<float> Health : register(u3, space1);
+// See sim/TurretEffects.hpp. Armed mines count the units that come near.
+RWStructuredBuffer<uint> Feedback : register(u4, space1);
+RWStructuredBuffer<UnitStatus> Status : register(u5, space1);
 
 #include "unit_state.hlsli"
 
 #define MAX_MARKERS 8
 #define MAX_FIELDS 32
-#define MAX_EXPLOSIONS 8
+#define MAX_EXPLOSIONS 256
+#define MAX_TURRETS 64
+
+// How a turret's effect is shaped: matches sim::TurretShape.
+#define TURRET_CONE 0 // within range, and within a half-angle of its direction
+#define TURRET_BEAM 1 // within a half-width of the segment along its direction
+#define TURRET_MINE 2 // no damage: a unit within range counts into Feedback
+// A turret effect's last float holds its shape in the low bits, its turret
+// slot above them.
+#define TURRET_SHAPE_BITS 4
+#define TURRET_SHAPE_MASK 15u
+#define FEEDBACK_HEADER 4
+#define FEEDBACK_PER_TURRET 4
+#define FEEDBACK_HITS 3
 
 // Matches GPUIntegrateUniforms in sim/GpuCollidePhysics.cpp
 cbuffer IntegrateParams : register(b0, space2) {
@@ -64,7 +88,8 @@ cbuffer IntegrateParams : register(b0, space2) {
     // Two per debug explosion: [2i] xy = centre, z = radius, w = this step's
     // push at the centre (negative pulls inward); [2i+1] x = falloff
     // (0 constant, 1 linear, 2 quadratic), y = 1 to fling rather than shove,
-    // z = this step's damage at the centre, in hit points.
+    // z = this step's damage at the centre, in hit points, w = its index
+    // into StatusTable (0: none).
     float4 Explosions[MAX_EXPLOSIONS * 2];
     float Time;        // seconds of simulation
     float WobbleAngle; // radians either side of the heading; 0 turns it off
@@ -77,6 +102,13 @@ cbuffer IntegrateParams : register(b0, space2) {
     float CongestionStart;
     float CongestionStop;
     uint3 CongestionPadding;
+    uint TurretCount;
+    uint3 TurretPadding;
+    // Two per turret effect active this step: [2i] xy = centre, zw =
+    // direction (unit length); [2i+1] x = range, y = the cone's cos half-angle
+    // or the beam's half-width, z = this step's damage, w = TURRET_* shape |
+    // turret slot << TURRET_SHAPE_BITS.
+    float4 Turrets[MAX_TURRETS * 2];
 };
 
 // How far this unit's heading sways from straight at this moment, in radians.
@@ -95,8 +127,9 @@ float wobble(uint id) {
 // What every active explosion does to a unit at `centre` this step: how far
 // shoves move it (`push`), how much flings add to its velocity (`launch`),
 // and how many hit points it loses (`damage`). Damage fades with distance by
-// the same falloff as the push.
-void explosionPush(float2 centre, uint id, out float2 push, out float2 launch, out float damage) {
+// the same falloff as the push. Sets any status effects the blasts carry.
+void explosionPush(float2 centre, uint id, inout UnitStatus status, out float2 push, out float2 launch,
+                   out float damage) {
     push = float2(0.0f, 0.0f);
     launch = float2(0.0f, 0.0f);
     damage = 0.0f;
@@ -116,6 +149,10 @@ void explosionPush(float2 centre, uint id, out float2 push, out float2 launch, o
         float scale = falloff < 0.5f ? 1.0f : (falloff < 1.5f ? 1.0f - t : (1.0f - t) * (1.0f - t));
         float amount = blast.w * scale;
         damage += Explosions[i * 2 + 1].z * scale;
+        uint effect = (uint)Explosions[i * 2 + 1].w;
+        if (effect != 0) {
+            applyStatus(status, StatusTable[effect]);
+        }
         if (fling) {
             // Not so fast a pull would carry it past the centre in one step.
             launch += dir * max(amount, -distance / Dt);
@@ -124,6 +161,39 @@ void explosionPush(float2 centre, uint id, out float2 push, out float2 launch, o
             push += dir * max(amount, -distance);
         }
     }
+}
+
+// Hit points a unit at `centre` loses this step to turrets, setting any
+// status effects they carry. Also counts it against any armed mine it is near.
+float turretDamage(float2 centre, inout UnitStatus status) {
+    float damage = 0.0f;
+    for (uint i = 0; i < TurretCount; ++i) {
+        float4 at = Turrets[i * 2];
+        float4 effect = Turrets[i * 2 + 1];
+        float2 d = centre - at.xy;
+        float along = dot(d, at.zw);
+        uint packed = (uint)effect.w;
+        uint shape = packed & TURRET_SHAPE_MASK;
+        uint slot = packed >> TURRET_SHAPE_BITS;
+        bool hit;
+        if (shape == TURRET_MINE) {
+            if (length(d) <= effect.x + Radius) {
+                InterlockedAdd(Feedback[FEEDBACK_HEADER + slot * FEEDBACK_PER_TURRET + FEEDBACK_HITS], 1u);
+            }
+            continue;
+        } else if (shape == TURRET_BEAM) {
+            float across = abs(dot(d, float2(-at.w, at.z)));
+            hit = along >= 0.0f && along <= effect.x && across <= effect.y + Radius;
+        } else {
+            float distance = length(d);
+            hit = distance <= effect.x + Radius && along >= distance * effect.y;
+        }
+        if (hit) {
+            damage += effect.z;
+            applyStatus(status, StatusTable[1 + slot]);
+        }
+    }
+    return damage;
 }
 
 // Every field region containing `centre`, summed as direction x turn rate.
@@ -215,6 +285,16 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     float2 desired;
     float turnRate;
 
+    // Status timers run down first; anything hitting the unit this step
+    // then starts its effects afresh.
+    UnitStatus status = Status[index];
+    bool stunned = status.stun > 0.0f;
+    bool slowed = status.slow > 0.0f;
+    float burnDamage = status.burn > 0.0f ? status.burnDps * min(status.burn, Dt) : 0.0f;
+    status.stun = max(status.stun - Dt, 0.0f);
+    status.slow = max(status.slow - Dt, 0.0f);
+    status.burn = max(status.burn - Dt, 0.0f);
+
     // A field region outranks the exit: inside one, a unit turns to follow
     // its arrow at full speed rather than cutting diagonally toward the exit.
     float2 flow = fieldFlow(centre);
@@ -239,12 +319,22 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     if (desiredSpeed > 0.001f) {
         desired *= congestionSpeed(unit.pos, desired / desiredSpeed);
     }
+    // Stunned, a unit stops trying to go anywhere, slowing to a halt at its
+    // usual steering rate; the crowd and blasts can still move it.
+    if (stunned) {
+        desired = float2(0.0f, 0.0f);
+        turnRate = Steering;
+    } else if (slowed) {
+        desired *= status.slowFactor;
+    }
 
     unit.vel += (desired - unit.vel) * saturate(turnRate * Dt);
     float2 push;
     float2 launch;
     float damage;
-    explosionPush(centre, Ids[index], push, launch, damage);
+    explosionPush(centre, Ids[index], status, push, launch, damage);
+    damage += turretDamage(centre, status) + burnDamage;
+    Status[index] = status;
     if (damage > 0.0f) {
         Health[index] = max(Health[index] - damage, 0.0f);
     }

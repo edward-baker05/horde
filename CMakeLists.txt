@@ -31,6 +31,7 @@ add_executable(horde
     src/sim/GpuWalls.cpp
     src/sim/PhysicsRegistry.cpp
     src/sim/Spawn.cpp
+    src/sim/TurretEffects.cpp
     src/sim/UnitBuffers.cpp
     src/sim/WallColliders.cpp
     src/editor/EditorUi.cpp
@@ -45,6 +46,7 @@ add_executable(horde
     src/scene/Presets.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
+    src/scene/TurretPrep.cpp
     src/ui/ImGuiLayer.cpp
     src/logic/UnitData.hpp
     src/logic/Level.cpp
@@ -52,6 +54,7 @@ add_executable(horde
     src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
     src/logic/LevelValidation.cpp
+    src/logic/Turret.cpp
     src/logic/WallGridShapes.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
