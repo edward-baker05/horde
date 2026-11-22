@@ -12,6 +12,7 @@
 #include "logic/WallGridShapes.hpp"
 #include "scene/DancingCow.hpp"
 #include "scene/EditorOverlay.hpp"
+#include "scene/LevelMode.hpp"
 #include "scene/Scene.hpp"
 
 namespace horde::scene {
@@ -62,8 +63,14 @@ private:
     // World-space position of the mouse, updated every motion event.
     glm::vec2 mouseWorld(float screenX, float screenY) const;
 
+    // The view that frames the whole level in the feed above the tray.
+    FeedFit levelFit() const;
+
     // Frames the whole level in the feed above the tray.
     void fitLevel();
+
+    // Stops the camera zooming out past levelFit().
+    void limitZoom();
 
     // Turns the in-progress polyline draft into a wall, if it has enough
     // points, and clears it either way.

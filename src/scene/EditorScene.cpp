@@ -42,18 +42,31 @@ bool EditorScene::onEnter(Services& services) {
     return true;
 }
 
+FeedFit EditorScene::levelFit() const {
+    const glm::vec2 screen = m_camera.viewport();
+    return fitFeed(m_state.level.size, screen, screen.y * kRoundTrayFraction, 0.8f);
+}
+
 void EditorScene::fitLevel() {
     // The whole level with a margin, above the tray, so the editor opens on
     // something sensible rather than on the origin.
-    const glm::vec2 screen = m_camera.viewport();
-    const FeedFit fit = fitFeed(m_state.level.size, screen, screen.y * kRoundTrayFraction, 0.8f);
+    const FeedFit fit = levelFit();
+    limitZoom();
     m_camera.setZoom(fit.zoom);
     m_camera.setCenter(fit.center);
+}
+
+void EditorScene::limitZoom() {
+    // As in a round, zoomed all the way out is the whole level: any further
+    // and units shrink below a pixel and vanish.
+    m_camera.setZoomLimits(levelFit().zoom, 10.0f);
 }
 
 void EditorScene::update(float deltaTime) {
     m_cow.update(deltaTime);
     m_overlay.update(deltaTime, m_camera.zoom(), m_cursorWorld);
+    // The level's size can change from the overlay at any time.
+    limitZoom();
 
     if (m_overlay.takeLevelSwapped()) {
         // Whatever was half drawn belonged to the old level.
@@ -760,6 +773,7 @@ void EditorScene::render(gfx::SpriteBatch& batch) {
 
 void EditorScene::onResize(float width, float height) {
     m_camera.setViewport(width, height);
+    limitZoom();
 }
 
 } // namespace horde::scene
