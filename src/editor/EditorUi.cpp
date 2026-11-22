@@ -181,6 +181,56 @@ void drawToolbar(EditorState& state) {
     ImGui::End();
 }
 
+// The level's round: horde size, leak limit and money. Edited on a copy and
+// committed as one undoable change per edit, like the rest of the panel.
+void drawRoundSettings(EditorState& state) {
+    ImGui::SeparatorText(tr("Round"));
+    logic::RoundSettings round = state.level.round;
+    bool changed = false;
+
+    const auto count = [&](const char* label, std::uint32_t& value, int step, int fast, int most) {
+        int v = static_cast<int>(value);
+        if (ImGui::InputInt(label, &v, step, fast)) {
+            value = static_cast<std::uint32_t>(std::clamp(v, 1, most));
+            changed = true;
+        }
+    };
+    const auto money = [&](const char* label, int& value, int step) {
+        if (ImGui::InputInt(label, &value, step, step * 10)) {
+            value = std::max(value, 0);
+            changed = true;
+        }
+    };
+    const auto amount = [&](const char* label, float& value, float speed, float most, const char* format) {
+        if (ImGui::DragFloat(label, &value, speed, 0.0f, most, format)) {
+            value = std::clamp(value, 0.0f, most);
+            changed = true;
+        }
+    };
+
+    count(tr("Total units"), round.totalUnits, 100, 1000, 4'000'000);
+    count(tr("Unit HP"), round.unitHp, 1, 10, 100000);
+    count(tr("Leak limit"), round.leakLimit, 10, 100, 4'000'000);
+    money(tr("Start money"), round.startMoney, 50);
+    money(tr("Kill reward"), round.killReward, 1);
+    amount(tr("Spawn rate"), round.baseSpawnRate, 1.0f, 100000.0f, tr("%.0f/s"));
+    amount(tr("Spawn boost"), round.spawnBoost, 0.05f, 100.0f, "x%.2f");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(tr("Spawning speeds up as the horde dies: at the last kill it is\n"
+                             "the spawn rate times (1 + boost)."));
+    }
+    money(tr("Win reward"), round.winReward, 10);
+    amount(tr("Par time"), round.parSeconds, 1.0f, 36000.0f, "%.0f s");
+    amount(tr("Bonus per second"), round.bonusPerSecond, 0.05f, 1000.0f, "%.2f");
+
+    if (changed) {
+        state.beginMutation();
+        state.level.round = round;
+    }
+}
+
 void drawLevelPanel(EditorState& state, bool& wantsExit, bool& wantsPlay) {
     ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(280.0f, 260.0f), ImGuiCond_FirstUseEver);
@@ -192,14 +242,13 @@ void drawLevelPanel(EditorState& state, bool& wantsExit, bool& wantsPlay) {
 
     ImGui::SeparatorText(tr("Test play"));
 
-    ImGui::InputInt(tr("Units"), &state.testUnits, 1000, 10000);
-    state.testUnits = std::clamp(state.testUnits, 0, 4'000'000);
-
-    // Plays the level as it is now, saved or not: units stream in at the green
-    // spawns and head for the red exits. Leaving returns here.
+    // Plays the level as a round, as it is now, saved or not, with the round
+    // settings below. Leaving returns here.
     if (ImGui::Button(tr("Test play"), ImVec2(160.0f, 0.0f))) {
         wantsPlay = true;
     }
+
+    drawRoundSettings(state);
 
     ImGui::SeparatorText(tr("Bounds"));
 

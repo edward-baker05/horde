@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "logic/UnitData.hpp"
+#include "sim/CrowdEffects.hpp"
 
 namespace horde::scene {
 struct Services;
@@ -129,6 +130,9 @@ struct FlowSettings {
     // A unit that reaches an exit re-enters at a spawn, keeping the flow
     // going. Otherwise it stops there.
     bool respawnAtExit = true;
+    // A round: a unit reaching an exit leaves the level for good and counts
+    // as leaked (RoundCounters::leaked). Wins over respawnAtExit.
+    bool removeAtExit = false;
     std::uint32_t seed = 1;
 };
 
@@ -158,38 +162,7 @@ struct FieldArea {
 // with a warning.
 inline constexpr std::size_t kMaxFieldRegions = 32;
 
-// How an explosion fades from 1 at t = 0 toward 0 at t = 1: over its radius
-// (t = distance / radius) and over its duration (t = time / duration).
-enum class ExplosionFalloff {
-    Constant,  // 1: the same everywhere, or all the way through
-    Linear,    // 1 - t
-    Quadratic, // (1 - t)^2: concentrated near the centre, or the start
-};
-
 const char* falloffName(ExplosionFalloff falloff);
-
-// A debug blast: units within `radius` of `center` are pushed away from it,
-// or pulled toward it when `strength` is negative. Further out they get less,
-// as `falloff` says. The blast plays out over `duration` seconds (0: all in
-// one step), front-loaded as `decay` says.
-//
-// Shoved (the default), a unit at the centre is moved `strength` world units
-// in all and keeps walking at no more than the unit speed. Flung, it is
-// launched at up to `strength` world units per second, past the unit speed,
-// and slows down under the system's fling drag or on hitting something.
-struct Explosion {
-    glm::vec2 center{0.0f, 0.0f};
-    float radius = 100.0f;
-    float strength = 50.0f;
-    float duration = 0.15f;
-    ExplosionFalloff falloff = ExplosionFalloff::Linear;
-    ExplosionFalloff decay = ExplosionFalloff::Constant;
-    bool fling = false;
-    // Hit points a unit at the centre loses over the whole blast, fading
-    // toward the edge by `falloff` like the push. A unit left with none is
-    // despawned.
-    float damage = 0.0f;
-};
 
 // Where a despawned unit is kept: far outside any level, so every GPU pass
 // can tell it apart without another buffer. Matches DEAD_POSITION in
@@ -200,9 +173,6 @@ inline bool isDeadUnit(glm::vec2 pos) {
     return pos.x < -1.0e29f;
 }
 
-// GPU shaders hold at most this many explosions at once; a new one replaces
-// the oldest.
-inline constexpr std::size_t kMaxExplosions = 8;
 
 // Everything a physics system is handed when a level starts.
 struct SimConfig {
@@ -316,6 +286,39 @@ public:
     // the fling speed in one second.
     virtual void setFlingDrag(float perSecond) {
         (void)perSecond;
+    }
+
+    // Whether the system can run a round: setCrowdEffects, pollCounters,
+    // pollDensity and setSpawnRate all do something.
+    virtual bool supportsRounds() const {
+        return false;
+    }
+
+    // What a round asks of the crowd, from the next step on: tower bodies,
+    // pulls and slow zones.
+    virtual void setCrowdEffects(const CrowdEffects& effects) {
+        (void)effects;
+    }
+
+    // A fresh map of where the crowd is, if one has come back from the GPU
+    // since the last call. Only made while a round has set crowd effects.
+    // Never waits.
+    virtual bool pollDensity(DensityMap& out) {
+        (void)out;
+        return false;
+    }
+
+    // Units brought in per second at the spawns from now on, for systems that
+    // support flow.
+    virtual void setSpawnRate(float perSecond) {
+        (void)perSecond;
+    }
+
+    // A newer report of kills, leaks and tower contacts than the last call
+    // returned, if one has come back from the GPU. Never waits.
+    virtual bool pollCounters(RoundCounters& out) {
+        (void)out;
+        return false;
     }
 };
 

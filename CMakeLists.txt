@@ -18,6 +18,7 @@ add_executable(horde
     src/bench/Benchmark.cpp
     src/bench/Quality.cpp
     src/core/Paths.cpp
+    src/core/SaveData.cpp
     src/gfx/Blur.cpp
     src/gfx/Camera2D.cpp
     src/gfx/GpuContext.cpp
@@ -37,6 +38,8 @@ add_executable(horde
     src/sim/Spawn.cpp
     src/sim/UnitBuffers.cpp
     src/sim/WallColliders.cpp
+    src/sim/TowerSite.cpp
+    src/sim/GpuReadback.cpp
     src/editor/EditorUi.cpp
     src/editor/Handles.cpp
     src/editor/Markers.cpp
@@ -48,6 +51,7 @@ add_executable(horde
     src/scene/MainMenuScene.cpp
     src/scene/PauseScene.cpp
     src/scene/Presets.cpp
+    src/scene/RoundOverlay.cpp
     src/scene/SceneStack.cpp
     src/scene/TechTreeScene.cpp
     src/ui/DeviceLayout.cpp
@@ -69,7 +73,9 @@ add_executable(horde
     src/logic/LevelFiles.cpp
     src/logic/LevelIO.cpp
     src/logic/LevelValidation.cpp
-    src/logic/WallGridShapes.cpp)
+    src/logic/WallGridShapes.cpp
+    src/logic/TowerStats.cpp
+    src/logic/Round.cpp)
 
 target_compile_features(horde PRIVATE cxx_std_20)
 target_include_directories(horde PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

@@ -1,0 +1,304 @@
+/* Tablet round app: a camera OSD over the feed and a labelled tower tray along
+   the bottom. Sizes are in dp on the 1280x800 landscape tablet. The feed shows
+   through the body, which ignores the pointer so clicks reach the scene; only
+   the tray takes them. Same renderer limits as phone_normal.rcss: flat colours,
+   vertex gradients, radii, opacity and transforms. */
+
+body {
+	font-family: "Liberation Sans";
+	font-size: 17dp;
+	color: #ffffff;
+	width: 100%;
+	height: 100%;
+	display: block;
+	pointer-events: none;
+}
+
+/* --- Feed OSD ---------------------------------------------------------- */
+
+/* White on the feed, outlined in black so it reads over any level colour. */
+.osd {
+	position: absolute;
+	display: block;
+	font-size: 19dp;
+	font-weight: bold;
+	font-effect: outline(1dp #000000);
+}
+
+.osd .line {
+	display: block;
+	margin-bottom: 5dp;
+}
+
+/* The feed ends at the tray's top: 116dp up from the bottom. */
+.top-left { left: 26dp; top: 20dp; }
+.top-right { right: 26dp; top: 20dp; text-align: right; }
+.bottom-left { left: 26dp; bottom: 134dp; }
+.bottom-right { right: 26dp; bottom: 134dp; }
+
+.rec-dot {
+	display: inline-block;
+	width: 12dp;
+	height: 12dp;
+	margin-right: 7dp;
+	border-radius: 6dp;
+	background-color: #ff3b30;
+	transition: opacity 0.15s;
+}
+
+.rec-dot.off {
+	opacity: 0.2;
+}
+
+.pips {
+	display: block;
+	height: 16dp;
+}
+
+.pip {
+	display: inline-block;
+	width: 10dp;
+	height: 16dp;
+	margin-right: 4dp;
+	border: 1dp #000000;
+	background-color: #ffffff26;
+}
+
+.pip.on {
+	background-color: #ffffff;
+}
+
+/* Centre of the feed: half of the 684dp above the tray. */
+.crosshair {
+	position: absolute;
+	left: 50%;
+	top: 342dp;
+	width: 34dp;
+	height: 34dp;
+	margin: -17dp 0 0 -17dp;
+}
+
+.crosshair .v,
+.crosshair .h {
+	position: absolute;
+	background-color: #ffffff66;
+}
+
+.crosshair .v { left: 16dp; top: 0; width: 2dp; height: 34dp; }
+.crosshair .h { left: 0; top: 16dp; width: 34dp; height: 2dp; }
+
+/* --- Tower tray --------------------------------------------------------- */
+
+/* Height must match kRoundTrayFraction in src/scene/LevelMode.hpp. */
+.tray {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 116dp;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: #121417;
+	decorator: vertical-gradient(#15171a #0e1012);
+	border-top: 1dp #ffffff14;
+	pointer-events: auto;
+}
+
+.slots {
+	display: flex;
+	padding: 8dp;
+	background-color: #ffffff0d;
+	border: 1dp #ffffff14;
+	border-radius: 22dp;
+}
+
+.tower {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 100dp;
+	height: 76dp;
+	margin: 0 4dp;
+	border: 1dp #00000000;
+	border-radius: 16dp;
+	transition: background-color 0.12s;
+}
+
+.tower:hover {
+	background-color: #ffffff14;
+}
+
+.tower:active {
+	transform: scale(0.96);
+}
+
+.tower.selected {
+	background-color: #ffffff1a;
+	border-color: #ffffff59;
+}
+
+.tower.ability {
+	margin-left: 14dp;
+}
+
+.tower.disabled {
+	opacity: 0.35;
+}
+
+.tower.disabled:hover {
+	background-color: #00000000;
+}
+
+.tower .cooldown {
+	position: absolute;
+	top: 6dp;
+	right: 10dp;
+	font-size: 12dp;
+	font-weight: bold;
+	color: #ffffff;
+}
+
+.tower .icon {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 36dp;
+	height: 36dp;
+	border-radius: 10dp;
+}
+
+.tower .label {
+	display: block;
+	margin-top: 7dp;
+	font-size: 12dp;
+	color: #dfe3e7;
+}
+
+/* Tower glyphs: dark marks on the tinted icon. Shapes radii can't make use
+   a font glyph (tri). */
+.glyph {
+	display: block;
+	width: 14dp;
+	height: 14dp;
+	color: #0c0e10;
+}
+
+.glyph.circle { background-color: #0c0e10; border-radius: 7dp; }
+.glyph.square { background-color: #0c0e10; border-radius: 2dp; }
+.glyph.diamond { width: 12dp; height: 12dp; background-color: #0c0e10; border-radius: 2dp; transform: rotate(45deg); }
+.glyph.bar { height: 5dp; background-color: #0c0e10; border-radius: 1dp; }
+.glyph.ring { box-sizing: border-box; border: 3dp #0c0e10; border-radius: 7dp; }
+.glyph.tri { font-size: 22dp; line-height: 13dp; text-align: center; }
+
+/* --- Tower panel -------------------------------------------------------- */
+
+/* Placed by LevelScene in screen pixels, above the tower it describes. */
+.panel {
+	position: absolute;
+	display: block;
+	width: 170dp;
+	padding: 10dp 12dp;
+	background-color: #121417e6;
+	border: 1dp #ffffff26;
+	border-radius: 12dp;
+	pointer-events: auto;
+}
+
+.panel .title,
+.panel .stat {
+	display: block;
+}
+
+.panel .title {
+	font-weight: bold;
+	font-size: 16dp;
+}
+
+.panel .stat {
+	font-size: 13dp;
+	color: #c8cdd2;
+	margin: 3dp 0 8dp 0;
+}
+
+.act {
+	display: block;
+	padding: 7dp 10dp;
+	text-align: center;
+	font-size: 13dp;
+	font-weight: bold;
+	background-color: #2a7bff;
+	border-radius: 8dp;
+	transition: background-color 0.12s;
+}
+
+.act:hover {
+	background-color: #4a8fff;
+}
+
+.act.disabled {
+	background-color: #ffffff1f;
+	color: #ffffff66;
+}
+
+/* --- Results ------------------------------------------------------------ */
+
+.results {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 116dp;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: #00000099;
+	pointer-events: auto;
+}
+
+.results .card {
+	display: block;
+	width: 280dp;
+	padding: 22dp;
+	text-align: center;
+	background-color: #121417f2;
+	border: 1dp #ffffff26;
+	border-radius: 18dp;
+}
+
+.results .verdict {
+	display: block;
+	font-size: 44dp;
+	font-weight: bold;
+	color: #ff5a4f;
+	margin-bottom: 10dp;
+}
+
+.results .verdict.won {
+	color: #5fe08a;
+}
+
+.results .stat,
+.results .earned {
+	display: block;
+	font-size: 15dp;
+	margin: 4dp 0;
+}
+
+.results .earned {
+	font-size: 22dp;
+	font-weight: bold;
+	color: #5fe08a;
+}
+
+.results .buttons {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 16dp;
+}
+
+.results .buttons .act {
+	width: 110dp;
+}

@@ -75,6 +75,9 @@ private:
     std::string m_page = "root";
     std::string m_clock;
     std::string m_date;
+    // The home screen's Play widget: what Play will start, and how many levels.
+    std::string m_featured;
+    std::string m_levelCount;
     bool m_polish = false; // mirrors polish::enabled() for the settings switch
     bool m_togglePending = false;
     float m_clockTimer = 0.0f;

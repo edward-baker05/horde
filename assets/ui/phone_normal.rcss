@@ -1,4 +1,4 @@
-/* Phone theme: near-black ground, grouped cards, one warm accent. All sizes
+/* Phone theme: near-black ground, grouped cards, one teal accent. All sizes
    are in dp so the layout scales with the display. The renderer has no shader
    or layer support, so stick to flat colours, vertex gradients, radii,
    opacity and transforms (no box-shadow, filter or linear-gradient). */
@@ -8,7 +8,7 @@ body {
 	font-size: 17dp;
 	color: #f2f2f5;
 	background-color: #08080b;
-	decorator: vertical-gradient(#16131a #08080b);
+	decorator: vertical-gradient(#171a1f #08090b);
 	width: 100%;
 	height: 100%;
 	display: block;
@@ -84,7 +84,7 @@ body {
 }
 
 .wordmark .dot {
-	color: #ff8a3d;
+	color: #36dede;
 }
 
 .tagline {
@@ -107,17 +107,17 @@ body {
 	padding: 0 12dp 0 8dp;
 	font-size: 17dp;
 	line-height: 40dp;
-	color: #ff8a3d;
+	color: #36dede;
 	border-radius: 20dp;
 	transition: background-color 0.12s;
 }
 
 .header .back:hover {
-	background-color: #ff8a3d1f;
+	background-color: #36dede1f;
 }
 
 .header .back:active {
-	background-color: #ff8a3d40;
+	background-color: #36dede40;
 }
 
 .page-title {
@@ -233,15 +233,15 @@ button.primary {
 	font-weight: bold;
 	line-height: 60dp;
 	text-align: center;
-	color: #140a03;
-	background-color: #ff8a3d;
-	decorator: vertical-gradient(#ffa060 #ff7a28);
+	color: #071013;
+	background-color: #36dede;
+	decorator: vertical-gradient(#65f0f0 #00cacb);
 	border-radius: 18dp;
 	transition: transform 0.1s cubic-out;
 }
 
 button.primary:hover {
-	decorator: vertical-gradient(#ffb07a #ff8a3d);
+	decorator: vertical-gradient(#80f4f4 #36dede);
 }
 
 button.primary:active {
@@ -285,7 +285,7 @@ button.primary:active {
 }
 
 .switch.on {
-	background-color: #ff8a3d;
+	background-color: #36dede;
 }
 
 .switch .knob {
@@ -303,3 +303,176 @@ button.primary:active {
 	left: 21dp;
 }
 
+
+/* --- Home screen -------------------------------------------------------- */
+
+/* The Play widget: a glass card holding the wordmark, what Play starts, and
+   the one filled button. */
+.widget {
+	display: block;
+	margin: 34dp 8dp 0 8dp;
+	padding: 20dp;
+	background-color: #1a1d22e6;
+	border: 1dp #ffffff1f;
+	border-radius: 28dp;
+}
+
+.widget-head {
+	display: block;
+	height: 62dp;
+	position: relative;
+}
+
+.wordmark.small {
+	font-size: 31dp;
+	letter-spacing: 3dp;
+}
+
+.widget .tag {
+	position: absolute;
+	top: 4dp;
+	right: 0;
+	font-size: 11dp;
+	font-weight: bold;
+	letter-spacing: 1dp;
+	color: #8d939c;
+}
+
+/* Stands in for a level thumbnail until there is one to draw. */
+.thumb {
+	display: block;
+	position: relative;
+	height: 110dp;
+	margin-bottom: 16dp;
+	background-color: #1c2127;
+	decorator: vertical-gradient(#222831 #171b20);
+	border-radius: 16dp;
+}
+
+.thumb-label {
+	position: absolute;
+	left: 12dp;
+	bottom: 10dp;
+	font-size: 13dp;
+	color: #a9b0b8;
+}
+
+button.play {
+	display: block;
+	height: 58dp;
+	font-size: 22dp;
+	font-weight: bold;
+	letter-spacing: 3dp;
+	line-height: 58dp;
+	text-align: center;
+	color: #071013;
+	background-color: #36dede;
+	border-radius: 18dp;
+	transition: transform 0.1s cubic-out;
+}
+
+button.play:hover {
+	background-color: #65f0f0;
+}
+
+button.play:active {
+	transform: scale(0.98);
+}
+
+.play-icon {
+	margin-right: 10dp;
+	font-size: 16dp;
+}
+
+/* App icons: a tinted rounded square with a dark mark, label beneath. */
+.apps {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 28dp 15dp 0 15dp;
+}
+
+.apps .app {
+	width: 33.33%;
+}
+
+button.app {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	transition: transform 0.1s cubic-out;
+}
+
+button.app:active {
+	transform: scale(0.94);
+}
+
+.app-icon {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 72dp;
+	height: 72dp;
+	border: 1dp #ffffff33;
+	border-radius: 20dp;
+}
+
+.app-label {
+	display: block;
+	margin-top: 7dp;
+	font-size: 12dp;
+	color: #eef0f2;
+}
+
+.app-icon.gold { background-color: #f5c761; }
+.app-icon.teal { background-color: #36dede; }
+.app-icon.purple { background-color: #caacff; }
+.app-icon.silver { background-color: #d4d8dc; }
+.app-icon.red { background-color: #f97770; }
+
+/* Dark marks on the icons; tri is a font glyph, as radii can't make one. */
+.glyph {
+	display: block;
+	width: 26dp;
+	height: 26dp;
+	color: #0c0e10;
+}
+
+.glyph.circle { background-color: #0c0e10; border-radius: 13dp; }
+.glyph.square { background-color: #0c0e10; border-radius: 4dp; }
+.glyph.diamond { width: 22dp; height: 22dp; background-color: #0c0e10; border-radius: 3dp; transform: rotate(45deg); }
+.glyph.bar { height: 8dp; background-color: #0c0e10; border-radius: 2dp; }
+.glyph.tri { font-size: 40dp; line-height: 24dp; text-align: center; }
+
+/* The dock: system apps on a glass shelf above the home bar. */
+.dock {
+	position: absolute;
+	left: 13dp;
+	right: 13dp;
+	bottom: 30dp;
+	display: flex;
+	justify-content: space-around;
+	padding: 13dp 16dp;
+	background-color: #282b30d9;
+	border: 1dp #ffffff1f;
+	border-radius: 37dp;
+}
+
+.dock .app-icon {
+	width: 64dp;
+	height: 64dp;
+	border-radius: 18dp;
+}
+
+.dock .glyph {
+	width: 22dp;
+	height: 22dp;
+}
+
+.dock .glyph.circle { border-radius: 11dp; }
+.dock .glyph.diamond { width: 18dp; height: 18dp; }
+.dock .glyph.bar { height: 7dp; }
+.dock .glyph.tri { font-size: 34dp; line-height: 20dp; }
+
+.dock .app-label {
+	font-size: 11dp;
+}

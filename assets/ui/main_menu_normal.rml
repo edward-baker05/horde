@@ -12,24 +12,42 @@
 		</span>
 	</div>
 
-	<div class="page" data-if="page == 'root'">
-		<div class="hero">
-			<span class="wordmark">HORDE<span class="dot">.</span></span>
-			<span class="tagline">Hold the line.</span>
+	<!-- Home screen: a Play widget, app icons, and a dock of system apps. -->
+	<div class="page home" data-if="page == 'root'">
+		<div class="widget">
+			<div class="widget-head">
+				<span class="wordmark small">HORDE<span class="dot">.</span></span>
+				<span class="tag">{{level_count}}</span>
+			</div>
+			<div class="thumb"><span class="thumb-label">{{featured}}</span></div>
+			<button class="play" data-event-click="open('play')"><span class="play-icon">►</span>PLAY</button>
 		</div>
 
-		<button class="primary" data-event-click="open('play')">Play</button>
-
-		<div class="group">
-			<button class="row" data-event-click="upgrades">Upgrades<span class="chevron">›</span></button>
-			<button class="row" data-event-click="editor">Level Editor<span class="chevron">›</span></button>
-			<button class="row" data-event-click="open('dev')">Dev Ground<span class="chevron">›</span></button>
-			<button class="row" data-event-click="open('settings')">Settings<span class="chevron">›</span></button>
+		<div class="apps">
+			<button class="app" data-event-click="upgrades">
+				<span class="app-icon gold"><span class="glyph diamond"/></span>
+				<span class="app-label">Upgrades</span>
+			</button>
+			<button class="app" data-event-click="editor">
+				<span class="app-icon teal"><span class="glyph square"/></span>
+				<span class="app-label">Level Editor</span>
+			</button>
 		</div>
+	</div>
 
-		<div class="group">
-			<button class="row danger" data-event-click="quit">Quit</button>
-		</div>
+	<div class="dock" data-if="page == 'root'">
+		<button class="app" data-event-click="open('dev')">
+			<span class="app-icon purple"><span class="glyph tri">▲</span></span>
+			<span class="app-label">Dev Ground</span>
+		</button>
+		<button class="app" data-event-click="open('settings')">
+			<span class="app-icon silver"><span class="glyph circle"/></span>
+			<span class="app-label">Settings</span>
+		</button>
+		<button class="app" data-event-click="quit">
+			<span class="app-icon red"><span class="glyph bar"/></span>
+			<span class="app-label">Quit</span>
+		</button>
 	</div>
 
 	<div data-if="page == 'play'">

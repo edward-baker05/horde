@@ -4,7 +4,9 @@
 //
 // The including shader, before including this, defines the read-only buffer
 // slots for the three wall buffers and declares, in its cbuffer,
-// uint2 WallBinDim, float WallBinSize and uint WallCount:
+// uint2 WallBinDim, float WallBinSize, uint WallCount, and the round's towers
+// as uint TowerCount and float4 Towers[MAX_TOWERS] (xy = centre, z = radius;
+// 0 is an empty slot):
 //
 //   #define WALL_PRIMS_SLOT t3
 //   #define WALL_BINS_SLOT t4
@@ -12,6 +14,11 @@
 
 #ifndef HORDE_WALLS_HLSLI
 #define HORDE_WALLS_HLSLI
+
+// Matches sim::kMaxTowers.
+#ifndef MAX_TOWERS
+#define MAX_TOWERS 32
+#endif
 
 // Matches sim::WallPrimitive. See sim/WallColliders.hpp for what p0..p2 mean per kind.
 struct WallPrimitive {
@@ -99,6 +106,13 @@ float wallDistance(WallPrimitive w, float2 p, out float2 normal) {
 // inside one); very large when there is none.
 float wallClearance(float2 centre) {
     float best = 3.4e38f;
+    // Towers are few and move (they grow in), so they aren't binned: every
+    // unit checks every one, like a wall that is always near.
+    for (uint t = 0; t < TowerCount; ++t) {
+        if (Towers[t].z > 0.0f) {
+            best = min(best, length(centre - Towers[t].xy) - Towers[t].z);
+        }
+    }
     if (WallCount == 0) {
         return best;
     }
@@ -115,6 +129,20 @@ float wallClearance(float2 centre) {
 
 // Pushes a disc of `radius` centred at `centre` out of every wall near it.
 float2 resolveWalls(float2 centre, float radius) {
+    for (uint t = 0; t < TowerCount; ++t) {
+        float4 tower = Towers[t];
+        if (tower.z <= 0.0f) {
+            continue;
+        }
+        float2 d = centre - tower.xy;
+        float len = length(d);
+        float reach = tower.z + radius;
+        if (len < reach) {
+            // A unit dead on a new tower's centre still gets out: any way will do.
+            float2 n = len > 1e-6f ? d / len : float2(0.0f, -1.0f);
+            centre = tower.xy + n * reach;
+        }
+    }
     if (WallCount == 0) {
         return centre;
     }

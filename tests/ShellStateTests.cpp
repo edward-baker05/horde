@@ -111,3 +111,24 @@ TEST_CASE("computeTargets: a dev-mode level over the menu hides both devices") {
     CHECK(t.phone == Placement::Hidden);
     CHECK(t.tablet == Placement::Hidden);
 }
+
+TEST_CASE("fitFeed: level fits above the tray, centred in the feed") {
+    using horde::scene::fitFeed;
+    // 2000 square level on a 1280x800 screen with a 116 px tray: the feed is
+    // 684 tall, so height limits the zoom.
+    const horde::scene::FeedFit fit = fitFeed({2000.0f, 2000.0f}, {1280.0f, 800.0f}, 116.0f);
+    CHECK(fit.zoom == doctest::Approx(0.95f * 684.0f / 2000.0f));
+    // The camera centres the screen; the level's middle must land on the
+    // feed's middle, tray/2 px above the screen's.
+    const float feedMiddleY = 400.0f - 58.0f;
+    const float levelMiddleOnScreen = 400.0f + (1000.0f - fit.center.y) * fit.zoom;
+    CHECK(levelMiddleOnScreen == doctest::Approx(feedMiddleY));
+    CHECK(fit.center.x == doctest::Approx(1000.0f));
+}
+
+TEST_CASE("fitFeed: no tray is a plain fit") {
+    const horde::scene::FeedFit fit = horde::scene::fitFeed({4000.0f, 1000.0f}, {1280.0f, 800.0f}, 0.0f);
+    CHECK(fit.zoom == doctest::Approx(0.95f * 1280.0f / 4000.0f));
+    CHECK(fit.center.x == doctest::Approx(2000.0f));
+    CHECK(fit.center.y == doctest::Approx(500.0f));
+}

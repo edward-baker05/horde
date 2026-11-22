@@ -1,0 +1,61 @@
+<rml>
+<head>
+	<title>Round</title>
+	<link type="text/rcss" href="tablet.rcss"/>
+</head>
+<body data-model="round">
+	<div class="crosshair"><span class="v"/><span class="h"/></div>
+
+	<div class="osd top-left">
+		<span class="line">{{date}}</span>
+		<span class="line">{{time}}</span>
+		<span class="line money">{{money}}</span>
+	</div>
+
+	<div class="osd top-right">
+		<span class="line">{{camera}}</span>
+		<span class="line"><span class="rec-dot" data-class-off="!rec"/>REC</span>
+		<span class="line">{{elapsed}}</span>
+	</div>
+
+	<div class="osd bottom-left">
+		<span class="line">{{horde}}</span>
+		<span class="line">BASE</span>
+		<span class="pips"><span class="pip" data-for="p : base_pips" data-class-on="p == 1"></span></span>
+	</div>
+
+	<div class="osd bottom-right">
+		<span class="line">{{channel}}</span>
+	</div>
+
+	<div class="tray">
+		<div class="slots">
+			<div class="tower" data-for="t, i : towers" data-class-selected="i == selected" data-class-disabled="t.disabled" data-class-ability="i >= 4" data-event-click="pick(i)">
+				<div class="icon" data-style-background-color="t.color"><span data-attr-class="'glyph ' + t.shape">{{t.glyph}}</span></div>
+				<span class="label">{{t.name}} · ${{t.cost}}</span>
+				<span class="cooldown" data-if="t.cooldown != ''">{{t.cooldown}}</span>
+			</div>
+		</div>
+	</div>
+	<div class="panel" data-if="panel_open" data-style-left="panel_x + 'px'" data-style-top="panel_y + 'px'">
+		<span class="title">{{panel_name}}</span>
+		<span class="stat">{{panel_level}} · {{panel_hp}}</span>
+		<button class="act" data-class-disabled="!panel_affordable" data-event-click="offer">{{panel_action}}</button>
+	</div>
+
+	<div class="results" data-if="ended">
+		<div class="card">
+			<span class="verdict" data-class-won="won">{{result_title}}</span>
+			<span class="stat">{{result_time}}</span>
+			<span class="stat">{{result_kills}}</span>
+			<span class="stat">{{result_leaked}}</span>
+			<span class="earned" data-if="won">{{result_earned}}</span>
+			<span class="stat" data-if="won">{{result_total}}</span>
+			<div class="buttons">
+				<button class="act" data-event-click="retry">RETRY</button>
+				<button class="act" data-event-click="quit">QUIT</button>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>

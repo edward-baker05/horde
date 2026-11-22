@@ -5,6 +5,7 @@
 #include "gfx/UnitRenderer.hpp"
 #include "sim/GpuSpatialGrid.hpp"
 #include "sim/GpuUnitCollisions.hpp"
+#include "sim/GpuReadback.hpp"
 #include "sim/GpuUnitReorder.hpp"
 #include "sim/GpuWalls.hpp"
 #include "sim/PhysicsSystem.hpp"
@@ -57,6 +58,15 @@ public:
     bool supportsExplosions() const override {
         return true;
     }
+
+    bool supportsRounds() const override {
+        return true;
+    }
+
+    void setCrowdEffects(const CrowdEffects& effects) override;
+    bool pollCounters(RoundCounters& out) override;
+    void setSpawnRate(float perSecond) override;
+    bool pollDensity(DensityMap& out) override;
 
     bool addExplosion(const Explosion& explosion) override;
     std::vector<Explosion> activeExplosions() const override;
@@ -135,6 +145,25 @@ private:
     // walking velocity. Zero for units that haven't been flung.
     SDL_GPUBuffer* m_fling = nullptr;
     float m_flingDrag = 3.0f;
+
+    // Round reports: kills, leaks and contacts per tower slot, cumulative
+    // (see Counters in unit_finalize.comp.hlsl), read back without stalling.
+    SDL_GPUBuffer* m_counters = nullptr;
+    GpuReadback m_countersReadback;
+    // The round's towers, pulls and slow zones; empty outside a round.
+    CrowdEffects m_effects;
+    bool m_effectsSet = false;
+
+    // The coarse density map towers aim with (unit_density.comp): built every
+    // kDensityEverySteps steps during a round, and read back without stalling.
+    void buildDensity(SDL_GPUCommandBuffer* commands);
+    SDL_GPUComputePipeline* m_densityPipeline = nullptr;
+    SDL_GPUBuffer* m_density = nullptr;
+    GpuReadback m_densityReadback;
+    glm::ivec2 m_densityDim{0, 0};
+    std::uint32_t m_stepsSinceDensity = 0;
+    // A map was recorded and is waiting for its frame to be submitted.
+    bool m_densityPending = false;
 
     SimConfig m_config;
     std::uint32_t m_unitCount = 0;

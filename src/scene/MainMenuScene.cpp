@@ -3,6 +3,7 @@
 #include <RmlUi/Core.h>
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <memory>
 
 #include "audio/MusicPlayer.hpp"
@@ -43,6 +44,8 @@ bool MainMenuScene::onEnter(Services& services) {
     constructor.Bind("page", &m_page);
     constructor.Bind("clock", &m_clock);
     constructor.Bind("date", &m_date);
+    constructor.Bind("featured", &m_featured);
+    constructor.Bind("level_count", &m_levelCount);
     constructor.Bind("polish", &m_polish);
     constructor.BindEventCallback("open", &MainMenuScene::onOpen, this);
     constructor.BindEventCallback("back", &MainMenuScene::onBack, this);
@@ -134,9 +137,21 @@ void MainMenuScene::refreshLists() {
         m_presetNames.push_back(presetName(path));
         m_presets.push_back(m_presetNames.back());
     }
+    // As onOpen("play") picks: the built-in level, the only level, or a list.
+    if (m_levels.empty()) {
+        m_featured = "Built-in level";
+    } else if (m_levels.size() == 1) {
+        m_featured = m_levels.front();
+    } else {
+        m_featured = "Choose a level";
+    }
+    const std::size_t count = std::max<std::size_t>(m_levels.size(), 1);
+    m_levelCount = std::to_string(count) + (count == 1 ? " LEVEL" : " LEVELS");
     if (m_model) {
         m_model.DirtyVariable("levels");
         m_model.DirtyVariable("presets");
+        m_model.DirtyVariable("featured");
+        m_model.DirtyVariable("level_count");
     }
 }
 

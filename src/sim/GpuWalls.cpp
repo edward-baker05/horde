@@ -82,4 +82,14 @@ void GpuWalls::shutdown() {
     m_device = nullptr;
 }
 
+void GpuWalls::setTowers(const std::array<TowerCollider, kMaxTowers>& towers) {
+    m_towerCount = 0;
+    for (std::size_t i = 0; i < towers.size(); ++i) {
+        m_towers[i] = glm::vec4(towers[i].center, towers[i].radius, 0.0f);
+        if (towers[i].radius > 0.0f) {
+            m_towerCount = static_cast<std::uint32_t>(i + 1);
+        }
+    }
+}
+
 } // namespace horde::sim

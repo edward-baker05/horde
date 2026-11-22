@@ -8,6 +8,20 @@ add_executable(horde_tests
     DeviceLayoutTests.cpp
     ShellStateTests.cpp
     InputTests.cpp
+    LevelIoTests.cpp
+    TowerStatsTests.cpp
+    RoundTests.cpp
+    TowerSiteTests.cpp
+    SaveDataTests.cpp
+    ${PROJECT_SOURCE_DIR}/src/sim/TowerSite.cpp
+    ${PROJECT_SOURCE_DIR}/src/sim/WallColliders.cpp
+    ${PROJECT_SOURCE_DIR}/src/logic/LevelGeometry.cpp
+    ${PROJECT_SOURCE_DIR}/src/logic/WallGridShapes.cpp
+    ${PROJECT_SOURCE_DIR}/src/core/SaveData.cpp
+    ${PROJECT_SOURCE_DIR}/src/logic/Round.cpp
+    ${PROJECT_SOURCE_DIR}/src/logic/TowerStats.cpp
+    ${PROJECT_SOURCE_DIR}/src/logic/Level.cpp
+    ${PROJECT_SOURCE_DIR}/src/logic/LevelIO.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/DeviceLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/ShellState.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/RmlInput.cpp
@@ -15,7 +29,8 @@ add_executable(horde_tests
 
 target_compile_features(horde_tests PRIVATE cxx_std_20)
 target_include_directories(horde_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(horde_tests PRIVATE doctest::doctest glm::glm SDL3::SDL3 RmlUi::RmlUi)
+target_link_libraries(horde_tests PRIVATE doctest::doctest glm::glm SDL3::SDL3 RmlUi::RmlUi
+    nlohmann_json::nlohmann_json)
 
 if(MSVC)
     target_compile_options(horde_tests PRIVATE /W4 /permissive-)

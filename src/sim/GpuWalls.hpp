@@ -4,7 +4,10 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
+
+#include "sim/CrowdEffects.hpp"
 
 namespace horde::sim {
 
@@ -44,12 +47,29 @@ public:
         return m_count;
     }
 
+    // A round's towers, pushed out of like walls but passed to shaders in
+    // their uniforms (TowerCount, Towers in walls.hlsli), not binned: there
+    // are few, and they change size while they grow in.
+    void setTowers(const std::array<TowerCollider, kMaxTowers>& towers);
+
+    // Highest live slot + 1: shaders loop this far.
+    std::uint32_t towerCount() const {
+        return m_towerCount;
+    }
+
+    // kMaxTowers entries: (centre, radius, 0, 0); radius 0 is an empty slot.
+    const glm::vec4* towerUniforms() const {
+        return m_towers.data();
+    }
+
 private:
     SDL_GPUDevice* m_device = nullptr;
     SDL_GPUBuffer* m_buffers[3] = {nullptr, nullptr, nullptr};
     glm::uvec2 m_binDim{1, 1};
     float m_binSize = 1.0f;
     std::uint32_t m_count = 0;
+    std::array<glm::vec4, kMaxTowers> m_towers{};
+    std::uint32_t m_towerCount = 0;
 };
 
 } // namespace horde::sim

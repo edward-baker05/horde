@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <type_traits>
 #include <nlohmann/json.hpp>
 
 namespace horde::logic {
@@ -305,6 +306,70 @@ json writeWallGrid(const WallGrid& grid) {
     return node;
 }
 
+// Reads the optional "round" object. Unlike the rest of the file, a missing
+// key here takes its default: round settings were added in version 3 and
+// grow over time, and a level is still a playable level without them.
+bool readRound(const json& node, RoundSettings& out, std::string* error) {
+    const auto fail = [error](const std::string& message) {
+        if (error) {
+            *error = message;
+        }
+        return false;
+    };
+    if (!node.is_object()) {
+        return fail("'round' is not an object");
+    }
+    const auto number = [&](const char* key, auto& field) {
+        if (!node.contains(key)) {
+            return true;
+        }
+        if (!node[key].is_number()) {
+            return fail(std::string("non-numeric round key: ") + key);
+        }
+        field = node[key].get<std::remove_reference_t<decltype(field)>>();
+        return true;
+    };
+    // Unsigned fields go through a signed read so a negative isn't wrapped.
+    const auto count = [&](const char* key, std::uint32_t& field) {
+        double value = field;
+        if (!number(key, value)) {
+            return false;
+        }
+        if (value < 1.0) {
+            return fail(std::string("round key must be at least 1: ") + key);
+        }
+        field = static_cast<std::uint32_t>(value);
+        return true;
+    };
+    if (!count("totalUnits", out.totalUnits) || !count("unitHp", out.unitHp) || !count("leakLimit", out.leakLimit) ||
+        !number("startMoney", out.startMoney) || !number("killReward", out.killReward) ||
+        !number("baseSpawnRate", out.baseSpawnRate) || !number("spawnBoost", out.spawnBoost) ||
+        !number("winReward", out.winReward) || !number("parSeconds", out.parSeconds) ||
+        !number("bonusPerSecond", out.bonusPerSecond)) {
+        return false;
+    }
+    if (out.startMoney < 0 || out.killReward < 0 || out.winReward < 0 || out.baseSpawnRate < 0.0f ||
+        out.spawnBoost < 0.0f || out.parSeconds < 0.0f || out.bonusPerSecond < 0.0f) {
+        return fail("round settings may not be negative");
+    }
+    return true;
+}
+
+json writeRound(const RoundSettings& round) {
+    json node;
+    node["totalUnits"] = round.totalUnits;
+    node["unitHp"] = round.unitHp;
+    node["leakLimit"] = round.leakLimit;
+    node["startMoney"] = round.startMoney;
+    node["killReward"] = round.killReward;
+    node["baseSpawnRate"] = round.baseSpawnRate;
+    node["spawnBoost"] = round.spawnBoost;
+    node["winReward"] = round.winReward;
+    node["parSeconds"] = round.parSeconds;
+    node["bonusPerSecond"] = round.bonusPerSecond;
+    return node;
+}
+
 } // namespace
 
 std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* error) {
@@ -429,6 +494,11 @@ std::optional<Level> loadLevel(const std::filesystem::path& path, std::string* e
         }
     }
 
+    // Optional: levels before version 3 play with the default round.
+    if (root.contains("round") && !readRound(root["round"], level.round, error)) {
+        return std::nullopt;
+    }
+
     // A level on disk with no markers predates nothing and means a hand-edited
     // file lost them. Restore the minimum rather than refusing to load.
     if (countMarkers(level, MarkerKind::Spawn) == 0) {
@@ -475,6 +545,7 @@ bool saveLevel(const Level& level, const std::filesystem::path& path, std::strin
     }
     root["fieldRegions"] = std::move(regions);
     root["wallGrid"] = writeWallGrid(level.wallGrid);
+    root["round"] = writeRound(level.round);
 
     std::error_code code;
     std::filesystem::create_directories(path.parent_path(), code);

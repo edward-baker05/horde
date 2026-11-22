@@ -177,6 +177,27 @@ glm::ivec2 wallGridDimFor(glm::vec2 size);
 // now past the edge are dropped.
 void resizeWallGrid(WallGrid& grid, glm::vec2 size);
 
+// How a round on this level plays: how big the horde is, how many may get
+// through before the round is lost, and the money. Authored per level until
+// the campaign exists. See docs/superpowers/specs/2026-11-21-round-play-design.md.
+struct RoundSettings {
+    std::uint32_t totalUnits = 10000;
+    std::uint32_t unitHp = 10;
+    // Units reaching an exit before the round is lost.
+    std::uint32_t leakLimit = 200;
+    int startMoney = 400;
+    int killReward = 1;
+    // Units per second at the start; it rises with kills by
+    // baseSpawnRate * spawnBoost * killed / totalUnits.
+    float baseSpawnRate = 30.0f;
+    float spawnBoost = 4.0f;
+    // Upgrade money for a win: winReward, plus bonusPerSecond for every second
+    // under parSeconds.
+    int winReward = 100;
+    float parSeconds = 240.0f;
+    float bonusPerSecond = 1.0f;
+};
+
 // A rectangular arena and everything placed in it.
 //
 // Bounds run from (0,0) to `size`. The background exactly fills those bounds;
@@ -189,6 +210,7 @@ struct Level {
     std::vector<Marker> markers; // always at least one spawn and one exit
     std::vector<FieldRegion> fieldRegions;
     WallGrid wallGrid; // sized to `size` by makeDefaultLevel and loadLevel
+    RoundSettings round;
 };
 
 // Length of one edge of a level, in world units.

@@ -11,9 +11,11 @@
 
 #include "gfx/Camera2D.hpp"
 #include "logic/Level.hpp"
+#include "logic/Round.hpp"
 #include "logic/WallGridShapes.hpp"
 #include "scene/LevelMode.hpp"
 #include "scene/DancingCow.hpp"
+#include "scene/RoundOverlay.hpp"
 #include "scene/Scene.hpp"
 #include "sim/PhysicsRegistry.hpp"
 #include "sim/PhysicsSystem.hpp"
@@ -127,11 +129,38 @@ private:
     void healthUi();
     // The debug explosion tool's settings.
     void explosionUi();
+    // Player mode: the round's rules against the crowd's reports, once a frame.
+    void updateRound(float dt);
+    // Player mode: a tap on the feed at `screen` (tablet screen pixels).
+    void tapFeed(glm::vec2 screen);
+    // Player mode: towers, their zones and the placement ghost, in the feed.
+    void renderRound(gfx::SpriteBatch& batch);
+    bool siteClear(glm::vec2 world) const;
 
     Services* m_services = nullptr;
     DancingCow m_cow;
+    // Player mode's tablet app over the feed.
+    RoundOverlay m_overlay;
     // A pause has been pushed and not yet popped.
     bool m_pausePending = false;
+    // Player mode's round: null in Dev mode.
+    std::optional<logic::Round> m_round;
+    // Walls binned with reach enough to check a tower's clearance from them.
+    std::shared_ptr<sim::WallColliders> m_siteWalls = std::make_shared<sim::WallColliders>();
+    // The newest crowd map, kept until the next arrives.
+    sim::DensityMap m_density;
+    bool m_hasDensity = false;
+    // The placed tower whose panel is open, or -1.
+    int m_inspected = -1;
+    // Where the pointer last was on the tablet screen, for the ghost.
+    std::optional<glm::vec2> m_cursor;
+    // Recent blasts, drawn fading for a moment: most last a single step, too
+    // short to see. Seconds since each went off.
+    std::vector<std::pair<sim::Explosion, float>> m_recentBlasts;
+    // The results card is up, and the save has been paid into.
+    bool m_resultsShown = false;
+    // Player mode: the overlay's HUD, tray, panel and results from the round.
+    void presentRound();
     gfx::Camera2D m_camera;
     gfx::CameraController m_cameraController;
     FeedCamera m_feed;

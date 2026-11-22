@@ -40,7 +40,8 @@ RWStructuredBuffer<float> Health : register(u3, space1);
 
 #define MAX_MARKERS 8
 #define MAX_FIELDS 32
-#define MAX_EXPLOSIONS 8
+#define MAX_EXPLOSIONS 32
+#define MAX_TOWERS 32
 
 // Matches GPUIntegrateUniforms in sim/GpuCollidePhysics.cpp
 cbuffer IntegrateParams : register(b0, space2) {
@@ -77,6 +78,14 @@ cbuffer IntegrateParams : register(b0, space2) {
     float CongestionStart;
     float CongestionStop;
     uint3 CongestionPadding;
+    // A round's towers. Attractors: xy = centre, z = radius, w = turn rate
+    // per second. Slow zones: xy = centre, z = radius, w = speed factor.
+    uint AttractorCount;
+    uint SlowCount;
+    float AttractShare; // share of units, by ID, that respond to attractors
+    uint EffectsPadding;
+    float4 Attractors[MAX_TOWERS];
+    float4 SlowZones[MAX_TOWERS];
 };
 
 // How far this unit's heading sways from straight at this moment, in radians.
@@ -179,6 +188,43 @@ float congestionSpeed(float2 pos, float2 dir) {
     return saturate((CongestionStop - density) / (CongestionStop - CongestionStart));
 }
 
+// Whether this unit is one of the share that towers pull at all. A hash of
+// the ID unrelated to wobble's, so who peels off for a tower has nothing to
+// do with who sways which way.
+bool attractable(uint id) {
+    uint h = (id ^ 0x27D4EB2Fu) * 0x165667B1u;
+    h ^= h >> 15;
+    return float(h & 0xFFFFu) / 65535.0f < AttractShare;
+}
+
+// Every tower pull reaching `centre`, summed as direction x turn rate. The
+// unit walks toward the tower; nothing moves it bodily, so it arrives at
+// walking pace and piles up the way a crowd would.
+float2 attraction(float2 centre) {
+    float2 pull = float2(0.0f, 0.0f);
+    for (uint i = 0; i < AttractorCount; ++i) {
+        float4 a = Attractors[i];
+        float2 d = a.xy - centre;
+        float distance = length(d);
+        if (distance < a.z && distance > 0.001f) {
+            pull += d / distance * a.w;
+        }
+    }
+    return pull;
+}
+
+// The slowest of the slow zones `centre` is in, or 1 in none.
+float slowFactor(float2 centre) {
+    float factor = 1.0f;
+    for (uint i = 0; i < SlowCount; ++i) {
+        float4 z = SlowZones[i];
+        if (length(centre - z.xy) < z.z) {
+            factor = min(factor, z.w);
+        }
+    }
+    return factor;
+}
+
 // The point units steer toward: the nearest point of the nearest exit.
 float2 goalFor(float2 centre) {
     if (ExitCount == 0) {
@@ -217,11 +263,17 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
 
     // A field region outranks the exit: inside one, a unit turns to follow
     // its arrow at full speed rather than cutting diagonally toward the exit.
+    // It outranks a tower's pull too, so a level's steering still holds.
     float2 flow = fieldFlow(centre);
     float flowRate = length(flow);
+    float2 pull = AttractorCount > 0 && attractable(Ids[index]) ? attraction(centre) : float2(0.0f, 0.0f);
+    float pullRate = length(pull);
     if (flowRate > 0.0001f) {
         desired = flow / flowRate * MaxSpeed;
         turnRate = flowRate;
+    } else if (pullRate > 0.0001f) {
+        desired = pull / pullRate * MaxSpeed;
+        turnRate = pullRate;
     } else {
         float2 toGoal = goalFor(centre) - centre;
         float distance = length(toGoal);
@@ -238,6 +290,9 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
     float desiredSpeed = length(desired);
     if (desiredSpeed > 0.001f) {
         desired *= congestionSpeed(unit.pos, desired / desiredSpeed);
+    }
+    if (SlowCount > 0) {
+        desired *= slowFactor(centre);
     }
 
     unit.vel += (desired - unit.vel) * saturate(turnRate * Dt);
